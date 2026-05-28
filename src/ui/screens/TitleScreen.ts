@@ -8,18 +8,24 @@ interface ScoreEntry {
 
 export class TitleScreen {
   el: HTMLElement;
+  private _showAdvancedOptions: boolean;
   private _titleModeValue!: HTMLElement;
-  private _titleChapterValue!: HTMLElement;
-  private _titleLevelValue!: HTMLElement;
-  private _titleWeaponPips!: HTMLElement[];
-  private _titleWeaponPipsBox!: HTMLElement;
+  private _titleChapterValue: HTMLElement | null;
+  private _titleLevelValue: HTMLElement | null;
+  private _titleWeaponPips: HTMLElement[];
+  private _titleWeaponPipsBox: HTMLElement | null;
   private _titleScoresHeader!: HTMLElement;
   private _titleScoresList!: HTMLElement;
 
-  constructor() {
+  constructor(showAdvancedOptions = !import.meta.env.PROD) {
+    this._showAdvancedOptions = showAdvancedOptions;
     this.el = document.createElement('div');
     this.el.className = 'ui-screen';
     this.el.id = 'screen-title';
+    this._titleChapterValue = null;
+    this._titleLevelValue = null;
+    this._titleWeaponPips = [];
+    this._titleWeaponPipsBox = null;
     this._build();
   }
 
@@ -67,36 +73,39 @@ export class TitleScreen {
     s.appendChild(modeSelection);
 
     s.appendChild(this._el('div', 'title-start', 'PRESS SPACE TO START'));
-    s.appendChild(this._el('div', 'title-viewer-hint', 'PRESS V FOR DATABASE | PRESS M TO TOGGLE MUSIC'));
+    s.appendChild(this._el('div', 'title-viewer-hint',
+      this._showAdvancedOptions ? 'PRESS V FOR DATABASE | PRESS M TO TOGGLE MUSIC' : 'PRESS M TO TOGGLE MUSIC'));
 
-    // Selector row: Level + Weapon (Developer Settings)
-    const selectors = this._el('div', 'title-selectors');
+    if (this._showAdvancedOptions) {
+      // Selector row: Level + Weapon (Developer Settings)
+      const selectors = this._el('div', 'title-selectors');
 
-    // Starting level selector
-    const stageGroup = this._el('div', 'title-selector-group');
-    stageGroup.appendChild(this._el('div', 'title-selector-label', 'LEVEL'));
-    this._titleChapterValue = this._el('div', 'title-selector-chapter', '');
-    this._titleLevelValue = this._el('div', 'title-selector-value', '1-5');
-    stageGroup.appendChild(this._titleChapterValue);
-    stageGroup.appendChild(this._titleLevelValue);
-    stageGroup.appendChild(this._el('div', 'title-selector-hint', 'UP / DOWN'));
-    selectors.appendChild(stageGroup);
+      // Starting level selector
+      const stageGroup = this._el('div', 'title-selector-group');
+      stageGroup.appendChild(this._el('div', 'title-selector-label', 'LEVEL'));
+      this._titleChapterValue = this._el('div', 'title-selector-chapter', '');
+      this._titleLevelValue = this._el('div', 'title-selector-value', '1-5');
+      stageGroup.appendChild(this._titleChapterValue);
+      stageGroup.appendChild(this._titleLevelValue);
+      stageGroup.appendChild(this._el('div', 'title-selector-hint', 'UP / DOWN'));
+      selectors.appendChild(stageGroup);
 
-    // Weapon tier selector
-    const weaponGroup = this._el('div', 'title-selector-group');
-    weaponGroup.appendChild(this._el('div', 'title-selector-label', 'WEAPON TIER'));
-    this._titleWeaponPipsBox = this._el('div', 'title-weapon-pips');
-    this._titleWeaponPips = [];
-    for (let i = 0; i < 5; i++) {
-      const pip = this._el('div', 'title-weapon-pip');
-      this._titleWeaponPips.push(pip);
-      this._titleWeaponPipsBox.appendChild(pip);
+      // Weapon tier selector
+      const weaponGroup = this._el('div', 'title-selector-group');
+      weaponGroup.appendChild(this._el('div', 'title-selector-label', 'WEAPON TIER'));
+      this._titleWeaponPipsBox = this._el('div', 'title-weapon-pips');
+      this._titleWeaponPips = [];
+      for (let i = 0; i < 5; i++) {
+        const pip = this._el('div', 'title-weapon-pip');
+        this._titleWeaponPips.push(pip);
+        this._titleWeaponPipsBox.appendChild(pip);
+      }
+      weaponGroup.appendChild(this._titleWeaponPipsBox);
+      weaponGroup.appendChild(this._el('div', 'title-selector-hint', 'LEFT / RIGHT'));
+      selectors.appendChild(weaponGroup);
+
+      s.appendChild(selectors);
     }
-    weaponGroup.appendChild(this._titleWeaponPipsBox);
-    weaponGroup.appendChild(this._el('div', 'title-selector-hint', 'LEFT / RIGHT'));
-    selectors.appendChild(weaponGroup);
-
-    s.appendChild(selectors);
 
     this._titleScoresHeader = this._el('div', 'title-scores-header', 'HIGH SCORES');
     this._titleScoresList   = this._el('div', 'title-scores-list');

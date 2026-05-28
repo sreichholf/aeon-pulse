@@ -26,6 +26,7 @@ export class Game {
   scene: Scene;
   input: InputManager;
   audio: AudioManager;
+  private _showAdvancedTitleOptions: boolean;
   private _mode: DifficultyMode;
   score: ScoreManager;
   ui: UI;
@@ -54,9 +55,10 @@ export class Game {
     this.scene = new Scene(canvas);
     this.input = new InputManager();
     this.audio = new AudioManager();
+    this._showAdvancedTitleOptions = !import.meta.env.PROD;
     this._mode = DifficultyMode.ROOKIE;
     this.score = new ScoreManager(this._mode);
-    this.ui = new UI(uiOverlay, this.scene, this.audio);
+    this.ui = new UI(uiOverlay, this.scene, this.audio, this._showAdvancedTitleOptions);
     this.sprites = {};
 
     this._state = null;
@@ -169,27 +171,27 @@ export class Game {
   }
 
   _updateTitle(_dt: number): void {
-    if (this.input.wasJustPressed(Action.VIEWER)) {
+    if (this._showAdvancedTitleOptions && this.input.wasJustPressed(Action.VIEWER)) {
       this.audio.play('menuSelect');
       this._setState(GameState.VIEWER);
       return;
     }
 
-    if (this.input.wasJustPressed(Action.UP)) {
+    if (this._showAdvancedTitleOptions && this.input.wasJustPressed(Action.UP)) {
       this.currentLevel = getNextTitleLevel(this.currentLevel);
       this.ui.updateTitleLevel(toLevelLabel(this.currentLevel));
       this.audio.play('menuSelect');
-    } else if (this.input.wasJustPressed(Action.DOWN)) {
+    } else if (this._showAdvancedTitleOptions && this.input.wasJustPressed(Action.DOWN)) {
       this.currentLevel = getPreviousImplementedLevel(this.currentLevel);
       this.ui.updateTitleLevel(toLevelLabel(this.currentLevel));
       this.audio.play('menuSelect');
     }
 
-    if (this.input.wasJustPressed(Action.RIGHT)) {
+    if (this._showAdvancedTitleOptions && this.input.wasJustPressed(Action.RIGHT)) {
       this._startWeaponTier = this._startWeaponTier === 5 ? 1 : this._startWeaponTier + 1;
       this.ui.updateTitleWeapon(this._startWeaponTier);
       this.audio.play('menuSelect');
-    } else if (this.input.wasJustPressed(Action.LEFT)) {
+    } else if (this._showAdvancedTitleOptions && this.input.wasJustPressed(Action.LEFT)) {
       this._startWeaponTier = this._startWeaponTier === 1 ? 5 : this._startWeaponTier - 1;
       this.ui.updateTitleWeapon(this._startWeaponTier);
       this.audio.play('menuSelect');

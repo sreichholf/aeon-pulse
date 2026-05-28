@@ -50,7 +50,7 @@ export class UI {
   private _volumeControl: VolumeControl;
   private _onResize: () => void;
 
-  constructor(overlay: HTMLElement, scene: SceneLike, audio: AudioManager | null) {
+  constructor(overlay: HTMLElement, scene: SceneLike, audio: AudioManager | null, showAdvancedTitleOptions = !import.meta.env.PROD) {
     this._scene = scene;
 
     this._container = document.createElement('div');
@@ -66,7 +66,7 @@ export class UI {
       this._bgContainer = null;
     }
 
-    this._title         = new TitleScreen();
+    this._title         = new TitleScreen(showAdvancedTitleOptions);
     this._levelStart    = new LevelStartScreen();
     this._hud           = new HUDScreen();
     this._pause         = new PauseScreen();
