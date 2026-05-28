@@ -1,4 +1,5 @@
 import { MusicCue } from '../../../types.ts';
+import { hiveTheme } from './hiveTheme.ts';
 import { industrialTheme } from './industrialTheme.ts';
 import { megastructureTheme } from './megastructureTheme.ts';
 import { ThemeId, type NoteEvent, type ThemeDefinition } from './types.ts';
@@ -6,13 +7,14 @@ import { ThemeId, type NoteEvent, type ThemeDefinition } from './types.ts';
 const THEME_DEFINITIONS: Record<ThemeId, ThemeDefinition> = {
   [ThemeId.MEGASTRUCTURE]: megastructureTheme,
   [ThemeId.INDUSTRIAL]: industrialTheme,
+  [ThemeId.HIVE]: hiveTheme,
 };
 
 const MUSIC_CUE_TO_THEME_ID: Record<MusicCue, ThemeId> = {
   [MusicCue.TITLE]: ThemeId.MEGASTRUCTURE,
   [MusicCue.CHAPTER_MEGASTRUCTURE]: ThemeId.MEGASTRUCTURE,
   [MusicCue.CHAPTER_INDUSTRIAL]: ThemeId.INDUSTRIAL,
-  [MusicCue.CHAPTER_HIVE]: ThemeId.MEGASTRUCTURE,
+  [MusicCue.CHAPTER_HIVE]: ThemeId.HIVE,
   [MusicCue.CHAPTER_VOLCANIC]: ThemeId.MEGASTRUCTURE,
 };
 
