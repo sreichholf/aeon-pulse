@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  base: './',
   build: {
     chunkSizeWarningLimit: 800, // Silences warnings for larger cacheable third-party chunks
     rollupOptions: {
