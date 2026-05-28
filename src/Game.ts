@@ -6,9 +6,10 @@ import { ScoreManager } from './systems/ScoreManager.ts';
 import { GameplayRun } from './systems/GameplayRun.ts';
 import { UI } from './ui/UI.ts';
 import { TacticalDatabase } from './viewer/TacticalDatabase.ts';
-import { GameState, DifficultyMode } from './types.ts';
+import { GameState, DifficultyMode, MusicCue } from './types.ts';
 import {
   getFirstImplementedLevel,
+  getMusicCueForChapterKey,
   getNextImplementedLevel,
   getNextTitleLevel,
   getPreviousImplementedLevel,
@@ -47,6 +48,7 @@ export class Game {
   private _levelStartTimer: number;
   private _waitingForRestart: boolean;
   private _waitingForReturn: boolean;
+  private _titlePreviewCue: MusicCue | null;
 
   private _run: GameplayRun | null;
   private _viewer: TacticalDatabase;
@@ -77,6 +79,7 @@ export class Game {
     this._levelStartTimer = 0;
     this._waitingForRestart = false;
     this._waitingForReturn = false;
+    this._titlePreviewCue = null;
 
     this._run = null;
     this._viewer = new TacticalDatabase(this.scene, this.sprites, this.ui, this.audio);
@@ -164,10 +167,11 @@ export class Game {
     this._savedWeaponTier = 1;
     this._startWeaponTier = 1;
     this._mode = DifficultyMode.ROOKIE;
+    this._titlePreviewCue = null;
     this.score = new ScoreManager(this._mode);
     this.ui.showTitle(this.score.getTopScores(), toLevelLabel(this.currentLevel), this._startWeaponTier, this._mode);
     this.audio.setMusicVolumeMultiplier(1.0);
-    this.audio.startMusic();
+    this.audio.playMusicCue(MusicCue.TITLE);
   }
 
   _updateTitle(_dt: number): void {
@@ -181,10 +185,12 @@ export class Game {
       this.currentLevel = getNextTitleLevel(this.currentLevel);
       this.ui.updateTitleLevel(toLevelLabel(this.currentLevel));
       this.audio.play('menuSelect');
+      this._previewTitleChapterTheme();
     } else if (this._showAdvancedTitleOptions && this.input.wasJustPressed(Action.DOWN)) {
       this.currentLevel = getPreviousImplementedLevel(this.currentLevel);
       this.ui.updateTitleLevel(toLevelLabel(this.currentLevel));
       this.audio.play('menuSelect');
+      this._previewTitleChapterTheme();
     }
 
     if (this._showAdvancedTitleOptions && this.input.wasJustPressed(Action.RIGHT)) {
@@ -220,6 +226,7 @@ export class Game {
   _enterLevelStart(): void {
     this.ui.showLevelStart(toLevelLabel(this.currentLevel));
     this._levelStartTimer = 1.2;
+    this.audio.playMusicCue(getMusicCueForChapterKey(this.currentLevel.chapterKey));
   }
 
   _updateLevelStart(dt: number): void {
@@ -247,7 +254,6 @@ export class Game {
       this.score.reset();
     }
     this.audio.setMusicVolumeMultiplier(0.3);
-    this.audio.startMusic();
     this.ui.showHUD();
     this._run = new GameplayRun({
       scene: this.scene,
@@ -338,7 +344,6 @@ export class Game {
   // ── LEVEL COMPLETE ─────────────────────────────────────────────────────────
 
   _enterLevelComplete() {
-    this.audio.stopMusic();
     this.audio.play('levelComplete');
     this._savedWeaponTier = this._run?.getSavedWeaponTier() ?? 1;
     this._clearGameplay();
@@ -374,7 +379,6 @@ export class Game {
   // ── GAME COMPLETE ──────────────────────────────────────────────────────────
 
   _enterGameComplete() {
-    this.audio.stopMusic();
     this.audio.play('levelComplete');
     this.ui.showGameComplete(
       this.score.score,
@@ -427,5 +431,15 @@ export class Game {
     }
 
     this._viewer.update(dt);
+  }
+
+  private _previewTitleChapterTheme(): void {
+    if (!this._showAdvancedTitleOptions) return;
+
+    const nextCue = getMusicCueForChapterKey(this.currentLevel.chapterKey);
+    if (nextCue === this._titlePreviewCue) return;
+
+    this._titlePreviewCue = nextCue;
+    this.audio.playMusicCue(nextCue);
   }
 }

@@ -1,3 +1,5 @@
+import { MusicCue } from '../types.ts';
+
 export type ChapterKey = 'Megastructure' | 'Industrial' | 'Hive' | 'Volcanic';
 export type ClearType = 'level' | 'chapter';
 export type LevelId = `${number}-${number}`;
@@ -151,4 +153,13 @@ export function toLevelLabel(level: CampaignLevelRecord): LevelLabel {
     id: level.id,
     chapterName: level.chapterName,
   };
+}
+
+export function getMusicCueForChapterKey(chapterKey: ChapterKey): MusicCue {
+  switch (chapterKey) {
+    case 'Megastructure': return MusicCue.CHAPTER_MEGASTRUCTURE;
+    case 'Industrial': return MusicCue.CHAPTER_INDUSTRIAL;
+    case 'Hive': return MusicCue.CHAPTER_HIVE;
+    case 'Volcanic': return MusicCue.CHAPTER_VOLCANIC;
+  }
 }

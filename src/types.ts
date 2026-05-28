@@ -47,6 +47,14 @@ export enum DifficultyMode {
   ACE = 'ace',
 }
 
+export enum MusicCue {
+  TITLE = 'title',
+  CHAPTER_MEGASTRUCTURE = 'chapter_megastructure',
+  CHAPTER_INDUSTRIAL = 'chapter_industrial',
+  CHAPTER_HIVE = 'chapter_hive',
+  CHAPTER_VOLCANIC = 'chapter_volcanic',
+}
+
 // ── Game state type (kept for backward compat) ───────────────────────────────
 // GameState is now an enum above — no separate type alias needed.
 

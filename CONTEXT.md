@@ -52,6 +52,22 @@ _Avoid_: Lava stage
 The reference visual and mechanical identity for a chapter. The four current levels are the initial chapter archetypes that future chapter levels vary from.
 _Avoid_: Chapter base level, template level
 
+**Chapter Theme**:
+The musical identity assigned to a chapter. A Chapter Theme belongs to the chapter as a whole, while individual levels may vary its arrangement without becoming separate themes.
+_Avoid_: Level theme when referring to a whole chapter
+
+**Title Theme**:
+The musical identity used by non-campaign front-end surfaces such as the title screen and Tactical Database. A Title Theme is not a Chapter Theme, even if it temporarily reuses the same underlying score.
+_Avoid_: Stage 1 theme when referring to front-end music
+
+**Music Cue**:
+The runtime music selection token sent by the game to the audio system. A Music Cue names the current musical context, such as the Title Theme or a Chapter Theme, without exposing playback internals.
+_Avoid_: Raw track number, direct sequencer state
+
+**Chapter Theme Preview**:
+The dev-only use of the Starting Level Selector on the title screen to audition Chapter Themes before starting a Campaign Attempt. It is a testing affordance, not part of the player-facing Title Theme behavior in production builds.
+_Avoid_: Production title music behavior, player-facing track select
+
 **Chapter Finale**:
 The climactic level of a chapter. In the current campaign shape this is the fifth level, so the four current playable levels become `1-5`, `2-5`, `3-5`, and `4-5`.
 _Avoid_: Boss stage, base level

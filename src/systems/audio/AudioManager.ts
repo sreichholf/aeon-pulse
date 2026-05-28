@@ -1,6 +1,7 @@
-import type { IAudio } from '../../types.ts';
+import { MusicCue, type IAudio } from '../../types.ts';
 import { SFXLibrary }     from './SFXLibrary.ts';
 import { MusicSequencer } from './MusicSequencer.ts';
+import { resolveThemeDefinition } from './themes/registry.ts';
 
 export class AudioManager implements IAudio {
   private _ctx: AudioContext | null;
@@ -62,9 +63,9 @@ export class AudioManager implements IAudio {
   }
 
   // Music sequencer delegation
-  startMusic(): void {
+  playMusicCue(cue: MusicCue): void {
     try {
-      this._sequencer.start();
+      this._sequencer.playCue(cue, resolveThemeDefinition(cue));
     } catch (_) {}
   }
 
