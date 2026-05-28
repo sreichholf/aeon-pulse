@@ -126,6 +126,7 @@ export class Game {
       case GameState.TITLE: this._enterTitle(); break;
       case GameState.LEVEL_START: this._enterLevelStart(); break;
       case GameState.PLAYING: this._enterPlaying(); break;
+      case GameState.PAUSED: this._enterPaused(); break;
       case GameState.GAME_OVER: this._enterGameOver(); break;
       case GameState.LEVEL_COMPLETE: this._enterLevelComplete(); break;
       case GameState.GAME_COMPLETE: this._enterGameComplete(); break;
@@ -146,6 +147,7 @@ export class Game {
       case GameState.TITLE: this._updateTitle(dt); break;
       case GameState.LEVEL_START: this._updateLevelStart(dt); break;
       case GameState.PLAYING: this._updatePlaying(dt); break;
+      case GameState.PAUSED: this._updatePaused(dt); break;
       case GameState.GAME_OVER: this._updateGameOver(dt); break;
       case GameState.LEVEL_COMPLETE: this._updateLevelComplete(dt); break;
       case GameState.GAME_COMPLETE: this._updateGameComplete(dt); break;
@@ -232,6 +234,13 @@ export class Game {
   // ── PLAYING ────────────────────────────────────────────────────────────────
 
   _enterPlaying() {
+    if (this._run) {
+      this.audio.setMusicVolumeMultiplier(0.3);
+      this.ui.showHUD();
+      this.ui.updateHUD(this._run.getHUDSnapshot());
+      return;
+    }
+
     if (this.currentLevel.id === getFirstImplementedLevel().id) {
       this.score.reset();
     }
@@ -251,11 +260,39 @@ export class Game {
   }
 
   _updatePlaying(dt: number): void {
+    if (this.input.wasJustPressed(Action.PAUSE)) {
+      this.audio.play('menuSelect');
+      this._setState(GameState.PAUSED);
+      return;
+    }
+
     this._run?.tick(dt);
     this.ui.updateHUD(this._run?.getHUDSnapshot() ?? {});
 
     if (this.score.isGameOver) {
       this._setState(GameState.GAME_OVER);
+    }
+  }
+
+  // ── PAUSED ────────────────────────────────────────────────────────────────
+
+  _enterPaused(): void {
+    this.audio.stopChargeHum();
+    this.audio.setMusicVolumeMultiplier(0.08);
+    this.ui.showPause();
+    this.ui.updateHUD(this._run?.getHUDSnapshot() ?? {});
+  }
+
+  _updatePaused(_dt: number): void {
+    this.ui.updateHUD(this._run?.getHUDSnapshot() ?? {});
+
+    if (
+      this.input.wasJustPressed(Action.PAUSE) ||
+      this.input.wasJustPressed(Action.FIRE) ||
+      this.input.wasJustPressed(Action.CONFIRM)
+    ) {
+      this.audio.play('menuSelect');
+      this._setState(GameState.PLAYING);
     }
   }
 

@@ -4,6 +4,7 @@ import type { AudioManager }    from '../systems/audio/AudioManager.ts';
 import { TitleScreen }         from './screens/TitleScreen.ts';
 import { LevelStartScreen }    from './screens/LevelStartScreen.ts';
 import { HUDScreen }           from './screens/HUDScreen.ts';
+import { PauseScreen }         from './screens/PauseScreen.ts';
 import { GameOverScreen }      from './screens/GameOverScreen.ts';
 import { GameCompleteScreen }  from './screens/GameCompleteScreen.ts';
 import { LevelCompleteScreen } from './screens/LevelCompleteScreen.ts';
@@ -41,6 +42,7 @@ export class UI {
   private _title: TitleScreen;
   private _levelStart: LevelStartScreen;
   private _hud: HUDScreen;
+  private _pause: PauseScreen;
   private _gameOver: GameOverScreen;
   private _gameComplete: GameCompleteScreen;
   private _levelComplete: LevelCompleteScreen;
@@ -67,12 +69,13 @@ export class UI {
     this._title         = new TitleScreen();
     this._levelStart    = new LevelStartScreen();
     this._hud           = new HUDScreen();
+    this._pause         = new PauseScreen();
     this._gameOver      = new GameOverScreen();
     this._gameComplete  = new GameCompleteScreen();
     this._levelComplete = new LevelCompleteScreen();
     this._viewer        = new ViewerScreen();
 
-    for (const s of [this._title, this._levelStart, this._hud, this._gameOver, this._gameComplete, this._levelComplete, this._viewer]) {
+    for (const s of [this._title, this._levelStart, this._hud, this._pause, this._gameOver, this._gameComplete, this._levelComplete, this._viewer]) {
       this._container.appendChild(s.el);
     }
 
@@ -92,6 +95,7 @@ export class UI {
     this._title.hide();
     this._levelStart.hide();
     this._hud.hide();
+    this._pause.hide();
     this._gameOver.hide();
     this._gameComplete.hide();
     this._levelComplete.hide();
@@ -128,6 +132,12 @@ export class UI {
   }
 
   updateHUD(args: Parameters<HUDScreen['updateHUD']>[0]): void { this._hud.updateHUD(args); }
+
+  showPause(): void {
+    this._hideAll();
+    this._hud.show();
+    this._pause.show();
+  }
 
   showGameOver(score: number, topScores: ScoreEntry[], onSubmit?: (initials: string) => void): void {
     this._hideAll();

@@ -145,6 +145,43 @@
 /* ── HUD ────────────────────────────────────────────── */
 #screen-hud { pointer-events: none; }
 
+/* ── PAUSE ──────────────────────────────────────────── */
+#screen-pause {
+  pointer-events: none;
+  background: rgba(5, 10, 18, 0.54);
+}
+
+#screen-pause.active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pause-title {
+  font-size: 52px;
+  font-weight: bold;
+  letter-spacing: 10px;
+  color: #ffaa00;
+  text-shadow: 0 0 12px #ff3300, 0 0 28px rgba(255, 170, 0, 0.6);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.pause-status {
+  font-size: 12px;
+  letter-spacing: 5px;
+  color: #3d6cb3;
+}
+
+.pause-resume {
+  margin-top: 12px;
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: #fff;
+  animation: blink 1s step-end infinite;
+}
+
 /* ── LEVEL START ────────────────────────────────────── */
 #screen-levelstart {
   background: rgba(10, 20, 40, 0.82);
