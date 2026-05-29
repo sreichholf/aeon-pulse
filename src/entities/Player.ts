@@ -6,6 +6,10 @@ import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 import { Bullet } from './Bullet.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
+
 const HALF_W = GAME_WIDTH / 2;
 const HALF_H = GAME_HEIGHT / 2;
 
@@ -268,11 +272,11 @@ export class Player {
 
     // Merge static fuselage parts sharing hullMat
     const hullGeos = [
-      latheGeo.clone().translate(-2, 0, 0),
-      strutGeo.clone().translate(-8, 7, 3),
-      strutGeo.clone().translate(-8, -7, -3),
-      prongGeo.clone().translate(12, 12, 3.5),
-      prongGeo.clone().translate(12, -12, -3.5),
+      ensureNonIndexed(latheGeo).translate(-2, 0, 0),
+      ensureNonIndexed(strutGeo).translate(-8, 7, 3),
+      ensureNonIndexed(strutGeo).translate(-8, -7, -3),
+      ensureNonIndexed(prongGeo).translate(12, 12, 3.5),
+      ensureNonIndexed(prongGeo).translate(12, -12, -3.5),
     ];
     const mergedHullGeo = mergeGeometries(hullGeos);
     const hullMesh = new THREE.Mesh(mergedHullGeo, hullMat);
@@ -289,8 +293,8 @@ export class Player {
     prongTipGeo.rotateZ(-Math.PI / 2); // Point forward (+X)
 
     const tipGeos = [
-      prongTipGeo.clone().translate(37, 12, 3.5),
-      prongTipGeo.clone().translate(37, -12, -3.5),
+      ensureNonIndexed(prongTipGeo).translate(37, 12, 3.5),
+      ensureNonIndexed(prongTipGeo).translate(37, -12, -3.5),
     ];
     const mergedTipGeo = mergeGeometries(tipGeos);
     const tipMesh = new THREE.Mesh(mergedTipGeo, trimMat);
@@ -527,10 +531,12 @@ export class Player {
 
       if (this._yellowParticleMesh) {
         this._yellowParticleMesh.count = yellowCount;
+        this._yellowParticleMesh.visible = yellowCount > 0;
         this._yellowParticleMesh.instanceMatrix.needsUpdate = true;
       }
       if (this._orangeParticleMesh) {
         this._orangeParticleMesh.count = orangeCount;
+        this._orangeParticleMesh.visible = orangeCount > 0;
         this._orangeParticleMesh.instanceMatrix.needsUpdate = true;
       }
     }

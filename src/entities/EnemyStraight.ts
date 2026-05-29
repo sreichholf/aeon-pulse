@@ -3,6 +3,10 @@ import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import type { GetPositionFn, IAudio, IScene } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
+
 const SPEED         = 130;
 const FIRE_INTERVAL = 2.5;
 const PAUSE_DUR     = 0.30;
@@ -265,15 +269,15 @@ export class EnemyStraight extends Enemy {
 
     // Merge static carbon geometries
     const carbonGeos = [
-      bodyGeo.clone().translate(1, 0, 0),
-      noseGeo.clone().translate(-12, 0, 0),
-      rearGeo.clone().translate(11.5, 0, 0),
-      baseWingGeo.clone(),
-      filletGeo.clone().translate(2, 0, 0),
-      flapTopGeo.clone().translate(14, 4.0, 0),
-      flapBotGeo.clone().translate(14, -4.0, 0),
-      panelLeftGeo.clone().translate(14, 0, 4.9),
-      panelRightGeo.clone().translate(14, 0, -4.9),
+      ensureNonIndexed(bodyGeo).translate(1, 0, 0),
+      ensureNonIndexed(noseGeo).translate(-12, 0, 0),
+      ensureNonIndexed(rearGeo).translate(11.5, 0, 0),
+      ensureNonIndexed(baseWingGeo),
+      ensureNonIndexed(filletGeo).translate(2, 0, 0),
+      ensureNonIndexed(flapTopGeo).translate(14, 4.0, 0),
+      ensureNonIndexed(flapBotGeo).translate(14, -4.0, 0),
+      ensureNonIndexed(panelLeftGeo).translate(14, 0, 4.9),
+      ensureNonIndexed(panelRightGeo).translate(14, 0, -4.9),
     ];
     const mergedCarbonGeo = mergeGeometries(carbonGeos);
     const carbonMesh = new THREE.Mesh(mergedCarbonGeo, carbonMat);
@@ -314,8 +318,8 @@ export class EnemyStraight extends Enemy {
     midWingGeo.rotateX(Math.PI / 2);
 
     const crimsonGeos = [
-      midWingGeo.clone().translate(0, 0, 1.8),
-      midWingGeo.clone().translate(0, 0, -1.8),
+      ensureNonIndexed(midWingGeo).translate(0, 0, 1.8),
+      ensureNonIndexed(midWingGeo).translate(0, 0, -1.8),
     ];
     const mergedCrimsonGeo = mergeGeometries(crimsonGeos);
     const crimsonMesh = new THREE.Mesh(mergedCrimsonGeo, crimsonMat);
@@ -348,8 +352,8 @@ export class EnemyStraight extends Enemy {
     outerWingGeo.rotateX(Math.PI / 2);
 
     const obsidianGeos = [
-      outerWingGeo.clone().translate(0, 0, 3.2),
-      outerWingGeo.clone().translate(0, 0, -3.2),
+      ensureNonIndexed(outerWingGeo).translate(0, 0, 3.2),
+      ensureNonIndexed(outerWingGeo).translate(0, 0, -3.2),
     ];
     const mergedObsidianGeo = mergeGeometries(obsidianGeos);
     const obsidianMesh = new THREE.Mesh(mergedObsidianGeo, obsidianMat);
@@ -360,12 +364,12 @@ export class EnemyStraight extends Enemy {
     outerWingGeo.dispose();
 
     // Merge visor parts (canopy + sensor)
-    const canopyGeoCloned = canopyGeo.clone();
+    const canopyGeoCloned = ensureNonIndexed(canopyGeo);
     canopyGeoCloned.rotateY(0.1);
     canopyGeoCloned.rotateZ(Math.PI / 2);
     canopyGeoCloned.translate(-5, 3.2, 0);
 
-    const sensorGeoCloned = sensorGeo.clone();
+    const sensorGeoCloned = ensureNonIndexed(sensorGeo);
     sensorGeoCloned.rotateZ(0.2);
     sensorGeoCloned.translate(-14.5, -1.0, 0);
 
@@ -386,9 +390,9 @@ export class EnemyStraight extends Enemy {
     nozzleSideGeo.rotateZ(Math.PI / 2);
 
     const nozzleGeos = [
-      nozzleCentralGeo.clone().translate(12.5, 0, 0),
-      nozzleSideGeo.clone().translate(12.0, 2.5, 1.8),
-      nozzleSideGeo.clone().translate(12.0, -2.5, -1.8),
+      ensureNonIndexed(nozzleCentralGeo).translate(12.5, 0, 0),
+      ensureNonIndexed(nozzleSideGeo).translate(12.0, 2.5, 1.8),
+      ensureNonIndexed(nozzleSideGeo).translate(12.0, -2.5, -1.8),
     ];
     const mergedNozzleGeo = mergeGeometries(nozzleGeos);
     const nozzleMesh = new THREE.Mesh(mergedNozzleGeo, nozzleMat);

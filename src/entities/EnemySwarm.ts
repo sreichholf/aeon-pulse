@@ -3,6 +3,10 @@ import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import type { GetPositionFn, IAudio, IScene } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
+
 const SPEED         = 230;
 const FIRE_INTERVAL = 2.7;
 const PAUSE_DUR     = 0.20;
@@ -169,8 +173,8 @@ export class EnemySwarm extends Enemy {
     prongGeo.rotateZ(Math.PI / 2);
 
     const prongGeos = [
-      prongGeo.clone().translate(-17, 4, 0),
-      prongGeo.clone().translate(-17, -4, 0),
+      ensureNonIndexed(prongGeo).translate(-17, 4, 0),
+      ensureNonIndexed(prongGeo).translate(-17, -4, 0),
     ];
     const mergedProngGeo = mergeGeometries(prongGeos);
     const prongsMesh = new THREE.Mesh(mergedProngGeo, brightMat);
