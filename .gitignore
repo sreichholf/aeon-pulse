@@ -25,4 +25,4 @@ dist-ssr
 
 # Antigravity CLI
 .antigravitycli/
-
+.agents/
