@@ -12,6 +12,8 @@ npm run preview  # serve the production build locally
 
 There is no test suite. Verification is browser-based testing at http://localhost:5173, and agents may perform that verification directly using the available in-app browser tooling.
 
+For render-performance work, see `docs/render-optimization-notes.md` for the current profiling workflow, scenario guidance, and the existing Chapter 1 / Chapter 4 optimization results.
+
 ## Git
 
 `git commit` is the only permitted write git command in this project. Do not run `git push`, `git merge`, `git rebase`, or any other git write command.
