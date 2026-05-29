@@ -17,14 +17,12 @@ export class Terrain3 implements ITerrain {
   private _points: ControlPoint[];
   private _time: number;
 
-  // ── Shared Materials ──
   private _baseMat: THREE.MeshPhongMaterial;
   private _membraneMat: THREE.MeshPhongMaterial;
   private _glowMat: THREE.MeshBasicMaterial;
   private _sporeGlowMat: THREE.MeshBasicMaterial;
   private _boneMat: THREE.MeshPhongMaterial;
 
-  // ── Shared Geometries ──
   private _membraneGeo: THREE.BoxGeometry;
   private _lobeGeo: THREE.SphereGeometry;
   private _veinGeo: THREE.BoxGeometry;
@@ -33,21 +31,22 @@ export class Terrain3 implements ITerrain {
   private _knuckleGeo: THREE.SphereGeometry;
   private _tipGeo: THREE.SphereGeometry;
 
-  // ── Pools ──
   private _sliceWidth: number;
   private _numSlices: number;
-  private _topPanels: THREE.Group[];
-  private _botPanels: THREE.Group[];
-  private _topSpikes: THREE.Group[];
-  private _botSpikes: THREE.Group[];
+  private _membraneMesh: THREE.InstancedMesh;
+  private _lobeMesh: THREE.InstancedMesh;
+  private _veinMesh: THREE.InstancedMesh;
+  private _panelSporeMesh: THREE.InstancedMesh;
+  private _spikeShaftMesh: THREE.InstancedMesh;
+  private _spikeKnuckleMesh: THREE.InstancedMesh;
+  private _spikeTipMesh: THREE.InstancedMesh;
+  private _instanceHelper: THREE.Object3D;
 
   constructor(scene: IScene, points: ControlPoint[]) {
-    this._scene  = scene;
+    this._scene = scene;
     this._points = points;
-    this._time   = 0;
+    this._time = 0;
 
-    // ── 1. Shared Biological Materials ──
-    // Wet organic rose-crimson/magenta flesh tissue for surface lobes
     this._baseMat = new THREE.MeshPhongMaterial({
       color: 0xb52d57,
       emissive: 0x2b0614,
@@ -56,30 +55,26 @@ export class Terrain3 implements ITerrain {
       flatShading: true,
     });
 
-    // Deep shadowed backing tissue membrane (dark burgundy-black to prevent flat-surface specular blowout)
     this._membraneMat = new THREE.MeshPhongMaterial({
-      color: 0x3d0a19,      // Deep rich organic shadow burgundy
-      emissive: 0x0c0105,   // Dark shadow emission
-      specular: 0x22050e,   // Low specular reflection to prevent blowout
-      shininess: 20,        // Soft matte-wet look
+      color: 0x3d0a19,
+      emissive: 0x0c0105,
+      specular: 0x22050e,
+      shininess: 20,
       flatShading: true,
     });
 
-    // Searing hot magenta veins
     this._glowMat = new THREE.MeshBasicMaterial({
       color: 0xff00aa,
       transparent: true,
       opacity: 0.95,
     });
 
-    // Toxic yellow-green bioluminescent spores
     this._sporeGlowMat = new THREE.MeshBasicMaterial({
       color: 0xb2ff00,
       transparent: true,
       opacity: 0.95,
     });
 
-    // Polished calcified ivory bone
     this._boneMat = new THREE.MeshPhongMaterial({
       color: 0xf2ebd9,
       specular: 0xffffff,
@@ -87,144 +82,91 @@ export class Terrain3 implements ITerrain {
       flatShading: true,
     });
 
-    // ── 2. Shared Geometries (Pre-allocated for locked 60 FPS) ──
     this._membraneGeo = new THREE.BoxGeometry(66, 1.0, 15);
-    this._lobeGeo     = new THREE.SphereGeometry(25, 8, 8);
-    this._veinGeo     = new THREE.BoxGeometry(4, 1.01, 8);
-    this._sporeGeo    = new THREE.SphereGeometry(4, 6, 6);
-    this._boneColGeo  = new THREE.CylinderGeometry(2, 3, 1.0, 6);
-    this._knuckleGeo  = new THREE.SphereGeometry(4.5, 6, 6);
-    this._tipGeo      = new THREE.SphereGeometry(5, 6, 6);
+    this._lobeGeo = new THREE.SphereGeometry(25, 8, 8);
+    this._veinGeo = new THREE.BoxGeometry(4, 1.01, 8);
+    this._sporeGeo = new THREE.SphereGeometry(4, 6, 6);
+    this._boneColGeo = new THREE.CylinderGeometry(2, 3, 1.0, 6);
+    this._knuckleGeo = new THREE.SphereGeometry(4.5, 6, 6);
+    this._tipGeo = new THREE.SphereGeometry(5, 6, 6);
 
-    // ── 3. Initialize Reusable Segment Pools ──
     this._sliceWidth = 70;
-    this._numSlices  = 18;
+    this._numSlices = 18;
 
-    this._topPanels  = [];
-    this._botPanels  = [];
-    this._topSpikes  = [];
-    this._botSpikes  = [];
+    const panelCount = this._numSlices * 2;
+    const lobeCount = panelCount * 3;
+    const veinCount = panelCount * 2;
+    const panelSporeCount = panelCount * 3;
+    const spikeCount = panelCount;
+    const knuckleCount = spikeCount * 3;
 
-    for (let i = 0; i < this._numSlices; i++) {
-      // Build organic ceiling and floor panels
-      const topP = this._buildPanel(this._baseMat, this._glowMat, this._sporeGlowMat);
-      const botP = this._buildPanel(this._baseMat, this._glowMat, this._sporeGlowMat);
-      markRenderCategory(topP, RenderCategory.TERRAIN);
-      markRenderCategory(botP, RenderCategory.TERRAIN);
-      this._scene.add(topP);
-      this._scene.add(botP);
-      this._topPanels.push(topP);
-      this._botPanels.push(botP);
+    this._membraneMesh = new THREE.InstancedMesh(this._membraneGeo, this._membraneMat, panelCount);
+    this._lobeMesh = new THREE.InstancedMesh(this._lobeGeo, this._baseMat, lobeCount);
+    this._veinMesh = new THREE.InstancedMesh(this._veinGeo, this._glowMat, veinCount);
+    this._panelSporeMesh = new THREE.InstancedMesh(this._sporeGeo, this._sporeGlowMat, panelSporeCount);
+    this._spikeShaftMesh = new THREE.InstancedMesh(this._boneColGeo, this._boneMat, spikeCount);
+    this._spikeKnuckleMesh = new THREE.InstancedMesh(this._knuckleGeo, this._boneMat, knuckleCount);
+    this._spikeTipMesh = new THREE.InstancedMesh(this._tipGeo, this._sporeGlowMat, spikeCount);
 
-      // Build calcified bone spikes at the seams
-      const topSpk = this._buildSpike(this._boneMat, this._sporeGlowMat);
-      const botSpk = this._buildSpike(this._boneMat, this._sporeGlowMat);
-      markRenderCategory(topSpk, RenderCategory.TERRAIN);
-      markRenderCategory(botSpk, RenderCategory.TERRAIN);
-      this._scene.add(topSpk);
-      this._scene.add(botSpk);
-      this._topSpikes.push(topSpk);
-      this._botSpikes.push(botSpk);
+    for (const mesh of [
+      this._membraneMesh,
+      this._lobeMesh,
+      this._veinMesh,
+      this._panelSporeMesh,
+      this._spikeShaftMesh,
+      this._spikeKnuckleMesh,
+      this._spikeTipMesh,
+    ]) {
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     }
+
+    markRenderCategory(this._membraneMesh, RenderCategory.TERRAIN, 'terrain.panel');
+    markRenderCategory(this._lobeMesh, RenderCategory.TERRAIN, 'terrain.panel');
+    markRenderCategory(this._veinMesh, RenderCategory.TERRAIN, 'terrain.panel');
+    markRenderCategory(this._panelSporeMesh, RenderCategory.TERRAIN, 'terrain.panel');
+    markRenderCategory(this._spikeShaftMesh, RenderCategory.TERRAIN, 'terrain.spike');
+    markRenderCategory(this._spikeKnuckleMesh, RenderCategory.TERRAIN, 'terrain.spike');
+    markRenderCategory(this._spikeTipMesh, RenderCategory.TERRAIN, 'terrain.spike');
+
+    this._scene.add(this._membraneMesh);
+    this._scene.add(this._lobeMesh);
+    this._scene.add(this._veinMesh);
+    this._scene.add(this._panelSporeMesh);
+    this._scene.add(this._spikeShaftMesh);
+    this._scene.add(this._spikeKnuckleMesh);
+    this._scene.add(this._spikeTipMesh);
+
+    this._instanceHelper = new THREE.Object3D();
 
     this.update(0);
   }
 
-  // ── 3D Modular Organ Builders ──
-
-  private _buildPanel(
-    baseMat: THREE.MeshPhongMaterial,
-    glowMat: THREE.MeshBasicMaterial,
-    sporeMat: THREE.MeshBasicMaterial
-  ): THREE.Group {
-    const group = new THREE.Group();
-
-    // Backing membrane box that will be stretched vertically (uses the dark, non-blowout shadow material)
-    const membrane = new THREE.Mesh(this._membraneGeo, this._membraneMat);
-    group.add(membrane);
-
-    // Surface organic structures (lobes, veins, spores) that remain undistorted
-    const surface = new THREE.Group();
-
-    // Lobe 1 (center)
-    const lobe1 = new THREE.Mesh(this._lobeGeo, baseMat);
-    lobe1.scale.set(1.0, 1.0, 0.4);
-    surface.add(lobe1);
-
-    // Lobe 2 (left)
-    const lobe2 = new THREE.Mesh(this._lobeGeo, baseMat);
-    lobe2.scale.set(0.8, 1.2, 0.35);
-    lobe2.position.set(-18, 0, -2);
-    surface.add(lobe2);
-
-    // Lobe 3 (right)
-    const lobe3 = new THREE.Mesh(this._lobeGeo, baseMat);
-    lobe3.scale.set(0.8, 1.2, 0.35);
-    lobe3.position.set(18, 0, -2);
-    surface.add(lobe3);
-
-    // Glowing magenta veins
-    const leftVein = new THREE.Mesh(this._veinGeo, glowMat);
-    leftVein.position.set(-20, 0, 6);
-    const rightVein = new THREE.Mesh(this._veinGeo, glowMat);
-    rightVein.position.set(20, 0, 6);
-    surface.add(leftVein, rightVein);
-
-    // Toxic yellow-green bioluminescent spores
-    const spore1 = new THREE.Mesh(this._sporeGeo, sporeMat);
-    spore1.position.set(-8, 0, 10);
-    const spore2 = new THREE.Mesh(this._sporeGeo, sporeMat);
-    spore2.position.set(8, 0, 10);
-    const spore3 = new THREE.Mesh(this._sporeGeo, sporeMat);
-    spore3.position.set(0, 0, 11);
-    surface.add(spore1, spore2, spore3);
-
-    group.add(surface);
-
-    // Store references in userData for distortion-free updating
-    group.userData = { membrane, surface };
-
-    return group;
+  private _setInstanceTransform(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    position: THREE.Vector3Tuple,
+    scale: THREE.Vector3Tuple,
+  ): void {
+    this._instanceHelper.position.set(...position);
+    this._instanceHelper.rotation.set(0, 0, 0);
+    this._instanceHelper.scale.set(...scale);
+    this._instanceHelper.updateMatrix();
+    mesh.setMatrixAt(index, this._instanceHelper.matrix);
   }
-
-  private _buildSpike(boneMat: THREE.MeshPhongMaterial, sporeMat: THREE.MeshBasicMaterial): THREE.Group {
-    const group = new THREE.Group();
-
-    // Calcified bone shaft (height 1, will be scaled)
-    const shaft = new THREE.Mesh(this._boneColGeo, boneMat);
-    group.add(shaft);
-
-    // Joint knuckles running down the shaft (will remain perfect spheres)
-    const knuckle1 = new THREE.Mesh(this._knuckleGeo, boneMat);
-    const knuckle2 = new THREE.Mesh(this._knuckleGeo, boneMat);
-    const knuckle3 = new THREE.Mesh(this._knuckleGeo, boneMat);
-    group.add(knuckle1, knuckle2, knuckle3);
-
-    // Glowing toxic tip at the inner edge (will remain perfect sphere)
-    const tip = new THREE.Mesh(this._tipGeo, sporeMat);
-    group.add(tip);
-
-    // Store references in userData for update loop scaling
-    group.userData = { shaft, knuckle1, knuckle2, knuckle3, tip };
-
-    return group;
-  }
-
-  // ── Linear Interpolation for dynamic organic walls ──
 
   getWallsAt(scrollX: number): TerrainBounds {
     const pts = this._points;
     if (!pts || pts.length === 0) return { top: GAME_HEIGHT / 2, bottom: -GAME_HEIGHT / 2 };
     const first = pts[0]!;
-    const last  = pts[pts.length - 1]!;
+    const last = pts[pts.length - 1]!;
     if (scrollX <= first.at) return { top: first.top, bottom: first.bottom };
-    if (scrollX >= last.at)  return { top: last.top,  bottom: last.bottom  };
+    if (scrollX >= last.at) return { top: last.top, bottom: last.bottom };
     let prev = first;
     for (const cur of pts.slice(1)) {
       if (scrollX >= prev.at && scrollX <= cur.at) {
         const t = (scrollX - prev.at) / (cur.at - prev.at);
         return {
-          top:    prev.top    + (cur.top    - prev.top)    * t,
+          top: prev.top + (cur.top - prev.top) * t,
           bottom: prev.bottom + (cur.bottom - prev.bottom) * t,
         };
       }
@@ -233,107 +175,116 @@ export class Terrain3 implements ITerrain {
     return { top: last.top, bottom: last.bottom };
   }
 
-  // ── Infinite Scrolling & Writhing Breathing Update Loop ──
-
   update(scrollX: number): void {
-    this._time += 0.016; // approximate delta time per frame
+    this._time += 0.016;
 
-    for (const [i, topPanel] of this._topPanels.entries()) {
-      // Infinite wrapping relative X viewport coordinate
+    let membraneIndex = 0;
+    let lobeIndex = 0;
+    let veinIndex = 0;
+    let panelSporeIndex = 0;
+    let spikeIndex = 0;
+    let knuckleIndex = 0;
+    let tipIndex = 0;
+
+    for (let i = 0; i < this._numSlices; i++) {
       const localX = (i * this._sliceWidth - (scrollX % this._sliceWidth)) - (HALF_W + 100);
-
-      // Calculate global world X for dynamic LEVEL3_TERRAIN wall queries
       const worldX = scrollX + localX;
       const { top, bottom } = this.getWallsAt(worldX);
 
-      // --- 1. Ceiling Panels (top with sweeping phase-offset breathing) ---
       const breathingTop = 1.0 + 0.06 * Math.sin(this._time * 2.5 + i * 0.4);
-      const hTop = Math.max(1, HALF_H - top);
-      const tPanelData = topPanel.userData;
-
-      // Position the panel exactly at the ceiling boundary
-      topPanel.position.set(localX, top, -10);
-
-      // Scale and position only the backing box membrane to cover depth
-      tPanelData.membrane.scale.y = hTop;
-      tPanelData.membrane.position.y = hTop / 2;
-
-      // Apply uniform non-distorting organic breathing to the surface lobes
-      tPanelData.surface.scale.set(breathingTop, breathingTop, breathingTop);
-
-      // --- 2. Floor Panels (bottom with inverted phase-offset breathing) ---
       const breathingBot = 1.0 + 0.06 * Math.sin(this._time * 2.5 - i * 0.4);
+
+      const hTop = Math.max(1, HALF_H - top);
       const hBot = Math.max(1, bottom + HALF_H);
-      const botPanel = this._botPanels[i]!;
-      const bPanelData = botPanel.userData;
 
-      // Position the panel exactly at the floor boundary
-      botPanel.position.set(localX, bottom, -10);
+      this._setInstanceTransform(this._membraneMesh, membraneIndex++, [localX, top + hTop / 2, -10], [1, hTop, 1]);
+      this._setInstanceTransform(this._membraneMesh, membraneIndex++, [localX, bottom - hBot / 2, -10], [1, hBot, 1]);
 
-      // Scale and position only the backing box membrane to cover depth
-      bPanelData.membrane.scale.y = hBot;
-      bPanelData.membrane.position.y = -hBot / 2;
+      lobeIndex = this._writePanelSurface(localX, top, breathingTop, lobeIndex, veinIndex, panelSporeIndex, true).lobeIndex;
+      veinIndex = this._lastVeinIndex;
+      panelSporeIndex = this._lastSporeIndex;
+      lobeIndex = this._writePanelSurface(localX, bottom, breathingBot, lobeIndex, veinIndex, panelSporeIndex, false).lobeIndex;
+      veinIndex = this._lastVeinIndex;
+      panelSporeIndex = this._lastSporeIndex;
 
-      // Apply uniform non-distorting organic breathing to the surface lobes
-      bPanelData.surface.scale.set(breathingBot, breathingBot, breathingBot);
-
-      // --- 3. Ceiling Spikes (bone ribs at panel seams) ---
       const seamLocalX = localX + this._sliceWidth / 2;
       const seamWorldX = scrollX + seamLocalX;
-      const seamWalls  = this.getWallsAt(seamWorldX);
+      const seamWalls = this.getWallsAt(seamWorldX);
 
       const hTopSpike = Math.max(1, HALF_H - seamWalls.top + 8);
-      const topSpk = this._topSpikes[i]!;
-      const tSpkData = topSpk.userData;
+      this._setInstanceTransform(this._spikeShaftMesh, spikeIndex++, [seamLocalX, seamWalls.top - 4 + hTopSpike / 2, -7], [1, hTopSpike, 1]);
+      this._setInstanceTransform(this._spikeKnuckleMesh, knuckleIndex++, [seamLocalX, seamWalls.top - 4 + hTopSpike * 0.25, -7], [1, 1, 1]);
+      this._setInstanceTransform(this._spikeKnuckleMesh, knuckleIndex++, [seamLocalX, seamWalls.top - 4 + hTopSpike * 0.5, -7], [1, 1, 1]);
+      this._setInstanceTransform(this._spikeKnuckleMesh, knuckleIndex++, [seamLocalX, seamWalls.top - 4 + hTopSpike * 0.75, -7], [1, 1, 1]);
+      this._setInstanceTransform(this._spikeTipMesh, tipIndex++, [seamLocalX, seamWalls.top - 4, -7], [1, 1, 1]);
 
-      // Position Group exactly at the ceiling boundary seam
-      topSpk.position.set(seamLocalX, seamWalls.top - 4, -7);
-
-      // Scale and position only the shaft cylinder
-      tSpkData.shaft.scale.y = hTopSpike;
-      tSpkData.shaft.position.y = hTopSpike / 2;
-
-      // Position knuckles along the scaled shaft without distortion
-      tSpkData.knuckle1.position.y = hTopSpike * 0.25;
-      tSpkData.knuckle2.position.y = hTopSpike * 0.50;
-      tSpkData.knuckle3.position.y = hTopSpike * 0.75;
-
-      // Position the toxic glowing spore tip at the inner edge (local y = 0)
-      tSpkData.tip.position.y = 0;
-
-      // --- 4. Floor Spikes (flipped vertically pointing upwards) ---
       const hBotSpike = Math.max(1, seamWalls.bottom + HALF_H + 8);
-      const botSpk = this._botSpikes[i]!;
-      const bSpkData = botSpk.userData;
-
-      // Position Group exactly at the floor boundary seam
-      botSpk.position.set(seamLocalX, seamWalls.bottom + 4, -7);
-
-      // Scale and position only the shaft cylinder extending downwards
-      bSpkData.shaft.scale.y = hBotSpike;
-      bSpkData.shaft.position.y = -hBotSpike / 2;
-
-      // Position knuckles along the scaled shaft without distortion
-      bSpkData.knuckle1.position.y = -hBotSpike * 0.25;
-      bSpkData.knuckle2.position.y = -hBotSpike * 0.50;
-      bSpkData.knuckle3.position.y = -hBotSpike * 0.75;
-
-      // Position the toxic glowing spore tip at the inner edge (local y = 0)
-      bSpkData.tip.position.y = 0;
+      this._setInstanceTransform(this._spikeShaftMesh, spikeIndex++, [seamLocalX, seamWalls.bottom + 4 - hBotSpike / 2, -7], [1, hBotSpike, 1]);
+      this._setInstanceTransform(this._spikeKnuckleMesh, knuckleIndex++, [seamLocalX, seamWalls.bottom + 4 - hBotSpike * 0.25, -7], [1, 1, 1]);
+      this._setInstanceTransform(this._spikeKnuckleMesh, knuckleIndex++, [seamLocalX, seamWalls.bottom + 4 - hBotSpike * 0.5, -7], [1, 1, 1]);
+      this._setInstanceTransform(this._spikeKnuckleMesh, knuckleIndex++, [seamLocalX, seamWalls.bottom + 4 - hBotSpike * 0.75, -7], [1, 1, 1]);
+      this._setInstanceTransform(this._spikeTipMesh, tipIndex++, [seamLocalX, seamWalls.bottom + 4, -7], [1, 1, 1]);
     }
+
+    this._membraneMesh.count = membraneIndex;
+    this._lobeMesh.count = lobeIndex;
+    this._veinMesh.count = veinIndex;
+    this._panelSporeMesh.count = panelSporeIndex;
+    this._spikeShaftMesh.count = spikeIndex;
+    this._spikeKnuckleMesh.count = knuckleIndex;
+    this._spikeTipMesh.count = tipIndex;
+
+    this._membraneMesh.instanceMatrix.needsUpdate = true;
+    this._lobeMesh.instanceMatrix.needsUpdate = true;
+    this._veinMesh.instanceMatrix.needsUpdate = true;
+    this._panelSporeMesh.instanceMatrix.needsUpdate = true;
+    this._spikeShaftMesh.instanceMatrix.needsUpdate = true;
+    this._spikeKnuckleMesh.instanceMatrix.needsUpdate = true;
+    this._spikeTipMesh.instanceMatrix.needsUpdate = true;
   }
 
-  // ── GPU Memory Clean-up ──
+  private _lastVeinIndex = 0;
+  private _lastSporeIndex = 0;
+
+  private _writePanelSurface(
+    panelX: number,
+    panelY: number,
+    breathing: number,
+    lobeIndex: number,
+    veinIndex: number,
+    sporeIndex: number,
+    isTop: boolean,
+  ): { lobeIndex: number } {
+    const z = -10;
+    const zOffset = (base: number) => z + base * breathing;
+    const yOffset = (base: number) => panelY + base * breathing;
+    const sign = isTop ? 1 : 1;
+
+    this._setInstanceTransform(this._lobeMesh, lobeIndex++, [panelX, yOffset(0), zOffset(0)], [breathing, breathing, 0.4 * breathing]);
+    this._setInstanceTransform(this._lobeMesh, lobeIndex++, [panelX - 18 * breathing, yOffset(0), zOffset(-2)], [0.8 * breathing, 1.2 * breathing, 0.35 * breathing]);
+    this._setInstanceTransform(this._lobeMesh, lobeIndex++, [panelX + 18 * breathing, yOffset(0), zOffset(-2)], [0.8 * breathing, 1.2 * breathing, 0.35 * breathing]);
+
+    this._setInstanceTransform(this._veinMesh, veinIndex++, [panelX - 20 * breathing, yOffset(0), zOffset(6)], [breathing, breathing, breathing]);
+    this._setInstanceTransform(this._veinMesh, veinIndex++, [panelX + 20 * breathing, yOffset(0), zOffset(6)], [breathing, breathing, breathing]);
+
+    this._setInstanceTransform(this._panelSporeMesh, sporeIndex++, [panelX - 8 * breathing, yOffset(0), zOffset(10)], [breathing, breathing, breathing]);
+    this._setInstanceTransform(this._panelSporeMesh, sporeIndex++, [panelX + 8 * breathing, yOffset(0), zOffset(10)], [breathing, breathing, breathing]);
+    this._setInstanceTransform(this._panelSporeMesh, sporeIndex++, [panelX, yOffset(0), zOffset(11)], [breathing, breathing, breathing]);
+
+    this._lastVeinIndex = veinIndex;
+    this._lastSporeIndex = sporeIndex;
+    return { lobeIndex };
+  }
 
   destroy(): void {
-    for (let i = 0; i < this._numSlices; i++) {
-      this._scene.remove(this._topPanels[i]!);
-      this._scene.remove(this._botPanels[i]!);
-      this._scene.remove(this._topSpikes[i]!);
-      this._scene.remove(this._botSpikes[i]!);
-    }
+    this._scene.remove(this._membraneMesh);
+    this._scene.remove(this._lobeMesh);
+    this._scene.remove(this._veinMesh);
+    this._scene.remove(this._panelSporeMesh);
+    this._scene.remove(this._spikeShaftMesh);
+    this._scene.remove(this._spikeKnuckleMesh);
+    this._scene.remove(this._spikeTipMesh);
 
-    // Dispose shared geometries
     this._membraneGeo.dispose();
     this._lobeGeo.dispose();
     this._veinGeo.dispose();
@@ -342,16 +293,10 @@ export class Terrain3 implements ITerrain {
     this._knuckleGeo.dispose();
     this._tipGeo.dispose();
 
-    // Dispose shared materials
     this._baseMat.dispose();
     this._membraneMat.dispose();
     this._glowMat.dispose();
     this._sporeGlowMat.dispose();
     this._boneMat.dispose();
-
-    this._topPanels = [];
-    this._botPanels = [];
-    this._topSpikes = [];
-    this._botSpikes = [];
   }
 }
