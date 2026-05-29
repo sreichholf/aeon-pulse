@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import type { GetPositionFn, IAudio, IScene } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const SPEED         = 230;
 const FIRE_INTERVAL = 2.7;
@@ -167,11 +168,17 @@ export class EnemySwarm extends Enemy {
     const prongGeo = new THREE.CylinderGeometry(0.9, 0.5, 7, 8);
     prongGeo.rotateZ(Math.PI / 2);
 
-    for (const side of [1, -1]) {
-      const prong = new THREE.Mesh(prongGeo, brightMat);
-      prong.position.set(-17, side * 4, 0); // in front of nose (-X)
-      group.add(prong);
-    }
+    const prongGeos = [
+      prongGeo.clone().translate(-17, 4, 0),
+      prongGeo.clone().translate(-17, -4, 0),
+    ];
+    const mergedProngGeo = mergeGeometries(prongGeos);
+    const prongsMesh = new THREE.Mesh(mergedProngGeo, brightMat);
+    group.add(prongsMesh);
+
+    // Clean up temporary geometries
+    prongGeos.forEach(g => g.dispose());
+    prongGeo.dispose();
 
     // ── 4. COCKPIT DOME ────────────────────────────────────────────────────────
     // A raised glowing sphere sitting on top of the fuselage, clearly 3D.

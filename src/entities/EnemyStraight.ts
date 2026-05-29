@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import type { GetPositionFn, IAudio, IScene } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const SPEED         = 130;
 const FIRE_INTERVAL = 2.5;
@@ -193,39 +194,22 @@ export class EnemyStraight extends Enemy {
     // Central Main Hull (tapers slightly back)
     const bodyGeo = new THREE.CylinderGeometry(4.0, 5.0, 16, 6);
     bodyGeo.rotateZ(Math.PI / 2); // Lay along the horizontal X-axis
-    const bodyMesh = new THREE.Mesh(bodyGeo, carbonMat);
-    bodyMesh.position.set(1, 0, 0);
-    visuals.add(bodyMesh);
 
     // Front Nose Cone (tapers aggressively forward)
     const noseGeo = new THREE.CylinderGeometry(0.8, 4.0, 10, 6);
     noseGeo.rotateZ(Math.PI / 2);
-    const noseMesh = new THREE.Mesh(noseGeo, carbonMat);
-    noseMesh.position.set(-12, 0, 0);
-    visuals.add(noseMesh);
 
     // Rear Engine Fuselage Interface
     const rearGeo = new THREE.CylinderGeometry(5.0, 4.2, 5, 6);
     rearGeo.rotateZ(Math.PI / 2);
-    const rearMesh = new THREE.Mesh(rearGeo, carbonMat);
-    rearMesh.position.set(11.5, 0, 0);
-    visuals.add(rearMesh);
 
     // --- 2. Cockpit Canopy & Tactical Visors ---
     // Faceted Diamond Glass Canopy (mounted on top of the sloped body)
     const canopyGeo = new THREE.CylinderGeometry(1.2, 2.5, 8, 5);
     canopyGeo.rotateZ(Math.PI / 2);
-    canopyGeo.rotateY(0.1); // Angled downward for stealth profile
-    const canopyMesh = new THREE.Mesh(canopyGeo, visorMat);
-    canopyMesh.position.set(-5, 3.2, 0);
-    visuals.add(canopyMesh);
 
     // Aggressive recessed sensor visor slit on the nose tip
     const sensorGeo = new THREE.BoxGeometry(3, 0.6, 3);
-    sensorGeo.rotateZ(0.2);
-    const sensorMesh = new THREE.Mesh(sensorGeo, visorMat);
-    sensorMesh.position.set(-14.5, -1.0, 0);
-    visuals.add(sensorMesh);
 
     // --- 3. Forward-Swept Wings (Su-47 Style) & Beveled Armor Fillets ---
     // Tier 1 (Base - Matte Obsidian Carbon-Steel, Forward-Swept Profile)
@@ -248,10 +232,7 @@ export class EnemyStraight extends Enemy {
     };
     const baseWingGeo = new THREE.ExtrudeGeometry(wingShape, extrudeBase);
     baseWingGeo.center();
-    const baseWings = new THREE.Mesh(baseWingGeo, carbonMat);
-    baseWings.rotation.x = Math.PI / 2;
-    baseWings.position.set(0, 0, 0);
-    visuals.add(baseWings);
+    baseWingGeo.rotateX(Math.PI / 2);
 
     // Sloped Armor Fillets (flared structural wing roots bridging wing to hexagonal body)
     const filletShape = new THREE.Shape();
@@ -273,10 +254,42 @@ export class EnemyStraight extends Enemy {
     };
     const filletGeo = new THREE.ExtrudeGeometry(filletShape, extrudeFillet);
     filletGeo.center();
-    const filletMesh = new THREE.Mesh(filletGeo, carbonMat);
-    filletMesh.rotation.x = Math.PI / 2;
-    filletMesh.position.set(2, 0, 0);
-    visuals.add(filletMesh);
+    filletGeo.rotateX(Math.PI / 2);
+
+    // --- 4. Recessed Thrust-Vectoring Exhaust Ports (F-22 style Flaps) ---
+    // Outer casing shrouds that cover and recess the engines
+    const flapTopGeo = new THREE.BoxGeometry(5, 1.2, 11);
+    const flapBotGeo = new THREE.BoxGeometry(5, 1.2, 11);
+    const panelLeftGeo = new THREE.BoxGeometry(5, 7.5, 1.2);
+    const panelRightGeo = new THREE.BoxGeometry(5, 7.5, 1.2);
+
+    // Merge static carbon geometries
+    const carbonGeos = [
+      bodyGeo.clone().translate(1, 0, 0),
+      noseGeo.clone().translate(-12, 0, 0),
+      rearGeo.clone().translate(11.5, 0, 0),
+      baseWingGeo.clone(),
+      filletGeo.clone().translate(2, 0, 0),
+      flapTopGeo.clone().translate(14, 4.0, 0),
+      flapBotGeo.clone().translate(14, -4.0, 0),
+      panelLeftGeo.clone().translate(14, 0, 4.9),
+      panelRightGeo.clone().translate(14, 0, -4.9),
+    ];
+    const mergedCarbonGeo = mergeGeometries(carbonGeos);
+    const carbonMesh = new THREE.Mesh(mergedCarbonGeo, carbonMat);
+    visuals.add(carbonMesh);
+
+    // Clean up temporary carbon geometries
+    carbonGeos.forEach(g => g.dispose());
+    bodyGeo.dispose();
+    noseGeo.dispose();
+    rearGeo.dispose();
+    baseWingGeo.dispose();
+    filletGeo.dispose();
+    flapTopGeo.dispose();
+    flapBotGeo.dispose();
+    panelLeftGeo.dispose();
+    panelRightGeo.dispose();
 
     // Tier 2 (Mid-Plate - Crimson Titanium, Swept Wing Inserts)
     const midShape = new THREE.Shape();
@@ -298,16 +311,19 @@ export class EnemyStraight extends Enemy {
     };
     const midWingGeo = new THREE.ExtrudeGeometry(midShape, extrudeMid);
     midWingGeo.center();
+    midWingGeo.rotateX(Math.PI / 2);
 
-    const topMidWing = new THREE.Mesh(midWingGeo, crimsonMat);
-    topMidWing.rotation.x = Math.PI / 2;
-    topMidWing.position.set(0, 0, 1.8);
-    visuals.add(topMidWing);
+    const crimsonGeos = [
+      midWingGeo.clone().translate(0, 0, 1.8),
+      midWingGeo.clone().translate(0, 0, -1.8),
+    ];
+    const mergedCrimsonGeo = mergeGeometries(crimsonGeos);
+    const crimsonMesh = new THREE.Mesh(mergedCrimsonGeo, crimsonMat);
+    visuals.add(crimsonMesh);
 
-    const botMidWing = new THREE.Mesh(midWingGeo, crimsonMat);
-    botMidWing.rotation.x = Math.PI / 2;
-    botMidWing.position.set(0, 0, -1.8);
-    visuals.add(botMidWing);
+    // Clean up temporary crimson geometries
+    crimsonGeos.forEach(g => g.dispose());
+    midWingGeo.dispose();
 
     // Tier 3 (Outer - Polished Obsidian Blade Tips)
     const outerShape = new THREE.Shape();
@@ -329,38 +345,39 @@ export class EnemyStraight extends Enemy {
     };
     const outerWingGeo = new THREE.ExtrudeGeometry(outerShape, extrudeOuter);
     outerWingGeo.center();
+    outerWingGeo.rotateX(Math.PI / 2);
 
-    const topOuterWing = new THREE.Mesh(outerWingGeo, obsidianMat);
-    topOuterWing.rotation.x = Math.PI / 2;
-    topOuterWing.position.set(0, 0, 3.2);
-    visuals.add(topOuterWing);
+    const obsidianGeos = [
+      outerWingGeo.clone().translate(0, 0, 3.2),
+      outerWingGeo.clone().translate(0, 0, -3.2),
+    ];
+    const mergedObsidianGeo = mergeGeometries(obsidianGeos);
+    const obsidianMesh = new THREE.Mesh(mergedObsidianGeo, obsidianMat);
+    visuals.add(obsidianMesh);
 
-    const botOuterWing = new THREE.Mesh(outerWingGeo, obsidianMat);
-    botOuterWing.rotation.x = Math.PI / 2;
-    botOuterWing.position.set(0, 0, -3.2);
-    visuals.add(botOuterWing);
+    // Clean up temporary obsidian geometries
+    obsidianGeos.forEach(g => g.dispose());
+    outerWingGeo.dispose();
 
-    // --- 4. Recessed Thrust-Vectoring Exhaust Ports (F-22 style Flaps) ---
-    // Outer casing shrouds that cover and recess the engines
-    const flapTopGeo = new THREE.BoxGeometry(5, 1.2, 11);
-    const flapTop = new THREE.Mesh(flapTopGeo, carbonMat);
-    flapTop.position.set(14, 4.0, 0);
-    visuals.add(flapTop);
+    // Merge visor parts (canopy + sensor)
+    const canopyGeoCloned = canopyGeo.clone();
+    canopyGeoCloned.rotateY(0.1);
+    canopyGeoCloned.rotateZ(Math.PI / 2);
+    canopyGeoCloned.translate(-5, 3.2, 0);
 
-    const flapBotGeo = new THREE.BoxGeometry(5, 1.2, 11);
-    const flapBot = new THREE.Mesh(flapBotGeo, carbonMat);
-    flapBot.position.set(14, -4.0, 0);
-    visuals.add(flapBot);
+    const sensorGeoCloned = sensorGeo.clone();
+    sensorGeoCloned.rotateZ(0.2);
+    sensorGeoCloned.translate(-14.5, -1.0, 0);
 
-    const panelLeftGeo = new THREE.BoxGeometry(5, 7.5, 1.2);
-    const panelLeft = new THREE.Mesh(panelLeftGeo, carbonMat);
-    panelLeft.position.set(14, 0, 4.9);
-    visuals.add(panelLeft);
+    const visorGeos = [canopyGeoCloned, sensorGeoCloned];
+    const mergedVisorGeo = mergeGeometries(visorGeos);
+    const visorMesh = new THREE.Mesh(mergedVisorGeo, visorMat);
+    visuals.add(visorMesh);
 
-    const panelRightGeo = new THREE.BoxGeometry(5, 7.5, 1.2);
-    const panelRight = new THREE.Mesh(panelRightGeo, carbonMat);
-    panelRight.position.set(14, 0, -4.9);
-    visuals.add(panelRight);
+    // Clean up temporary visor geometries
+    visorGeos.forEach(g => g.dispose());
+    canopyGeo.dispose();
+    sensorGeo.dispose();
 
     // Recessed thruster nozzles nestled inside the shrouds
     const nozzleCentralGeo = new THREE.CylinderGeometry(2.0, 1.6, 3.5, 12);
@@ -368,17 +385,19 @@ export class EnemyStraight extends Enemy {
     const nozzleSideGeo = new THREE.CylinderGeometry(1.4, 1.0, 3, 12);
     nozzleSideGeo.rotateZ(Math.PI / 2);
 
-    const centralNozzle = new THREE.Mesh(nozzleCentralGeo, nozzleMat);
-    centralNozzle.position.set(12.5, 0, 0);
-    visuals.add(centralNozzle);
+    const nozzleGeos = [
+      nozzleCentralGeo.clone().translate(12.5, 0, 0),
+      nozzleSideGeo.clone().translate(12.0, 2.5, 1.8),
+      nozzleSideGeo.clone().translate(12.0, -2.5, -1.8),
+    ];
+    const mergedNozzleGeo = mergeGeometries(nozzleGeos);
+    const nozzleMesh = new THREE.Mesh(mergedNozzleGeo, nozzleMat);
+    visuals.add(nozzleMesh);
 
-    const topNozzle = new THREE.Mesh(nozzleSideGeo, nozzleMat);
-    topNozzle.position.set(12.0, 2.5, 1.8);
-    visuals.add(topNozzle);
-
-    const bottomNozzle = new THREE.Mesh(nozzleSideGeo, nozzleMat);
-    bottomNozzle.position.set(12.0, -2.5, -1.8);
-    visuals.add(bottomNozzle);
+    // Clean up temporary nozzle geometries
+    nozzleGeos.forEach(g => g.dispose());
+    nozzleCentralGeo.dispose();
+    nozzleSideGeo.dispose();
 
     // Supersonic cyan exhaust cones originating from inside the vectoring shroud
     const flameCentralGeo = new THREE.ConeGeometry(1.6, 9, 12);

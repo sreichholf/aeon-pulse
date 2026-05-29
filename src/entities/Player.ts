@@ -4,6 +4,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { Action } from '../systems/InputManager.ts';
 import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 import { Bullet } from './Bullet.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const HALF_W = GAME_WIDTH / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -39,7 +40,7 @@ interface InputManager {
 }
 
 interface ThrusterParticle {
-  mesh: THREE.Mesh;
+  isYellow: boolean;
   x: number;
   y: number;
   z: number;
@@ -78,6 +79,9 @@ export class Player {
   private _flickerTimer: number;
   private _newBullets: IBullet[];
   private _particles: ThrusterParticle[];
+  private _yellowParticleMesh: THREE.InstancedMesh | null;
+  private _orangeParticleMesh: THREE.InstancedMesh | null;
+  private _instanceHelper: THREE.Object3D;
   private _engineLight: THREE.PointLight | null;
   private _chargeOrb: THREE.Mesh | null;
   private _shieldAura: THREE.Mesh<THREE.SphereGeometry, THREE.MeshPhongMaterial> | null;
@@ -122,6 +126,9 @@ export class Player {
 
     // Build the high-fidelity 3D player ship group!
     this._particles = [];
+    this._yellowParticleMesh = null;
+    this._orangeParticleMesh = null;
+    this._instanceHelper = new THREE.Object3D();
     this._engineLight = null;
     this._chargeOrb = null;
     this._shieldAura = null;
@@ -210,10 +217,6 @@ export class Player {
     // Rotate lathe geometry to align along the longitudinal X-axis (pointing forward along +X)
     latheGeo.rotateZ(-Math.PI / 2);
 
-    const fuselage = new THREE.Mesh(latheGeo, hullMat);
-    fuselage.position.x = -2;
-    group.add(fuselage);
-
     // ── 2. SEAMLESSLY SUBMERGED CANOPY ───────────────────────────────────────
     // Submerging the canopy capsule into the lathed fuselage so it integrates smoothly.
     const cockpitGeo = new THREE.SphereGeometry(6.2, 24, 24);
@@ -259,37 +262,43 @@ export class Player {
     const strutGeo = new THREE.BoxGeometry(6, 12, 4);
     strutGeo.rotateZ(-Math.PI / 6); // Angled forward
 
-    const topStrut = new THREE.Mesh(strutGeo, hullMat);
-    topStrut.position.set(-8, 7, 3);
-    group.add(topStrut);
-
-    const bottomStrut = new THREE.Mesh(strutGeo, hullMat);
-    bottomStrut.position.set(-8, -7, -3);
-    group.add(bottomStrut);
-
     // Sleek continuous prongs
     const prongGeo = new THREE.CylinderGeometry(1.8, 1.8, 48, 12);
     prongGeo.rotateZ(Math.PI / 2); // Align along X axis
 
-    const topProng = new THREE.Mesh(prongGeo, hullMat);
-    topProng.position.set(12, 12, 3.5);
-    group.add(topProng);
+    // Merge static fuselage parts sharing hullMat
+    const hullGeos = [
+      latheGeo.clone().translate(-2, 0, 0),
+      strutGeo.clone().translate(-8, 7, 3),
+      strutGeo.clone().translate(-8, -7, -3),
+      prongGeo.clone().translate(12, 12, 3.5),
+      prongGeo.clone().translate(12, -12, -3.5),
+    ];
+    const mergedHullGeo = mergeGeometries(hullGeos);
+    const hullMesh = new THREE.Mesh(mergedHullGeo, hullMat);
+    group.add(hullMesh);
 
-    const bottomProng = new THREE.Mesh(prongGeo, hullMat);
-    bottomProng.position.set(12, -12, -3.5);
-    group.add(bottomProng);
+    // Clean up temporary geometries
+    hullGeos.forEach(g => g.dispose());
+    latheGeo.dispose();
+    strutGeo.dispose();
+    prongGeo.dispose();
 
     // Aerodynamic tapered prong tips (pointed red cones)
     const prongTipGeo = new THREE.ConeGeometry(2.0, 10, 12);
     prongTipGeo.rotateZ(-Math.PI / 2); // Point forward (+X)
 
-    const topProngTip = new THREE.Mesh(prongTipGeo, trimMat);
-    topProngTip.position.set(37, 12, 3.5);
-    group.add(topProngTip);
+    const tipGeos = [
+      prongTipGeo.clone().translate(37, 12, 3.5),
+      prongTipGeo.clone().translate(37, -12, -3.5),
+    ];
+    const mergedTipGeo = mergeGeometries(tipGeos);
+    const tipMesh = new THREE.Mesh(mergedTipGeo, trimMat);
+    group.add(tipMesh);
 
-    const bottomProngTip = new THREE.Mesh(prongTipGeo, trimMat);
-    bottomProngTip.position.set(37, -12, -3.5);
-    group.add(bottomProngTip);
+    // Clean up temporary tip geometries
+    tipGeos.forEach(g => g.dispose());
+    prongTipGeo.dispose();
 
     // ── 5. INTEGRATED ENGINE EXHAUST & GLOWING PLASMA PARTICLES ──────────────
     // The engine nozzle is shaped to blend cleanly into the tail taper
@@ -303,17 +312,22 @@ export class Player {
     const thrusterGroup = new THREE.Group();
     group.add(thrusterGroup);
 
-    // Create 20 trailing particle meshes
+    // Create 20 trailing particles using InstancedMesh instead of 20 separate meshes
     this._particles = [];
     const sphereGeo = new THREE.SphereGeometry(3.2, 8, 8);
 
+    this._yellowParticleMesh = new THREE.InstancedMesh(sphereGeo, matYellow, 20);
+    this._orangeParticleMesh = new THREE.InstancedMesh(sphereGeo, matOrange, 20);
+    this._yellowParticleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this._orangeParticleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+    thrusterGroup.add(this._yellowParticleMesh);
+    thrusterGroup.add(this._orangeParticleMesh);
+
     for (let i = 0; i < 20; i++) {
       const isYellow = Math.random() > 0.6;
-      const pMesh = new THREE.Mesh(sphereGeo, isYellow ? matYellow : matOrange);
-      thrusterGroup.add(pMesh);
-
       this._particles.push({
-        mesh: pMesh,
+        isYellow,
         x: -34,
         y: 0,
         z: 0,
@@ -476,6 +490,9 @@ export class Player {
   private _updateThrusterVisuals(dt: number, speedMult: number, targetLightIntensity: number): void {
     // Animate trailing volumetric plasma particles
     if (this._particles && this._particles.length > 0) {
+      let yellowCount = 0;
+      let orangeCount = 0;
+
       for (const p of this._particles) {
         p.life -= p.decay * dt;
         if (p.life <= 0) {
@@ -496,10 +513,25 @@ export class Player {
           p.z += p.vz * dt;
         }
 
-        // Scale down and fade opacity as life ticks away
-        const scale = p.life;
-        p.mesh.scale.setScalar(scale);
-        p.mesh.position.set(p.x, p.y, p.z);
+        // Set InstancedMesh matrix at corresponding index
+        const mesh = p.isYellow ? this._yellowParticleMesh : this._orangeParticleMesh;
+        const index = p.isYellow ? yellowCount++ : orangeCount++;
+
+        if (mesh) {
+          this._instanceHelper.position.set(p.x, p.y, p.z);
+          this._instanceHelper.scale.setScalar(p.life);
+          this._instanceHelper.updateMatrix();
+          mesh.setMatrixAt(index, this._instanceHelper.matrix);
+        }
+      }
+
+      if (this._yellowParticleMesh) {
+        this._yellowParticleMesh.count = yellowCount;
+        this._yellowParticleMesh.instanceMatrix.needsUpdate = true;
+      }
+      if (this._orangeParticleMesh) {
+        this._orangeParticleMesh.count = orangeCount;
+        this._orangeParticleMesh.instanceMatrix.needsUpdate = true;
       }
     }
 
