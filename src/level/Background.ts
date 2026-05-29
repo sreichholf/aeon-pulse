@@ -5,7 +5,6 @@ import type { IBackground, IScene } from '../types.ts';
 import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 const HALF_W = GAME_WIDTH / 2;
-const HALF_H = GAME_HEIGHT / 2;
 
 const NEBULA_FRAG = `
   uniform float uTime;
@@ -37,7 +36,6 @@ const NEBULA_FRAG = `
   void main() {
     vec2 uv = vUv;
 
-    // --- Background Nebula (Original space colors backdrop) ---
     float n = fbm(uv * 3.0 + vec2(-uTime * 0.05,  uTime * 0.02)) * 0.6
             + fbm(uv * 5.5 + vec2( uTime * 0.03, -uTime * 0.015) + 4.1) * 0.4;
     float d = smoothstep(0.45, 0.82, n);
@@ -50,16 +48,50 @@ const NEBULA_FRAG = `
   }
 `;
 
-interface StructEntry {
-  mesh: THREE.Group;
-  speedMult: number;
-  type: string;
-  gearSpeed?: number;
+interface ArchEntry {
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface TowerEntry {
+  x: number;
+  y: number;
+  z: number;
+  flipped: boolean;
+  bladeRotation: number;
+}
+
+interface PipeEntry {
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface SpireEntry {
+  x: number;
+  y: number;
+  z: number;
+  flipped: boolean;
+}
+
+interface RingEntry {
+  x: number;
+  y: number;
+  z: number;
+  rotationY: number;
 }
 
 interface DustEntry {
-  mesh: THREE.Mesh;
+  kind: 'octa' | 'tetra';
+  color: 'cyan' | 'blue';
+  x: number;
+  y: number;
+  z: number;
   speedMult: number;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
   rx: number;
   ry: number;
   rz: number;
@@ -78,167 +110,200 @@ export class Background implements IBackground {
   private _archBaseMat: THREE.MeshPhongMaterial;
   private _archEmissiveMat: THREE.MeshBasicMaterial;
 
-  private _structures: StructEntry[];
+  private _archRingGeo: THREE.TorusGeometry;
+  private _archPanelGeo: THREE.BoxGeometry;
+  private _archIndicatorGeo: THREE.BoxGeometry;
+  private _archTrimGeo: THREE.TorusGeometry;
+  private _archOuterTrimGeo: THREE.TorusGeometry;
+  private _archRingMesh: THREE.InstancedMesh;
+  private _archPanelMesh: THREE.InstancedMesh;
+  private _archIndicatorMesh: THREE.InstancedMesh;
+  private _archTrimMesh: THREE.InstancedMesh;
+  private _archOuterTrimMesh: THREE.InstancedMesh;
+  private _arches: ArchEntry[];
+
+  private _towerBaseGeo: THREE.CylinderGeometry;
+  private _towerHubGeo: THREE.CylinderGeometry;
+  private _towerBladeGeo: THREE.BoxGeometry;
+  private _towerVentGeo: THREE.CylinderGeometry;
+  private _towerBaseMesh: THREE.InstancedMesh;
+  private _towerHubMesh: THREE.InstancedMesh;
+  private _towerBladeMesh: THREE.InstancedMesh;
+  private _towerVentMesh: THREE.InstancedMesh;
+  private _towers: TowerEntry[];
+
+  private _pipeBodyGeo: THREE.CylinderGeometry;
+  private _pipeClampGeo: THREE.CylinderGeometry;
+  private _pipeSeamGeo: THREE.CylinderGeometry;
+  private _pipeBodyMesh: THREE.InstancedMesh;
+  private _pipeClampMesh: THREE.InstancedMesh;
+  private _pipeSeamMesh: THREE.InstancedMesh;
+  private _pipes: PipeEntry[];
+
+  private _spireBodyGeo: THREE.CylinderGeometry;
+  private _spireCrownGeo: THREE.CylinderGeometry;
+  private _spireBodyMesh: THREE.InstancedMesh;
+  private _spireCrownMesh: THREE.InstancedMesh;
+  private _spires: SpireEntry[];
+
+  private _ringBodyGeo: THREE.TorusGeometry;
+  private _ringCoreGeo: THREE.TorusGeometry;
+  private _ringBodyMesh: THREE.InstancedMesh;
+  private _ringCoreMesh: THREE.InstancedMesh;
+  private _rings: RingEntry[];
 
   private _dustMatCyan: THREE.MeshBasicMaterial;
   private _dustMatBlue: THREE.MeshBasicMaterial;
   private _dustGeoOcta: THREE.OctahedronGeometry;
   private _dustGeoTetra: THREE.TetrahedronGeometry;
+  private _dustOctaCyanMesh: THREE.InstancedMesh;
+  private _dustOctaBlueMesh: THREE.InstancedMesh;
+  private _dustTetraCyanMesh: THREE.InstancedMesh;
+  private _dustTetraBlueMesh: THREE.InstancedMesh;
   private _dust: DustEntry[];
 
-  constructor(scene: IScene, baseSpeed: number = 100) {
-    this._scene    = scene;
-    this.baseSpeed = baseSpeed;
-    this._time     = 0;
+  private _instanceHelper: THREE.Object3D;
+  private _rotationEuler: THREE.Euler;
 
-    // ── 1. Cosmic Space Nebula Backdrop ──
+  constructor(scene: IScene, baseSpeed: number = 100) {
+    this._scene = scene;
+    this.baseSpeed = baseSpeed;
+    this._time = 0;
+    this._instanceHelper = new THREE.Object3D();
+    this._rotationEuler = new THREE.Euler();
+
     const nebulaMat = new THREE.ShaderMaterial({
-      uniforms:       { uTime: { value: 0 } },
-      vertexShader:   STANDARD_VERT,
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: STANDARD_VERT,
       fragmentShader: NEBULA_FRAG,
-      depthWrite:     false,
+      depthWrite: false,
     });
-    const nebulaGeo  = new THREE.PlaneGeometry(GAME_WIDTH, GAME_HEIGHT);
+    const nebulaGeo = new THREE.PlaneGeometry(GAME_WIDTH, GAME_HEIGHT);
     this._nebulaMesh = new THREE.Mesh(nebulaGeo, nebulaMat);
-    markRenderCategory(this._nebulaMesh, RenderCategory.BACKGROUND);
+    markRenderCategory(this._nebulaMesh, RenderCategory.BACKGROUND, 'background.nebula');
     this._nebulaMesh.position.z = -100;
-    this._nebulaMesh.scale.set(1.4, 1.4, 1.0); // Scale up to ensure full screen coverage under tilt
+    this._nebulaMesh.scale.set(1.4, 1.4, 1.0);
     scene.add(this._nebulaMesh);
     this._nebulaMat = nebulaMat;
 
-    // ── 2. Shared Megastructure Materials ──
     this._baseMat = new THREE.MeshPhongMaterial({
-      color: 0x1d212a,       // dark metallic carbon-steel
-      emissive: 0x050608,    // deep ambient backing
-      specular: 0x556688,    // cool gray-blue highlights
+      color: 0x1d212a,
+      emissive: 0x050608,
+      specular: 0x556688,
       shininess: 75,
-      flatShading: true,     // sharp faceted low-poly look
+      flatShading: true,
     });
-
     this._emissiveMat = new THREE.MeshBasicMaterial({
-      color: 0x00ffcc,       // glowing neon cyber-cyan
+      color: 0x00ffcc,
       transparent: true,
       opacity: 0.95,
     });
-
-    // Brighter, higher-visibility custom materials for foreground arches so they stand out
     this._archBaseMat = new THREE.MeshPhongMaterial({
-      color: 0x3d4758,       // much brighter bluish steel
-      emissive: 0x0f1d2e,    // subtle deep-cyan self-illuminating ambient glow
-      specular: 0x8899bb,    // highly reactive specular sheen
+      color: 0x3d4758,
+      emissive: 0x0f1d2e,
+      specular: 0x8899bb,
       shininess: 90,
       flatShading: true,
     });
-
     this._archEmissiveMat = new THREE.MeshBasicMaterial({
-      color: 0x33ffdd,       // extra-bright glowing cyber-cyan
+      color: 0x33ffdd,
       transparent: true,
       opacity: 0.98,
     });
 
-    // ── 3. Megastructure Recycling Pool ──
-    this._structures = [];
-
-    // Layer A: Foreground Segmented Hangar Arches (Z = -22, speedMult = 1.25)
+    this._archRingGeo = new THREE.TorusGeometry(245, 14, 4, 8);
+    this._archRingGeo.rotateY(Math.PI / 2);
+    this._archPanelGeo = new THREE.BoxGeometry(32, 50, 18);
+    this._archIndicatorGeo = new THREE.BoxGeometry(34, 12, 20);
+    this._archTrimGeo = new THREE.TorusGeometry(234, 3.5, 4, 8);
+    this._archTrimGeo.rotateY(Math.PI / 2);
+    this._archOuterTrimGeo = new THREE.TorusGeometry(256, 2.2, 4, 8);
+    this._archOuterTrimGeo.rotateY(Math.PI / 2);
+    this._archRingMesh = this._createInstancedMesh(this._archRingGeo, this._archBaseMat, 4, 'background.arch');
+    this._archPanelMesh = this._createInstancedMesh(this._archPanelGeo, this._archBaseMat, 8, 'background.arch');
+    this._archIndicatorMesh = this._createInstancedMesh(this._archIndicatorGeo, this._archEmissiveMat, 8, 'background.arch');
+    this._archTrimMesh = this._createInstancedMesh(this._archTrimGeo, this._archEmissiveMat, 4, 'background.arch');
+    this._archOuterTrimMesh = this._createInstancedMesh(this._archOuterTrimGeo, this._archEmissiveMat, 4, 'background.arch');
+    this._arches = [];
     for (let i = 0; i < 4; i++) {
-      const arch = this._buildArch(this._archBaseMat, this._archEmissiveMat);
-      arch.position.set(
-        -HALF_W - 50 + i * (GAME_WIDTH / 3) + (Math.random() - 0.5) * 60,
-        0,
-        -22
-      );
-      markRenderCategory(arch, RenderCategory.BACKGROUND);
-      scene.add(arch);
-      this._structures.push({
-        mesh: arch,
-        speedMult: 1.25,
-        type: 'arch',
+      this._arches.push({
+        x: -HALF_W - 50 + i * (GAME_WIDTH / 3) + (Math.random() - 0.5) * 60,
+        y: 0,
+        z: -22,
       });
     }
 
-    // Layer B: Midground Cooling Fan Towers (Z = -45 to -52, speedMult = 0.70)
+    this._towerBaseGeo = new THREE.CylinderGeometry(16, 24, 110, 6);
+    this._towerHubGeo = new THREE.CylinderGeometry(13, 13, 14, 6);
+    this._towerHubGeo.rotateX(Math.PI / 2);
+    this._towerBladeGeo = new THREE.BoxGeometry(40, 5, 1.8);
+    this._towerVentGeo = new THREE.CylinderGeometry(14, 14, 3, 6);
+    this._towerBaseMesh = this._createInstancedMesh(this._towerBaseGeo, this._baseMat, 4, 'background.tower');
+    this._towerHubMesh = this._createInstancedMesh(this._towerHubGeo, this._baseMat, 4, 'background.tower');
+    this._towerBladeMesh = this._createInstancedMesh(this._towerBladeGeo, this._baseMat, 8, 'background.tower');
+    this._towerVentMesh = this._createInstancedMesh(this._towerVentGeo, this._emissiveMat, 4, 'background.tower');
+    this._towers = [];
     for (let i = 0; i < 4; i++) {
-      const tower = this._buildCoolingTower(this._baseMat, this._emissiveMat);
-      const ySign = i % 2 === 0 ? 1 : -1;
-      const yOffset = ySign * (145 + Math.random() * 25);
-      const zDepth = -45 - Math.random() * 7;
-      tower.position.set(
-        -HALF_W + i * (GAME_WIDTH / 3) + (Math.random() - 0.5) * 80,
-        yOffset,
-        zDepth
-      );
-      if (ySign === 1) {
-        tower.rotation.z = Math.PI; // flip overhead
-      }
-      markRenderCategory(tower, RenderCategory.BACKGROUND);
-      scene.add(tower);
-      this._structures.push({
-        mesh: tower,
-        speedMult: 0.70,
-        type: 'tower',
+      const flipped = i % 2 === 0;
+      this._towers.push({
+        x: -HALF_W + i * (GAME_WIDTH / 3) + (Math.random() - 0.5) * 80,
+        y: (flipped ? 1 : -1) * (145 + Math.random() * 25),
+        z: -45 - Math.random() * 7,
+        flipped,
+        bladeRotation: 0,
       });
     }
 
-    // Layer C: Midground Conduit Pipelines (Z = -55 to -62, speedMult = 0.65)
+    this._pipeBodyGeo = new THREE.CylinderGeometry(11, 11, 280, 6);
+    this._pipeBodyGeo.rotateZ(Math.PI / 2);
+    this._pipeClampGeo = new THREE.CylinderGeometry(15, 15, 16, 6);
+    this._pipeClampGeo.rotateZ(Math.PI / 2);
+    this._pipeSeamGeo = new THREE.CylinderGeometry(12.5, 12.5, 5, 6);
+    this._pipeSeamGeo.rotateZ(Math.PI / 2);
+    this._pipeBodyMesh = this._createInstancedMesh(this._pipeBodyGeo, this._baseMat, 4, 'background.pipe');
+    this._pipeClampMesh = this._createInstancedMesh(this._pipeClampGeo, this._baseMat, 8, 'background.pipe');
+    this._pipeSeamMesh = this._createInstancedMesh(this._pipeSeamGeo, this._emissiveMat, 8, 'background.pipe');
+    this._pipes = [];
     for (let i = 0; i < 4; i++) {
-      const pipe = this._buildPipeline(this._baseMat, this._emissiveMat);
-      const ySign = i % 2 === 0 ? 1 : -1;
-      const yOffset = ySign * (190 + Math.random() * 20);
-      const zDepth = -55 - Math.random() * 7;
-      pipe.position.set(
-        -HALF_W - 100 + i * (GAME_WIDTH / 3) + (Math.random() - 0.5) * 80,
-        yOffset,
-        zDepth
-      );
-      markRenderCategory(pipe, RenderCategory.BACKGROUND);
-      scene.add(pipe);
-      this._structures.push({
-        mesh: pipe,
-        speedMult: 0.65,
-        type: 'pipe',
+      const sign = i % 2 === 0 ? 1 : -1;
+      this._pipes.push({
+        x: -HALF_W - 100 + i * (GAME_WIDTH / 3) + (Math.random() - 0.5) * 80,
+        y: sign * (190 + Math.random() * 20),
+        z: -55 - Math.random() * 7,
       });
     }
 
-    // Layer D: Background Power Spires (Z = -90, speedMult = 0.25)
+    this._spireBodyGeo = new THREE.CylinderGeometry(9, 38, 480, 6);
+    this._spireCrownGeo = new THREE.CylinderGeometry(10, 10, 14, 6);
+    this._spireBodyMesh = this._createInstancedMesh(this._spireBodyGeo, this._baseMat, 3, 'background.spire');
+    this._spireCrownMesh = this._createInstancedMesh(this._spireCrownGeo, this._emissiveMat, 3, 'background.spire');
+    this._spires = [];
     for (let i = 0; i < 3; i++) {
-      const spire = this._buildPowerSpire(this._baseMat, this._emissiveMat);
-      const ySign = i % 2 === 0 ? 1 : -1;
-      const yOffset = ySign * (180 + Math.random() * 40);
-      spire.position.set(
-        -HALF_W + i * (GAME_WIDTH / 2) + (Math.random() - 0.5) * 120,
-        yOffset,
-        -90
-      );
-      if (ySign === 1) {
-        spire.rotation.z = Math.PI;
-      }
-      markRenderCategory(spire, RenderCategory.BACKGROUND);
-      scene.add(spire);
-      this._structures.push({
-        mesh: spire,
-        speedMult: 0.25,
-        type: 'spire',
+      const flipped = i % 2 === 0;
+      this._spires.push({
+        x: -HALF_W + i * (GAME_WIDTH / 2) + (Math.random() - 0.5) * 120,
+        y: (flipped ? 1 : -1) * (180 + Math.random() * 40),
+        z: -90,
+        flipped,
       });
     }
 
-    // Layer E: Background Station Rings (Z = -90, speedMult = 0.20)
+    this._ringBodyGeo = new THREE.TorusGeometry(180, 7, 4, 12);
+    this._ringBodyGeo.rotateY(Math.PI / 2);
+    this._ringCoreGeo = new THREE.TorusGeometry(171, 1.2, 4, 12);
+    this._ringCoreGeo.rotateY(Math.PI / 2);
+    this._ringBodyMesh = this._createInstancedMesh(this._ringBodyGeo, this._baseMat, 3, 'background.ring');
+    this._ringCoreMesh = this._createInstancedMesh(this._ringCoreGeo, this._emissiveMat, 3, 'background.ring');
+    this._rings = [];
     for (let i = 0; i < 3; i++) {
-      const ring = this._buildBackgroundRing(this._baseMat, this._emissiveMat);
-      ring.position.set(
-        -HALF_W + i * (GAME_WIDTH / 2) + (Math.random() - 0.5) * 120,
-        (Math.random() - 0.5) * 90,
-        -90
-      );
-      markRenderCategory(ring, RenderCategory.BACKGROUND);
-      scene.add(ring);
-      this._structures.push({
-        mesh: ring,
-        speedMult: 0.20,
-        type: 'ring',
+      this._rings.push({
+        x: -HALF_W + i * (GAME_WIDTH / 2) + (Math.random() - 0.5) * 120,
+        y: (Math.random() - 0.5) * 90,
+        z: -90,
+        rotationY: 0,
       });
     }
 
-    // ── 4. 3D Crystalline Space Dust ──
     this._dustMatCyan = new THREE.MeshBasicMaterial({
       color: 0x33ffcc,
       transparent: true,
@@ -249,245 +314,257 @@ export class Background implements IBackground {
       transparent: true,
       opacity: 0.70,
     });
-    this._dustGeoOcta  = new THREE.OctahedronGeometry(1.2);
+    this._dustGeoOcta = new THREE.OctahedronGeometry(1.2);
     this._dustGeoTetra = new THREE.TetrahedronGeometry(1.0);
-
+    this._dustOctaCyanMesh = this._createInstancedMesh(this._dustGeoOcta, this._dustMatCyan, 80, 'background.dust');
+    this._dustOctaBlueMesh = this._createInstancedMesh(this._dustGeoOcta, this._dustMatBlue, 80, 'background.dust');
+    this._dustTetraCyanMesh = this._createInstancedMesh(this._dustGeoTetra, this._dustMatCyan, 80, 'background.dust');
+    this._dustTetraBlueMesh = this._createInstancedMesh(this._dustGeoTetra, this._dustMatBlue, 80, 'background.dust');
     this._dust = [];
-    const dustCount = 80;
-    for (let i = 0; i < dustCount; i++) {
-      const geo = Math.random() > 0.5 ? this._dustGeoOcta : this._dustGeoTetra;
-      const mat = Math.random() > 0.5 ? this._dustMatCyan : this._dustMatBlue;
-      const mesh = new THREE.Mesh(geo, mat);
-
-      const zVal = -12 - Math.random() * 83; // Z bounds: -12 (foreground dust) to -95
-      // Parallax speed based on depth (closer particles scroll faster)
-      const speedMult = 0.15 + (1.0 - (Math.abs(zVal) - 12) / 83) * 1.15;
-
-      mesh.position.set(
-        (Math.random() - 0.5) * GAME_WIDTH * 1.5,
-        (Math.random() - 0.5) * GAME_HEIGHT * 1.2,
-        zVal
-      );
-
-      mesh.rotation.set(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI
-      );
-
-      const rx = (Math.random() - 0.5) * 2.2;
-      const ry = (Math.random() - 0.5) * 2.2;
-      const rz = (Math.random() - 0.5) * 2.2;
-
-      markRenderCategory(mesh, RenderCategory.BACKGROUND);
-      scene.add(mesh);
-      this._dust.push({ mesh, speedMult, rx, ry, rz });
+    for (let i = 0; i < 80; i++) {
+      const z = -12 - Math.random() * 83;
+      const speedMult = 0.15 + (1.0 - (Math.abs(z) - 12) / 83) * 1.15;
+      this._dust.push({
+        kind: Math.random() > 0.5 ? 'octa' : 'tetra',
+        color: Math.random() > 0.5 ? 'cyan' : 'blue',
+        x: (Math.random() - 0.5) * GAME_WIDTH * 1.5,
+        y: (Math.random() - 0.5) * GAME_HEIGHT * 1.2,
+        z,
+        speedMult,
+        rotationX: Math.random() * Math.PI,
+        rotationY: Math.random() * Math.PI,
+        rotationZ: Math.random() * Math.PI,
+        rx: (Math.random() - 0.5) * 2.2,
+        ry: (Math.random() - 0.5) * 2.2,
+        rz: (Math.random() - 0.5) * 2.2,
+      });
     }
   }
 
-  // ── 3D Procedural Megastructure Builders ──
-
-  private _buildArch(mat: THREE.MeshPhongMaterial, emissiveMat: THREE.MeshBasicMaterial): THREE.Group {
-    const group = new THREE.Group();
-
-    // Low-poly octagonal ring archway (player flies through its center)
-    const ringGeo = new THREE.TorusGeometry(245, 14, 4, 8);
-    ringGeo.rotateY(Math.PI / 2); // align perpendicular to viewport path
-    const ring = new THREE.Mesh(ringGeo, mat);
-    group.add(ring);
-
-    // Support reinforcement columns on outer bounds
-    const panelGeo = new THREE.BoxGeometry(32, 50, 18);
-    const topPanel = new THREE.Mesh(panelGeo, mat);
-    topPanel.position.set(0, 235, 0);
-    const botPanel = new THREE.Mesh(panelGeo, mat);
-    botPanel.position.set(0, -235, 0);
-    group.add(topPanel, botPanel);
-
-    // Dynamic glowing cyber-cyan indicator bars on the inner side of top/bottom columns
-    const indicatorGeo = new THREE.BoxGeometry(34, 12, 20);
-    const topInd = new THREE.Mesh(indicatorGeo, emissiveMat);
-    topInd.position.set(0, 205, 0);
-    const botInd = new THREE.Mesh(indicatorGeo, emissiveMat);
-    botInd.position.set(0, -205, 0);
-    group.add(topInd, botInd);
-
-    // Searing neon cyber-cyan glowing inner trim band (thickened)
-    const trimGeo = new THREE.TorusGeometry(234, 3.5, 4, 8);
-    trimGeo.rotateY(Math.PI / 2);
-    const trim = new THREE.Mesh(trimGeo, emissiveMat);
-    group.add(trim);
-
-    // Secondary outer neon cyber-cyan glowing trim band for double neon effect
-    const outerTrimGeo = new THREE.TorusGeometry(256, 2.2, 4, 8);
-    outerTrimGeo.rotateY(Math.PI / 2);
-    const outerTrim = new THREE.Mesh(outerTrimGeo, emissiveMat);
-    group.add(outerTrim);
-
-    return group;
+  private _createInstancedMesh(
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    count: number,
+    detail: string,
+  ): THREE.InstancedMesh {
+    const mesh = new THREE.InstancedMesh(geometry, material, count);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.count = count;
+    markRenderCategory(mesh, RenderCategory.BACKGROUND, detail);
+    this._scene.add(mesh);
+    return mesh;
   }
 
-  private _buildCoolingTower(mat: THREE.MeshPhongMaterial, emissiveMat: THREE.MeshBasicMaterial): THREE.Group {
-    const group = new THREE.Group();
-
-    // Heavy support column base
-    const baseGeo = new THREE.CylinderGeometry(16, 24, 110, 6);
-    const base = new THREE.Mesh(baseGeo, mat);
-    group.add(base);
-
-    // Ventilation fan hub
-    const hubGeo = new THREE.CylinderGeometry(13, 13, 14, 6);
-    hubGeo.rotateX(Math.PI / 2);
-    const hub = new THREE.Mesh(hubGeo, mat);
-    hub.position.set(0, 10, 5);
-    group.add(hub);
-
-    // Four cooling fan blades
-    const blades = new THREE.Group();
-    const bladeGeo = new THREE.BoxGeometry(40, 5, 1.8);
-    const blade1 = new THREE.Mesh(bladeGeo, mat);
-    const blade2 = new THREE.Mesh(bladeGeo, mat);
-    blade2.rotation.z = Math.PI / 2;
-    blades.add(blade1, blade2);
-    blades.position.copy(hub.position);
-    group.userData = { blades };
-    group.add(blades);
-
-    // Glowing exhaust portal
-    const ventGeo = new THREE.CylinderGeometry(14, 14, 3, 6);
-    const vent = new THREE.Mesh(ventGeo, emissiveMat);
-    vent.position.set(0, 56, 0);
-    group.add(vent);
-
-    return group;
-  }
-
-  private _buildPipeline(mat: THREE.MeshPhongMaterial, emissiveMat: THREE.MeshBasicMaterial): THREE.Group {
-    const group = new THREE.Group();
-
-    // Horizontal energy transport conduit
-    const pipeGeo = new THREE.CylinderGeometry(11, 11, 280, 6);
-    pipeGeo.rotateZ(Math.PI / 2);
-    const pipe = new THREE.Mesh(pipeGeo, mat);
-    group.add(pipe);
-
-    // Symmetrical industrial valve brackets
-    const clampGeo = new THREE.CylinderGeometry(15, 15, 16, 6);
-    clampGeo.rotateZ(Math.PI / 2);
-    const clampL = new THREE.Mesh(clampGeo, mat);
-    clampL.position.set(-75, 0, 0);
-    const clampR = new THREE.Mesh(clampGeo, mat);
-    clampR.position.set(75, 0, 0);
-    group.add(clampL, clampR);
-
-    // Magma-cyan cooling rings
-    const seamGeo = new THREE.CylinderGeometry(12.5, 12.5, 5, 6);
-    seamGeo.rotateZ(Math.PI / 2);
-    const seamL = new THREE.Mesh(seamGeo, emissiveMat);
-    seamL.position.copy(clampL.position);
-    const seamR = new THREE.Mesh(seamGeo, emissiveMat);
-    seamR.position.copy(clampR.position);
-    group.add(seamL, seamR);
-
-    return group;
-  }
-
-  private _buildPowerSpire(mat: THREE.MeshPhongMaterial, emissiveMat: THREE.MeshBasicMaterial): THREE.Group {
-    const group = new THREE.Group();
-
-    // Tower structural column
-    const spireGeo = new THREE.CylinderGeometry(9, 38, 480, 6);
-    const spire = new THREE.Mesh(spireGeo, mat);
-    group.add(spire);
-
-    // Glowing spire tip/capacitor
-    const crownGeo = new THREE.CylinderGeometry(10, 10, 14, 6);
-    const crown = new THREE.Mesh(crownGeo, emissiveMat);
-    crown.position.set(0, 240, 0);
-    group.add(crown);
-
-    return group;
-  }
-
-  private _buildBackgroundRing(mat: THREE.MeshPhongMaterial, emissiveMat: THREE.MeshBasicMaterial): THREE.Group {
-    const group = new THREE.Group();
-
-    // Giant background station ring
-    const ringGeo = new THREE.TorusGeometry(180, 7, 4, 12);
-    ringGeo.rotateY(Math.PI / 2);
-    const ring = new THREE.Mesh(ringGeo, mat);
-    group.add(ring);
-
-    // Inner neon energetic torus core
-    const coreGeo = new THREE.TorusGeometry(171, 1.2, 4, 12);
-    coreGeo.rotateY(Math.PI / 2);
-    const core = new THREE.Mesh(coreGeo, emissiveMat);
-    group.add(core);
-
-    return group;
+  private _setInstanceTransform(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    position: THREE.Vector3Tuple,
+    rotation: THREE.Euler,
+    scale: THREE.Vector3Tuple = [1, 1, 1],
+  ): void {
+    this._instanceHelper.position.set(...position);
+    this._instanceHelper.rotation.copy(rotation);
+    this._instanceHelper.scale.set(...scale);
+    this._instanceHelper.updateMatrix();
+    mesh.setMatrixAt(index, this._instanceHelper.matrix);
   }
 
   update(dt: number): void {
     this._time += dt;
     this._nebulaMat.uniforms['uTime']!.value = this._time;
 
-    // 1. Scroll & Wrap Megastructures
-    for (const struct of this._structures) {
-      const dx = this.baseSpeed * struct.speedMult * dt;
-      struct.mesh.position.x -= dx;
+    this._updateArches(dt);
+    this._updateTowers(dt);
+    this._updatePipes(dt);
+    this._updateSpires(dt);
+    this._updateRings(dt);
+    this._updateDust(dt);
+  }
 
-      // Wrap back to the right when off-screen
-      if (struct.mesh.position.x < -HALF_W - 130) {
-        struct.mesh.position.x = HALF_W + 130 + Math.random() * 120;
+  private _updateArches(dt: number): void {
+    const dx = this.baseSpeed * 1.25 * dt;
+    let panelIndex = 0;
+    let indicatorIndex = 0;
 
-        // Re-randomize height offsets and rotations to keep landscape organic
-        if (struct.type === 'tower') {
-          const ySign = Math.random() > 0.5 ? 1 : -1;
-          struct.mesh.position.y = ySign * (145 + Math.random() * 25);
-          struct.mesh.rotation.z = ySign === 1 ? Math.PI : 0;
-        } else if (struct.type === 'pipe') {
-          const ySign = Math.random() > 0.5 ? 1 : -1;
-          struct.mesh.position.y = ySign * (190 + Math.random() * 20);
-        } else if (struct.type === 'spire') {
-          const ySign = Math.random() > 0.5 ? 1 : -1;
-          struct.mesh.position.y = ySign * (180 + Math.random() * 40);
-          struct.mesh.rotation.z = ySign === 1 ? Math.PI : 0;
-        } else if (struct.type === 'ring') {
-          struct.mesh.position.y = (Math.random() - 0.5) * 90;
-        }
+    for (let i = 0; i < this._arches.length; i++) {
+      const arch = this._arches[i]!;
+      arch.x -= dx;
+      if (arch.x < -HALF_W - 130) {
+        arch.x = HALF_W + 130 + Math.random() * 120;
       }
 
-      // Fan blade active rotation
-      if (struct.type === 'tower' && struct.mesh.userData.blades) {
-        struct.mesh.userData.blades.rotation.z += 3.5 * dt;
+      this._rotationEuler.set(0, 0, 0);
+      this._setInstanceTransform(this._archRingMesh, i, [arch.x, arch.y, arch.z], this._rotationEuler);
+      this._setInstanceTransform(this._archTrimMesh, i, [arch.x, arch.y, arch.z], this._rotationEuler);
+      this._setInstanceTransform(this._archOuterTrimMesh, i, [arch.x, arch.y, arch.z], this._rotationEuler);
+
+      this._setInstanceTransform(this._archPanelMesh, panelIndex++, [arch.x, arch.y + 235, arch.z], this._rotationEuler);
+      this._setInstanceTransform(this._archPanelMesh, panelIndex++, [arch.x, arch.y - 235, arch.z], this._rotationEuler);
+      this._setInstanceTransform(this._archIndicatorMesh, indicatorIndex++, [arch.x, arch.y + 205, arch.z], this._rotationEuler);
+      this._setInstanceTransform(this._archIndicatorMesh, indicatorIndex++, [arch.x, arch.y - 205, arch.z], this._rotationEuler);
+    }
+
+    this._archRingMesh.instanceMatrix.needsUpdate = true;
+    this._archTrimMesh.instanceMatrix.needsUpdate = true;
+    this._archOuterTrimMesh.instanceMatrix.needsUpdate = true;
+    this._archPanelMesh.instanceMatrix.needsUpdate = true;
+    this._archIndicatorMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private _updateTowers(dt: number): void {
+    const dx = this.baseSpeed * 0.70 * dt;
+    let bladeIndex = 0;
+
+    for (let i = 0; i < this._towers.length; i++) {
+      const tower = this._towers[i]!;
+      tower.x -= dx;
+      tower.bladeRotation += 3.5 * dt;
+
+      if (tower.x < -HALF_W - 130) {
+        tower.x = HALF_W + 130 + Math.random() * 120;
+        tower.flipped = Math.random() > 0.5;
+        const sign = tower.flipped ? 1 : -1;
+        tower.y = sign * (145 + Math.random() * 25);
+        tower.z = -45 - Math.random() * 7;
       }
 
-      // Orbital station ring slow rotation
-      if (struct.type === 'ring') {
-        struct.mesh.rotation.y += 0.22 * dt;
+      const rotationZ = tower.flipped ? Math.PI : 0;
+      const yDir = tower.flipped ? -1 : 1;
+      this._rotationEuler.set(0, 0, rotationZ);
+      this._setInstanceTransform(this._towerBaseMesh, i, [tower.x, tower.y, tower.z], this._rotationEuler);
+      this._setInstanceTransform(this._towerHubMesh, i, [tower.x, tower.y + (10 * yDir), tower.z + 5], this._rotationEuler);
+      this._setInstanceTransform(this._towerVentMesh, i, [tower.x, tower.y + (56 * yDir), tower.z], this._rotationEuler);
+
+      this._rotationEuler.set(0, 0, rotationZ + tower.bladeRotation);
+      this._setInstanceTransform(this._towerBladeMesh, bladeIndex++, [tower.x, tower.y + (10 * yDir), tower.z + 5], this._rotationEuler);
+      this._rotationEuler.set(0, 0, rotationZ + tower.bladeRotation + Math.PI / 2);
+      this._setInstanceTransform(this._towerBladeMesh, bladeIndex++, [tower.x, tower.y + (10 * yDir), tower.z + 5], this._rotationEuler);
+    }
+
+    this._towerBaseMesh.instanceMatrix.needsUpdate = true;
+    this._towerHubMesh.instanceMatrix.needsUpdate = true;
+    this._towerVentMesh.instanceMatrix.needsUpdate = true;
+    this._towerBladeMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private _updatePipes(dt: number): void {
+    const dx = this.baseSpeed * 0.65 * dt;
+    let clampIndex = 0;
+    let seamIndex = 0;
+
+    for (let i = 0; i < this._pipes.length; i++) {
+      const pipe = this._pipes[i]!;
+      pipe.x -= dx;
+
+      if (pipe.x < -HALF_W - 130) {
+        pipe.x = HALF_W + 130 + Math.random() * 120;
+        const sign = Math.random() > 0.5 ? 1 : -1;
+        pipe.y = sign * (190 + Math.random() * 20);
+        pipe.z = -55 - Math.random() * 7;
+      }
+
+      this._rotationEuler.set(0, 0, 0);
+      this._setInstanceTransform(this._pipeBodyMesh, i, [pipe.x, pipe.y, pipe.z], this._rotationEuler);
+      this._setInstanceTransform(this._pipeClampMesh, clampIndex++, [pipe.x - 75, pipe.y, pipe.z], this._rotationEuler);
+      this._setInstanceTransform(this._pipeClampMesh, clampIndex++, [pipe.x + 75, pipe.y, pipe.z], this._rotationEuler);
+      this._setInstanceTransform(this._pipeSeamMesh, seamIndex++, [pipe.x - 75, pipe.y, pipe.z], this._rotationEuler);
+      this._setInstanceTransform(this._pipeSeamMesh, seamIndex++, [pipe.x + 75, pipe.y, pipe.z], this._rotationEuler);
+    }
+
+    this._pipeBodyMesh.instanceMatrix.needsUpdate = true;
+    this._pipeClampMesh.instanceMatrix.needsUpdate = true;
+    this._pipeSeamMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private _updateSpires(dt: number): void {
+    const dx = this.baseSpeed * 0.25 * dt;
+
+    for (let i = 0; i < this._spires.length; i++) {
+      const spire = this._spires[i]!;
+      spire.x -= dx;
+
+      if (spire.x < -HALF_W - 130) {
+        spire.x = HALF_W + 130 + Math.random() * 120;
+        spire.flipped = Math.random() > 0.5;
+        const sign = spire.flipped ? 1 : -1;
+        spire.y = sign * (180 + Math.random() * 40);
+      }
+
+      const rotationZ = spire.flipped ? Math.PI : 0;
+      const yDir = spire.flipped ? -1 : 1;
+      this._rotationEuler.set(0, 0, rotationZ);
+      this._setInstanceTransform(this._spireBodyMesh, i, [spire.x, spire.y, spire.z], this._rotationEuler);
+      this._setInstanceTransform(this._spireCrownMesh, i, [spire.x, spire.y + (240 * yDir), spire.z], this._rotationEuler);
+    }
+
+    this._spireBodyMesh.instanceMatrix.needsUpdate = true;
+    this._spireCrownMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private _updateRings(dt: number): void {
+    const dx = this.baseSpeed * 0.20 * dt;
+
+    for (let i = 0; i < this._rings.length; i++) {
+      const ring = this._rings[i]!;
+      ring.x -= dx;
+      ring.rotationY += 0.22 * dt;
+
+      if (ring.x < -HALF_W - 130) {
+        ring.x = HALF_W + 130 + Math.random() * 120;
+        ring.y = (Math.random() - 0.5) * 90;
+      }
+
+      this._rotationEuler.set(0, ring.rotationY, 0);
+      this._setInstanceTransform(this._ringBodyMesh, i, [ring.x, ring.y, ring.z], this._rotationEuler);
+      this._setInstanceTransform(this._ringCoreMesh, i, [ring.x, ring.y, ring.z], this._rotationEuler);
+    }
+
+    this._ringBodyMesh.instanceMatrix.needsUpdate = true;
+    this._ringCoreMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private _updateDust(dt: number): void {
+    const counts = {
+      octaCyan: 0,
+      octaBlue: 0,
+      tetraCyan: 0,
+      tetraBlue: 0,
+    };
+
+    for (const dust of this._dust) {
+      dust.x -= this.baseSpeed * dust.speedMult * dt;
+      dust.rotationX += dust.rx * dt;
+      dust.rotationY += dust.ry * dt;
+      dust.rotationZ += dust.rz * dt;
+
+      if (dust.x < -HALF_W - 40) {
+        dust.x = HALF_W + 40 + Math.random() * 40;
+        dust.y = (Math.random() - 0.5) * GAME_HEIGHT * 1.2;
+      }
+
+      this._rotationEuler.set(dust.rotationX, dust.rotationY, dust.rotationZ);
+      if (dust.kind === 'octa' && dust.color === 'cyan') {
+        this._setInstanceTransform(this._dustOctaCyanMesh, counts.octaCyan++, [dust.x, dust.y, dust.z], this._rotationEuler);
+      } else if (dust.kind === 'octa' && dust.color === 'blue') {
+        this._setInstanceTransform(this._dustOctaBlueMesh, counts.octaBlue++, [dust.x, dust.y, dust.z], this._rotationEuler);
+      } else if (dust.kind === 'tetra' && dust.color === 'cyan') {
+        this._setInstanceTransform(this._dustTetraCyanMesh, counts.tetraCyan++, [dust.x, dust.y, dust.z], this._rotationEuler);
+      } else {
+        this._setInstanceTransform(this._dustTetraBlueMesh, counts.tetraBlue++, [dust.x, dust.y, dust.z], this._rotationEuler);
       }
     }
 
-    // 2. Scroll & Tumbling Crystalline Space Dust
-    for (const d of this._dust) {
-      const dx = this.baseSpeed * d.speedMult * dt;
-      d.mesh.position.x -= dx;
-
-      // Active rotation spin
-      d.mesh.rotation.x += d.rx * dt;
-      d.mesh.rotation.y += d.ry * dt;
-      d.mesh.rotation.z += d.rz * dt;
-
-      // Wrap space dust
-      if (d.mesh.position.x < -HALF_W - 40) {
-        d.mesh.position.x = HALF_W + 40 + Math.random() * 40;
-        d.mesh.position.y = (Math.random() - 0.5) * GAME_HEIGHT * 1.2;
-      }
-    }
+    this._dustOctaCyanMesh.count = counts.octaCyan;
+    this._dustOctaBlueMesh.count = counts.octaBlue;
+    this._dustTetraCyanMesh.count = counts.tetraCyan;
+    this._dustTetraBlueMesh.count = counts.tetraBlue;
+    this._dustOctaCyanMesh.instanceMatrix.needsUpdate = true;
+    this._dustOctaBlueMesh.instanceMatrix.needsUpdate = true;
+    this._dustTetraCyanMesh.instanceMatrix.needsUpdate = true;
+    this._dustTetraBlueMesh.instanceMatrix.needsUpdate = true;
   }
 
   destroy(): void {
-    // 1. Clean up Nebula
     if (this._nebulaMesh) {
       this._scene.remove(this._nebulaMesh);
       this._nebulaMesh.geometry.dispose();
@@ -495,33 +572,55 @@ export class Background implements IBackground {
       this._nebulaMesh = null;
     }
 
-    // 2. Clean up Megastructures
-    for (const struct of this._structures) {
-      this._scene.remove(struct.mesh);
-      struct.mesh.traverse(child => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-        }
-      });
+    for (const mesh of [
+      this._archRingMesh,
+      this._archPanelMesh,
+      this._archIndicatorMesh,
+      this._archTrimMesh,
+      this._archOuterTrimMesh,
+      this._towerBaseMesh,
+      this._towerHubMesh,
+      this._towerBladeMesh,
+      this._towerVentMesh,
+      this._pipeBodyMesh,
+      this._pipeClampMesh,
+      this._pipeSeamMesh,
+      this._spireBodyMesh,
+      this._spireCrownMesh,
+      this._ringBodyMesh,
+      this._ringCoreMesh,
+      this._dustOctaCyanMesh,
+      this._dustOctaBlueMesh,
+      this._dustTetraCyanMesh,
+      this._dustTetraBlueMesh,
+    ]) {
+      this._scene.remove(mesh);
     }
-    this._structures = [];
 
-    // Dispose shared model styling resources
+    this._archRingGeo.dispose();
+    this._archPanelGeo.dispose();
+    this._archIndicatorGeo.dispose();
+    this._archTrimGeo.dispose();
+    this._archOuterTrimGeo.dispose();
+    this._towerBaseGeo.dispose();
+    this._towerHubGeo.dispose();
+    this._towerBladeGeo.dispose();
+    this._towerVentGeo.dispose();
+    this._pipeBodyGeo.dispose();
+    this._pipeClampGeo.dispose();
+    this._pipeSeamGeo.dispose();
+    this._spireBodyGeo.dispose();
+    this._spireCrownGeo.dispose();
+    this._ringBodyGeo.dispose();
+    this._ringCoreGeo.dispose();
+    this._dustGeoOcta.dispose();
+    this._dustGeoTetra.dispose();
+
     this._baseMat.dispose();
     this._emissiveMat.dispose();
     this._archBaseMat.dispose();
     this._archEmissiveMat.dispose();
-
-    // 3. Clean up Crystalline Space Dust
-    for (const d of this._dust) {
-      this._scene.remove(d.mesh);
-    }
-    this._dust = [];
-
-    // Dispose shared dust resources
     this._dustMatCyan.dispose();
     this._dustMatBlue.dispose();
-    this._dustGeoOcta.dispose();
-    this._dustGeoTetra.dispose();
   }
 }
