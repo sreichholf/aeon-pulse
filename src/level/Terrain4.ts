@@ -16,7 +16,6 @@ interface ControlPoint {
 }
 
 interface ColumnEntry {
-  mesh: THREE.Mesh;
   dx: number;
   dz: number;
   heightOffset: number;
@@ -88,6 +87,8 @@ export class Terrain4 implements ITerrain {
   private _lavaPlaneMat: THREE.MeshBasicMaterial;
   private _topColumnGeo: THREE.CylinderGeometry;
   private _botColumnGeo: THREE.CylinderGeometry;
+  private _topColumnMesh: THREE.InstancedMesh;
+  private _botColumnMesh: THREE.InstancedMesh;
 
   private _topSlots: ColumnEntry[][];
   private _botSlots: ColumnEntry[][];
@@ -96,14 +97,15 @@ export class Terrain4 implements ITerrain {
   private _slotCount: number;
 
   private _backingGeo: THREE.PlaneGeometry;
-  private _topBackings: THREE.Mesh[];
-  private _botBackings: THREE.Mesh[];
+  private _topBackingMesh: THREE.InstancedMesh;
+  private _botBackingMesh: THREE.InstancedMesh;
 
   private _debrisPool: DebrisEntry[];
   private _debrisGeo: THREE.ConeGeometry;
 
   private _scrollX: number;
   private _time: number;
+  private _instanceHelper: THREE.Object3D;
 
   constructor(scene: IScene, points: ControlPoint[]) {
     this._scene  = scene;
@@ -127,16 +129,25 @@ export class Terrain4 implements ITerrain {
       color: 0xff4400,      // Rich glowing red-orange
     });
 
+    this._slotSpacing = 28; // horizontal spacing between slots
+    this._slotCount = 60;   // pool size: covering screen width with safety margin
+    this._topSlots = [];
+    this._botSlots = [];
+
     // 3. Hexagonal Column geometries (tapered to create angled crystal basalt spires)
     // Wider base at screen edges, narrower tip extending into cavern
     this._topColumnGeo = new THREE.CylinderGeometry(15, 15 * 0.55, 1, 6);
     this._botColumnGeo = new THREE.CylinderGeometry(15 * 0.55, 15, 1, 6);
-
-    this._topSlots = [];
-    this._botSlots = [];
-
-    this._slotSpacing = 28; // horizontal spacing between slots
-    this._slotCount = 60;   // pool size: covering screen width with safety margin
+    this._topColumnMesh = new THREE.InstancedMesh(this._topColumnGeo, this._rockMat, this._slotCount * 3);
+    this._botColumnMesh = new THREE.InstancedMesh(this._botColumnGeo, this._rockMat, this._slotCount * 3);
+    this._topColumnMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this._botColumnMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    markRenderCategory(this._topColumnMesh, RenderCategory.TERRAIN, 'terrain.column');
+    markRenderCategory(this._botColumnMesh, RenderCategory.TERRAIN, 'terrain.column');
+    this._topColumnMesh.count = 0;
+    this._botColumnMesh.count = 0;
+    this._scene.add(this._topColumnMesh);
+    this._scene.add(this._botColumnMesh);
 
     // Pre-allocate slots, each holding 3 columns layered between Z = -28 and Z = -12 (behind player at Z = 2)
     for (let i = 0; i < this._slotCount; i++) {
@@ -152,15 +163,7 @@ export class Terrain4 implements ITerrain {
         const slantX = 0; // Zero depth-based tilt to prevent column meshes from extending into player ship's depth plane
         const slantZ = (Math.random() - 0.5) * 0.22;
 
-        // Top Column
-        const topMesh = new THREE.Mesh(this._topColumnGeo, this._rockMat);
-        markRenderCategory(topMesh, RenderCategory.TERRAIN, 'terrain.column');
-        topMesh.rotation.set(slantX, rotY, slantZ);
-        topMesh.visible = false;
-        this._scene.add(topMesh);
-
         topCols.push({
-          mesh: topMesh,
           dx,
           dz: zDepth,
           heightOffset: heightVar,
@@ -170,15 +173,7 @@ export class Terrain4 implements ITerrain {
           slantZ,
         });
 
-        // Bottom Column
-        const botMesh = new THREE.Mesh(this._botColumnGeo, this._rockMat);
-        markRenderCategory(botMesh, RenderCategory.TERRAIN, 'terrain.column');
-        botMesh.rotation.set(slantX, rotY, slantZ);
-        botMesh.visible = false;
-        this._scene.add(botMesh);
-
         botCols.push({
-          mesh: botMesh,
           dx,
           dz: zDepth,
           heightOffset: heightVar,
@@ -196,22 +191,16 @@ export class Terrain4 implements ITerrain {
     // 4. Pre-allocate 120 slot-based backing lava planes at Z = -35
     // These block the background void *only* behind the column sets, preventing bleeding
     this._backingGeo = new THREE.PlaneGeometry(28, 1);
-    this._topBackings = [];
-    this._botBackings = [];
-
-    for (let i = 0; i < this._slotCount; i++) {
-      const tBack = new THREE.Mesh(this._backingGeo, this._lavaPlaneMat);
-      markRenderCategory(tBack, RenderCategory.TERRAIN, 'terrain.backing');
-      tBack.visible = false;
-      this._scene.add(tBack);
-      this._topBackings.push(tBack);
-
-      const bBack = new THREE.Mesh(this._backingGeo, this._lavaPlaneMat);
-      markRenderCategory(bBack, RenderCategory.TERRAIN, 'terrain.backing');
-      bBack.visible = false;
-      this._scene.add(bBack);
-      this._botBackings.push(bBack);
-    }
+    this._topBackingMesh = new THREE.InstancedMesh(this._backingGeo, this._lavaPlaneMat, this._slotCount);
+    this._botBackingMesh = new THREE.InstancedMesh(this._backingGeo, this._lavaPlaneMat, this._slotCount);
+    this._topBackingMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this._botBackingMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    markRenderCategory(this._topBackingMesh, RenderCategory.TERRAIN, 'terrain.backing');
+    markRenderCategory(this._botBackingMesh, RenderCategory.TERRAIN, 'terrain.backing');
+    this._topBackingMesh.count = 0;
+    this._botBackingMesh.count = 0;
+    this._scene.add(this._topBackingMesh);
+    this._scene.add(this._botBackingMesh);
 
     // 5. Pre-allocate pool of 30 falling rock debris chunks
     this._debrisPool = [];
@@ -238,7 +227,22 @@ export class Terrain4 implements ITerrain {
 
     this._scrollX = 0;
     this._time = 0;
+    this._instanceHelper = new THREE.Object3D();
     this.update(0);
+  }
+
+  private _setInstanceTransform(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    position: THREE.Vector3Tuple,
+    rotation: THREE.Euler,
+    scale: THREE.Vector3Tuple,
+  ): void {
+    this._instanceHelper.position.set(...position);
+    this._instanceHelper.rotation.copy(rotation);
+    this._instanceHelper.scale.set(...scale);
+    this._instanceHelper.updateMatrix();
+    mesh.setMatrixAt(index, this._instanceHelper.matrix);
   }
 
   triggerLavaPulse(): void {
@@ -394,15 +398,10 @@ export class Terrain4 implements ITerrain {
     this._lavaPlaneMat.color.copy(curLava);
 
     // 4. Update the boundary Columns & Backing Planes dynamically
-    // Hide all meshes first
-    for (let i = 0; i < this._slotCount; i++) {
-      this._topBackings[i]!.visible = false;
-      this._botBackings[i]!.visible = false;
-      for (let d = 0; d < 3; d++) {
-        this._topSlots[i]![d]!.mesh.visible = false;
-        this._botSlots[i]![d]!.mesh.visible = false;
-      }
-    }
+    let topBackingCount = 0;
+    let botBackingCount = 0;
+    let topColumnCount = 0;
+    let botColumnCount = 0;
 
     const S = this._slotSpacing;
     const startSlot = Math.floor((scrollX - GAME_WIDTH / 2 - 120) / S);
@@ -421,20 +420,26 @@ export class Terrain4 implements ITerrain {
 
       // 4A. Update slot-clamped Lava Backing Planes (Z = -35)
       // These perfectly mask the background spires only where the column meshes stand
-      const tBack = this._topBackings[poolIndex]!;
-      tBack.scale.set(1, slotTopHeight, 1);
-      tBack.position.set(slotWorldX - scrollX, GAME_HEIGHT / 2 - slotTopHeight / 2, -35);
-      tBack.visible = true;
+      this._setInstanceTransform(
+        this._topBackingMesh,
+        topBackingCount++,
+        [slotWorldX - scrollX, GAME_HEIGHT / 2 - slotTopHeight / 2, -35],
+        new THREE.Euler(0, 0, 0),
+        [1, slotTopHeight, 1],
+      );
 
-      const bBack = this._botBackings[poolIndex]!;
-      bBack.scale.set(1, slotBotHeight, 1);
-      bBack.position.set(slotWorldX - scrollX, -GAME_HEIGHT / 2 + slotBotHeight / 2, -35);
-      bBack.visible = true;
+      this._setInstanceTransform(
+        this._botBackingMesh,
+        botBackingCount++,
+        [slotWorldX - scrollX, -GAME_HEIGHT / 2 + slotBotHeight / 2, -35],
+        new THREE.Euler(0, 0, 0),
+        [1, slotBotHeight, 1],
+      );
 
       // 4B. Update individual Column meshes (Z = -28 to 8)
       for (let d = 0; d < 3; d++) {
         const tCol = topCols[d]!;
-        const bCol = botCols[d]!
+        const bCol = botCols[d]!;
 
         const tWorldX = slotWorldX + tCol.dx;
         const bWorldX = slotWorldX + bCol.dx;
@@ -444,19 +449,34 @@ export class Terrain4 implements ITerrain {
 
         // Position, scale & rotate Top Column
         const topHeight = Math.max(1, (GAME_HEIGHT / 2 - tWalls.top) + tCol.heightOffset);
-        tCol.mesh.scale.set(tCol.radius, topHeight, 0.2);
-        tCol.mesh.position.set(tWorldX - scrollX, GAME_HEIGHT / 2 - topHeight / 2, tCol.dz);
-        tCol.mesh.rotation.set(tCol.slantX, tCol.rotY, tCol.slantZ);
-        tCol.mesh.visible = true;
+        this._setInstanceTransform(
+          this._topColumnMesh,
+          topColumnCount++,
+          [tWorldX - scrollX, GAME_HEIGHT / 2 - topHeight / 2, tCol.dz],
+          new THREE.Euler(tCol.slantX, tCol.rotY, tCol.slantZ),
+          [tCol.radius, topHeight, 0.2],
+        );
 
         // Position, scale & rotate Bottom Column
         const botHeight = Math.max(1, (bWalls.bottom - (-GAME_HEIGHT / 2)) + bCol.heightOffset);
-        bCol.mesh.scale.set(bCol.radius, botHeight, 0.2);
-        bCol.mesh.position.set(bWorldX - scrollX, -GAME_HEIGHT / 2 + botHeight / 2, bCol.dz);
-        bCol.mesh.rotation.set(bCol.slantX, bCol.rotY, bCol.slantZ);
-        bCol.mesh.visible = true;
+        this._setInstanceTransform(
+          this._botColumnMesh,
+          botColumnCount++,
+          [bWorldX - scrollX, -GAME_HEIGHT / 2 + botHeight / 2, bCol.dz],
+          new THREE.Euler(bCol.slantX, bCol.rotY, bCol.slantZ),
+          [bCol.radius, botHeight, 0.2],
+        );
       }
     }
+
+    this._topBackingMesh.count = topBackingCount;
+    this._botBackingMesh.count = botBackingCount;
+    this._topColumnMesh.count = topColumnCount;
+    this._botColumnMesh.count = botColumnCount;
+    this._topBackingMesh.instanceMatrix.needsUpdate = true;
+    this._botBackingMesh.instanceMatrix.needsUpdate = true;
+    this._topColumnMesh.instanceMatrix.needsUpdate = true;
+    this._botColumnMesh.instanceMatrix.needsUpdate = true;
 
     // 5. Spawning & updating gravity-driven falling ceiling debris
     if (this._pulsing && Math.random() < 0.15) {
@@ -507,20 +527,14 @@ export class Terrain4 implements ITerrain {
     this._scene.camera.position.set(0, 0, 100);
 
     // Clean up backing planes
-    for (let i = 0; i < this._slotCount; i++) {
-      this._scene.remove(this._topBackings[i]!);
-      this._scene.remove(this._botBackings[i]!);
-    }
+    this._scene.remove(this._topBackingMesh);
+    this._scene.remove(this._botBackingMesh);
     this._backingGeo.dispose();
     this._lavaPlaneMat.dispose();
 
     // Clean up columns
-    for (let i = 0; i < this._slotCount; i++) {
-      for (let d = 0; d < 3; d++) {
-        this._scene.remove(this._topSlots[i]![d]!.mesh);
-        this._scene.remove(this._botSlots[i]![d]!.mesh);
-      }
-    }
+    this._scene.remove(this._topColumnMesh);
+    this._scene.remove(this._botColumnMesh);
     this._topColumnGeo.dispose();
     this._botColumnGeo.dispose();
 

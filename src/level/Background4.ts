@@ -19,8 +19,10 @@ const BACKDROP_FRAG = `
 `;
 
 interface SpireEntry {
-  mesh: THREE.Mesh;
   isTop: boolean;
+  x: number;
+  y: number;
+  z: number;
   baseWidth: number;
   baseHeight: number;
 }
@@ -31,7 +33,6 @@ interface GeyserEntry {
 }
 
 interface ParticleEntry {
-  mesh: THREE.Mesh;
   x: number;
   y: number;
   z: number;
@@ -43,22 +44,31 @@ interface ParticleEntry {
 }
 
 interface SubRock {
-  mesh: THREE.Mesh;
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+  scaleX: number;
+  scaleY: number;
+  scaleZ: number;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
   rotX: number;
   rotY: number;
   rotZ: number;
 }
 
 interface PlateEntry {
-  group: THREE.Group;
-  mainMesh: THREE.Mesh;
+  x: number;
+  y: number;
+  z: number;
+  mainScale: { x: number; y: number; z: number };
+  mainRotation: { x: number; y: number; z: number };
   mainRot: { x: number; y: number; z: number };
   subRocks: SubRock[];
 }
 
 interface EmberEntry {
-  mesh: THREE.Mesh;
-  mat: THREE.MeshBasicMaterial;
   x: number;
   y: number;
   z: number;
@@ -82,6 +92,8 @@ export class Background4 implements IBackground {
   private _spireGeoTop: THREE.ConeGeometry;
   private _spireGeoBot: THREE.ConeGeometry;
   private _spireMat: THREE.MeshPhongMaterial;
+  private _topSpireMesh: THREE.InstancedMesh;
+  private _botSpireMesh: THREE.InstancedMesh;
 
   private _geysers: GeyserEntry[];
   private _geyserGeo: THREE.CylinderGeometry;
@@ -90,14 +102,21 @@ export class Background4 implements IBackground {
   private _particles: ParticleEntry[];
   private _particleGeo: THREE.SphereGeometry;
   private _particleMat: THREE.MeshBasicMaterial;
+  private _particleMesh: THREE.InstancedMesh;
 
   private _plates: PlateEntry[];
   private _mainRockGeo: THREE.IcosahedronGeometry;
   private _subRockGeo: THREE.IcosahedronGeometry;
   private _plateMat: THREE.MeshPhongMaterial;
+  private _plateMainMesh: THREE.InstancedMesh;
+  private _plateSubMesh: THREE.InstancedMesh;
 
   private _embers: EmberEntry[];
   private _emberGeo: THREE.BoxGeometry;
+  private _emberMat: THREE.MeshBasicMaterial;
+  private _emberMesh: THREE.InstancedMesh;
+  private _instanceHelper: THREE.Object3D;
+  private _blackColor: THREE.Color;
 
   constructor(scene: IScene) {
     this._scene = scene;
@@ -131,30 +150,34 @@ export class Background4 implements IBackground {
       shininess: 90,        // Extremely glassy
       flatShading: true,
     });
+    this._topSpireMesh = new THREE.InstancedMesh(this._spireGeoTop, this._spireMat, 4);
+    this._botSpireMesh = new THREE.InstancedMesh(this._spireGeoBot, this._spireMat, 4);
+    this._topSpireMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this._botSpireMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    markRenderCategory(this._topSpireMesh, RenderCategory.BACKGROUND, 'background.spire');
+    markRenderCategory(this._botSpireMesh, RenderCategory.BACKGROUND, 'background.spire');
+    this._topSpireMesh.count = 0;
+    this._botSpireMesh.count = 0;
+    this._scene.add(this._topSpireMesh);
+    this._scene.add(this._botSpireMesh);
 
     const spireCount = 8;
     for (let i = 0; i < spireCount; i++) {
       const isTop = i % 2 === 0;
-      const geo = isTop ? this._spireGeoTop : this._spireGeoBot;
-      const mesh = new THREE.Mesh(geo, this._spireMat);
-      markRenderCategory(mesh, RenderCategory.BACKGROUND, 'background.spire');
-
-      // Orient ceiling spires to point down
-      if (isTop) {
-        mesh.rotation.z = Math.PI;
-      }
-
       // Position spaced out horizontally with visual variety
       const x = (i - spireCount / 2) * (GAME_WIDTH / (spireCount - 1.5));
       const y = isTop ? GAME_HEIGHT / 2 - 20 : -GAME_HEIGHT / 2 + 20;
-      mesh.position.set(x, y, -85);
 
       const heightScale = 0.8 + Math.random() * 0.5;
       const widthScale = 0.7 + Math.random() * 0.6;
-      mesh.scale.set(widthScale, heightScale, widthScale);
-
-      this._scene.add(mesh);
-      this._spires.push({ mesh, isTop, baseWidth: widthScale, baseHeight: heightScale });
+      this._spires.push({
+        isTop,
+        x,
+        y,
+        z: -85,
+        baseWidth: widthScale,
+        baseHeight: heightScale,
+      });
     }
 
     // 3. Lava Geysers & Vents (Z = -65) - Parallax 0.25
@@ -187,16 +210,17 @@ export class Background4 implements IBackground {
     this._particleGeo = new THREE.SphereGeometry(3.5, 4, 4);
     this._particleMat = new THREE.MeshBasicMaterial({
       color: 0xffaa00,
+      transparent: true,
+      opacity: 0.9,
     });
+    this._particleMesh = new THREE.InstancedMesh(this._particleGeo, this._particleMat, 25);
+    this._particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    markRenderCategory(this._particleMesh, RenderCategory.BACKGROUND, 'background.geyserParticle');
+    this._particleMesh.count = 0;
+    this._scene.add(this._particleMesh);
 
     for (let i = 0; i < 25; i++) {
-      const mesh = new THREE.Mesh(this._particleGeo, this._particleMat);
-      markRenderCategory(mesh, RenderCategory.BACKGROUND, 'background.geyserParticle');
-      mesh.visible = false;
-      this._scene.add(mesh);
-
       this._particles.push({
-        mesh,
         x: 0,
         y: 0,
         z: -64,
@@ -220,21 +244,27 @@ export class Background4 implements IBackground {
       shininess: 12,        // Low shininess to make it look rough, dusty, and matte
       flatShading: true,
     });
+    this._plateMainMesh = new THREE.InstancedMesh(this._mainRockGeo, this._plateMat, 5);
+    this._plateSubMesh = new THREE.InstancedMesh(this._subRockGeo, this._plateMat, 10);
+    this._plateMainMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this._plateSubMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    markRenderCategory(this._plateMainMesh, RenderCategory.BACKGROUND, 'background.rockPlate');
+    markRenderCategory(this._plateSubMesh, RenderCategory.BACKGROUND, 'background.rockPlate');
+    this._plateMainMesh.count = 0;
+    this._plateSubMesh.count = 0;
+    this._scene.add(this._plateMainMesh);
+    this._scene.add(this._plateSubMesh);
 
     const plateCount = 5;
     for (let i = 0; i < plateCount; i++) {
-      const group = new THREE.Group();
-      markRenderCategory(group, RenderCategory.BACKGROUND, 'background.rockPlate');
-
-      // Main chunky boulder
-      const mainMesh = new THREE.Mesh(this._mainRockGeo, this._plateMat);
-      // Highly irregular low-poly scaling for jagged rocky appearance
       const sx = 0.85 + Math.random() * 0.5;
       const sy = 0.85 + Math.random() * 0.5;
       const sz = 0.85 + Math.random() * 0.5;
-      mainMesh.scale.set(sx, sy, sz);
-      mainMesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-      group.add(mainMesh);
+      const mainRotation = {
+        x: Math.random() * Math.PI,
+        y: Math.random() * Math.PI,
+        z: 0,
+      };
 
       const mainRot = {
         x: (Math.random() - 0.5) * 0.25,
@@ -246,23 +276,25 @@ export class Background4 implements IBackground {
       const subRocks: SubRock[] = [];
       const numSubs = 1 + Math.floor(Math.random() * 2);
       for (let j = 0; j < numSubs; j++) {
-        const subMesh = new THREE.Mesh(this._subRockGeo, this._plateMat);
-        // Irregular rocky scaling for satellite shards too
         const ssx = 0.7 + Math.random() * 0.6;
         const ssy = 0.7 + Math.random() * 0.6;
         const ssz = 0.7 + Math.random() * 0.6;
-        subMesh.scale.set(ssx, ssy, ssz);
 
         // Offset satellites around the main rock
         const dx = (Math.random() > 0.5 ? 1 : -1) * (26 + Math.random() * 12);
         const dy = (Math.random() - 0.5) * 32;
         const dz = (Math.random() - 0.5) * 14;
-        subMesh.position.set(dx, dy, dz);
-        subMesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-        group.add(subMesh);
 
         subRocks.push({
-          mesh: subMesh,
+          offsetX: dx,
+          offsetY: dy,
+          offsetZ: dz,
+          scaleX: ssx,
+          scaleY: ssy,
+          scaleZ: ssz,
+          rotationX: Math.random() * Math.PI,
+          rotationY: Math.random() * Math.PI,
+          rotationZ: 0,
           rotX: (Math.random() - 0.5) * 0.6,
           rotY: (Math.random() - 0.5) * 0.6,
           rotZ: (Math.random() - 0.5) * 0.4,
@@ -271,12 +303,13 @@ export class Background4 implements IBackground {
 
       const x = (i - plateCount / 2) * (GAME_WIDTH / (plateCount - 0.8)) + (Math.random() - 0.5) * 40;
       const y = (Math.random() - 0.5) * (GAME_HEIGHT * 0.5); // float around middle vertical area
-      group.position.set(x, y, -50);
-      this._scene.add(group);
 
       this._plates.push({
-        group,
-        mainMesh,
+        x,
+        y,
+        z: -50,
+        mainScale: { x: sx, y: sy, z: sz },
+        mainRotation,
         mainRot,
         subRocks,
       });
@@ -285,28 +318,27 @@ export class Background4 implements IBackground {
     // 6. Tumbling atmospheric space embers (75 flickering items) - Z = -45 to +10
     this._embers = [];
     this._emberGeo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+    this._emberMat = new THREE.MeshBasicMaterial({
+      color: 0xff8800,
+      transparent: true,
+      opacity: 1,
+      vertexColors: true,
+    });
+    this._emberMesh = new THREE.InstancedMesh(this._emberGeo, this._emberMat, 75);
+    this._emberMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this._emberMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(75 * 3), 3);
+    markRenderCategory(this._emberMesh, RenderCategory.BACKGROUND, 'background.ember');
+    this._emberMesh.count = 75;
+    this._scene.add(this._emberMesh);
+    this._instanceHelper = new THREE.Object3D();
+    this._blackColor = new THREE.Color(0x000000);
 
     for (let i = 0; i < 75; i++) {
-      // Individual cloned materials for custom opacity animation
-      const mat = new THREE.MeshBasicMaterial({
-        color: 0xff8800,
-        transparent: true,
-        opacity: 0.5,
-      });
-      const mesh = new THREE.Mesh(this._emberGeo, mat);
-      markRenderCategory(mesh, RenderCategory.BACKGROUND, 'background.ember');
-
       const x = (Math.random() - 0.5) * GAME_WIDTH;
       const y = (Math.random() - 0.5) * GAME_HEIGHT;
       const z = -45 + Math.random() * 55; // distributed in Z
-      mesh.position.set(x, y, z);
-
-      mesh.rotation.set(Math.random() * 3, Math.random() * 3, 0);
-      this._scene.add(mesh);
 
       this._embers.push({
-        mesh,
-        mat,
         x,
         y,
         z,
@@ -319,6 +351,20 @@ export class Background4 implements IBackground {
     }
   }
 
+  private _setInstanceTransform(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    position: THREE.Vector3Tuple,
+    rotation: THREE.Euler,
+    scale: THREE.Vector3Tuple,
+  ): void {
+    this._instanceHelper.position.set(...position);
+    this._instanceHelper.rotation.copy(rotation);
+    this._instanceHelper.scale.set(...scale);
+    this._instanceHelper.updateMatrix();
+    mesh.setMatrixAt(index, this._instanceHelper.matrix);
+  }
+
   update(dt: number): void {
     this._time += dt;
     this._backdropMat.uniforms['uTime']!.value = this._time;
@@ -327,20 +373,36 @@ export class Background4 implements IBackground {
 
     // 1. Scroll & wrap Obsidian Spires (Parallax = 0.10)
     const spMultiplier = 0.10;
+    let topSpireCount = 0;
+    let botSpireCount = 0;
     for (const sp of this._spires) {
-      sp.mesh.position.x -= scrollSpeed * spMultiplier * dt;
-      if (sp.mesh.position.x < -GAME_WIDTH / 2 - 60) {
-        sp.mesh.position.x = GAME_WIDTH / 2 + 60;
+      sp.x -= scrollSpeed * spMultiplier * dt;
+      if (sp.x < -GAME_WIDTH / 2 - 60) {
+        sp.x = GAME_WIDTH / 2 + 60;
 
         // Randomize dimensions on wrap to simulate infinite variety
-        const heightScale = 0.8 + Math.random() * 0.5;
-        const widthScale = 0.7 + Math.random() * 0.6;
-        sp.mesh.scale.set(widthScale, heightScale, widthScale);
+        sp.baseHeight = 0.8 + Math.random() * 0.5;
+        sp.baseWidth = 0.7 + Math.random() * 0.6;
 
         // Reposition slightly based on top/bottom
-        sp.mesh.position.y = sp.isTop ? GAME_HEIGHT / 2 - 20 : -GAME_HEIGHT / 2 + 20;
+        sp.y = sp.isTop ? GAME_HEIGHT / 2 - 20 : -GAME_HEIGHT / 2 + 20;
       }
+
+      const mesh = sp.isTop ? this._topSpireMesh : this._botSpireMesh;
+      const index = sp.isTop ? topSpireCount++ : botSpireCount++;
+      const rotationZ = sp.isTop ? Math.PI : 0;
+      this._setInstanceTransform(
+        mesh,
+        index,
+        [sp.x, sp.y, sp.z],
+        new THREE.Euler(0, 0, rotationZ),
+        [sp.baseWidth, sp.baseHeight, sp.baseWidth],
+      );
     }
+    this._topSpireMesh.count = topSpireCount;
+    this._botSpireMesh.count = botSpireCount;
+    this._topSpireMesh.instanceMatrix.needsUpdate = true;
+    this._botSpireMesh.instanceMatrix.needsUpdate = true;
 
     // 2. Scroll & wrap Lava Geysers (Parallax = 0.25)
     const gyMultiplier = 0.25;
@@ -364,20 +426,18 @@ export class Background4 implements IBackground {
           freeP.vy = 65 + Math.random() * 55; // vertical rise speed
           freeP.age = 0;
           freeP.maxAge = 1.0 + Math.random() * 0.8;
-          freeP.mesh.scale.setScalar(1.0);
-          freeP.mesh.visible = true;
         }
       }
     }
 
     // Update active geyser particles
+    let particleCount = 0;
     for (const p of this._particles) {
       if (!p.active) continue;
 
       p.age += dt;
       if (p.age >= p.maxAge) {
         p.active = false;
-        p.mesh.visible = false;
         continue;
       }
 
@@ -386,38 +446,65 @@ export class Background4 implements IBackground {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
 
-      p.mesh.position.set(p.x, p.y, p.z);
-
       // Shrink and fade as particle ages
       const lifeRatio = 1.0 - (p.age / p.maxAge);
-      p.mesh.scale.setScalar(lifeRatio);
+      this._setInstanceTransform(
+        this._particleMesh,
+        particleCount++,
+        [p.x, p.y, p.z],
+        new THREE.Euler(0, 0, 0),
+        [lifeRatio, lifeRatio, lifeRatio],
+      );
     }
+    this._particleMesh.count = particleCount;
+    this._particleMesh.instanceMatrix.needsUpdate = true;
 
     // 3. Scroll, wrap & tumble Tectonic Rocks (Parallax = 0.45)
     const plMultiplier = 0.45;
-    for (const pl of this._plates) {
-      pl.group.position.x -= scrollSpeed * plMultiplier * dt;
-      if (pl.group.position.x < -GAME_WIDTH / 2 - 120) {
-        pl.group.position.x = GAME_WIDTH / 2 + 120;
+    let plateSubIndex = 0;
+    for (let i = 0; i < this._plates.length; i++) {
+      const pl = this._plates[i]!;
+      pl.x -= scrollSpeed * plMultiplier * dt;
+      if (pl.x < -GAME_WIDTH / 2 - 120) {
+        pl.x = GAME_WIDTH / 2 + 120;
         // Re-randomize vertical height on wrap
-        pl.group.position.y = (Math.random() - 0.5) * (GAME_HEIGHT * 0.5);
+        pl.y = (Math.random() - 0.5) * (GAME_HEIGHT * 0.5);
       }
 
       // Slowly tumble the main rock in 3D
-      pl.mainMesh.rotation.x += pl.mainRot.x * dt;
-      pl.mainMesh.rotation.y += pl.mainRot.y * dt;
-      pl.mainMesh.rotation.z += pl.mainRot.z * dt;
+      pl.mainRotation.x += pl.mainRot.x * dt;
+      pl.mainRotation.y += pl.mainRot.y * dt;
+      pl.mainRotation.z += pl.mainRot.z * dt;
+      this._setInstanceTransform(
+        this._plateMainMesh,
+        i,
+        [pl.x, pl.y, pl.z],
+        new THREE.Euler(pl.mainRotation.x, pl.mainRotation.y, pl.mainRotation.z),
+        [pl.mainScale.x, pl.mainScale.y, pl.mainScale.z],
+      );
 
       // Slowly tumble the satellite rock chunks in 3D
       for (const sub of pl.subRocks) {
-        sub.mesh.rotation.x += sub.rotX * dt;
-        sub.mesh.rotation.y += sub.rotY * dt;
-        sub.mesh.rotation.z += sub.rotZ * dt;
+        sub.rotationX += sub.rotX * dt;
+        sub.rotationY += sub.rotY * dt;
+        sub.rotationZ += sub.rotZ * dt;
+        this._setInstanceTransform(
+          this._plateSubMesh,
+          plateSubIndex++,
+          [pl.x + sub.offsetX, pl.y + sub.offsetY, pl.z + sub.offsetZ],
+          new THREE.Euler(sub.rotationX, sub.rotationY, sub.rotationZ),
+          [sub.scaleX, sub.scaleY, sub.scaleZ],
+        );
       }
     }
+    this._plateMainMesh.count = this._plates.length;
+    this._plateSubMesh.count = plateSubIndex;
+    this._plateMainMesh.instanceMatrix.needsUpdate = true;
+    this._plateSubMesh.instanceMatrix.needsUpdate = true;
 
     // 4. Update Embers (drift left/up, tumble, flicker)
-    for (const em of this._embers) {
+    for (let i = 0; i < this._embers.length; i++) {
+      const em = this._embers[i]!;
       em.x += em.vx * dt;
       em.y += em.vy * dt;
 
@@ -431,15 +518,23 @@ export class Background4 implements IBackground {
         em.x = (Math.random() - 0.5) * GAME_WIDTH;
       }
 
-      em.mesh.position.set(em.x, em.y, em.z);
-
-      // Rotations
-      em.mesh.rotation.x += em.rotSpeed * dt;
-      em.mesh.rotation.y += em.rotSpeed * dt;
-
-      // Flicker opacity
       const flickerVal = Math.sin(this._time * em.flickerSpeed + em.flickerOffset);
-      em.mat.opacity = 0.25 + 0.75 * Math.abs(flickerVal);
+      const brightness = 0.25 + 0.75 * Math.abs(flickerVal);
+      const scale = 0.7 + 0.6 * brightness;
+      const rot = this._time * em.rotSpeed;
+
+      this._setInstanceTransform(
+        this._emberMesh,
+        i,
+        [em.x, em.y, em.z],
+        new THREE.Euler(rot, rot, 0),
+        [scale, scale, scale],
+      );
+      this._emberMesh.setColorAt(i, this._blackColor.setRGB(brightness, brightness * 0.55, 0));
+    }
+    this._emberMesh.instanceMatrix.needsUpdate = true;
+    if (this._emberMesh.instanceColor) {
+      this._emberMesh.instanceColor.needsUpdate = true;
     }
   }
 
@@ -450,9 +545,8 @@ export class Background4 implements IBackground {
     this._backdropMat.dispose();
 
     // Spires
-    for (const sp of this._spires) {
-      this._scene.remove(sp.mesh);
-    }
+    this._scene.remove(this._topSpireMesh);
+    this._scene.remove(this._botSpireMesh);
     this._spireGeoTop.dispose();
     this._spireGeoBot.dispose();
     this._spireMat.dispose();
@@ -465,25 +559,20 @@ export class Background4 implements IBackground {
     this._geyserMat.dispose();
 
     // Particles
-    for (const p of this._particles) {
-      this._scene.remove(p.mesh);
-    }
+    this._scene.remove(this._particleMesh);
     this._particleGeo.dispose();
     this._particleMat.dispose();
 
     // Tectonic Rocks
-    for (const pl of this._plates) {
-      this._scene.remove(pl.group);
-    }
+    this._scene.remove(this._plateMainMesh);
+    this._scene.remove(this._plateSubMesh);
     this._mainRockGeo.dispose();
     this._subRockGeo.dispose();
     this._plateMat.dispose();
 
     // Embers
-    for (const em of this._embers) {
-      this._scene.remove(em.mesh);
-      em.mat.dispose();
-    }
+    this._scene.remove(this._emberMesh);
     this._emberGeo.dispose();
+    this._emberMat.dispose();
   }
 }
