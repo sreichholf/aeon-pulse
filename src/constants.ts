@@ -1,2 +1,5 @@
 export const GAME_WIDTH  = 960;
 export const GAME_HEIGHT = 540;
+
+// Temporary build-time switch for exposing all title-screen options in production.
+export const ENABLE_ADVANCED_TITLE_OPTIONS = true;

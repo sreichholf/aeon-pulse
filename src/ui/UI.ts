@@ -10,6 +10,7 @@ import { GameCompleteScreen }  from './screens/GameCompleteScreen.ts';
 import { LevelCompleteScreen } from './screens/LevelCompleteScreen.ts';
 import { ViewerScreen }        from './screens/ViewerScreen.ts';
 import { VolumeControl }       from './screens/VolumeControl.ts';
+import { ENABLE_ADVANCED_TITLE_OPTIONS } from '../constants.ts';
 import type { LevelLabel } from '../campaign/Campaign.ts';
 import { DifficultyMode } from '../types.ts';
 
@@ -50,7 +51,7 @@ export class UI {
   private _volumeControl: VolumeControl;
   private _onResize: () => void;
 
-  constructor(overlay: HTMLElement, scene: SceneLike, audio: AudioManager | null, showAdvancedTitleOptions = !import.meta.env.PROD) {
+  constructor(overlay: HTMLElement, scene: SceneLike, audio: AudioManager | null, showAdvancedTitleOptions = ENABLE_ADVANCED_TITLE_OPTIONS) {
     this._scene = scene;
 
     this._container = document.createElement('div');

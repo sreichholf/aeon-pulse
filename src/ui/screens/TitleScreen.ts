@@ -1,4 +1,5 @@
 import type { LevelLabel } from '../../campaign/Campaign.ts';
+import { ENABLE_ADVANCED_TITLE_OPTIONS } from '../../constants.ts';
 import { DifficultyMode } from '../../types.ts';
 
 interface ScoreEntry {
@@ -17,7 +18,7 @@ export class TitleScreen {
   private _titleScoresHeader!: HTMLElement;
   private _titleScoresList!: HTMLElement;
 
-  constructor(showAdvancedOptions = !import.meta.env.PROD) {
+  constructor(showAdvancedOptions = ENABLE_ADVANCED_TITLE_OPTIONS) {
     this._showAdvancedOptions = showAdvancedOptions;
     this.el = document.createElement('div');
     this.el.className = 'ui-screen';

@@ -6,6 +6,7 @@ import { ScoreManager } from './systems/ScoreManager.ts';
 import { GameplayRun } from './systems/GameplayRun.ts';
 import { UI } from './ui/UI.ts';
 import { TacticalDatabase } from './viewer/TacticalDatabase.ts';
+import { ENABLE_ADVANCED_TITLE_OPTIONS } from './constants.ts';
 import { GameState, DifficultyMode, MusicCue } from './types.ts';
 import {
   getFirstImplementedLevel,
@@ -57,7 +58,7 @@ export class Game {
     this.scene = new Scene(canvas);
     this.input = new InputManager();
     this.audio = new AudioManager();
-    this._showAdvancedTitleOptions = !import.meta.env.PROD;
+    this._showAdvancedTitleOptions = ENABLE_ADVANCED_TITLE_OPTIONS;
     this._mode = DifficultyMode.ROOKIE;
     this.score = new ScoreManager(this._mode);
     this.ui = new UI(uiOverlay, this.scene, this.audio, this._showAdvancedTitleOptions);
