@@ -77,14 +77,13 @@ export const playerDefs: Record<string, BulletDef> = {
     w: 72, h: 24, hw: 30, hh: 9, damage: 3, isPlayer: true, piercing: true, key: 'playerCharge',
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
-      const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
-        const mat = getMat(key, () => new THREE.MeshPhongMaterial({
-          color: colorVal, emissive: emissiveVal, specular: specVal, shininess: shine, flatShading: flat,
-        })) as THREE.MeshPhongMaterial;
+      const getBulletMat = (key: string, colorVal: number, _emissiveVal: number, _specVal = 0xffffff, _shine = 30, _flat = false) => {
+        const mat = getMat(key, () => new THREE.MeshBasicMaterial({
+          color: colorVal,
+        })) as THREE.MeshBasicMaterial;
         if (tint) {
           const cloned = mat.clone();
           cloned.color.set(tint);
-          cloned.emissive.set(tint).multiplyScalar(0.4);
           cloned.userData = { cloned: true };
           return cloned;
         }
@@ -98,8 +97,8 @@ export const playerDefs: Record<string, BulletDef> = {
       group.add(new THREE.Mesh(coreGeo, coreMat));
 
       const ringGeo = getGeo('chargeRingGeo', () => new THREE.TorusGeometry(18, 1.8, 4, 16));
-      const ringMat = getMat('chargeRingMat', () => new THREE.MeshPhongMaterial({
-        color: 0x00ff88, emissive: 0x004422, transparent: true, opacity: 0.75, shininess: 60,
+      const ringMat = getMat('chargeRingMat', () => new THREE.MeshBasicMaterial({
+        color: 0x00ff88, transparent: true, opacity: 0.75,
       }));
 
       const ring1 = new THREE.Mesh(ringGeo, ringMat);
@@ -108,9 +107,6 @@ export const playerDefs: Record<string, BulletDef> = {
       ring2.rotation.x = Math.PI / 2;
       ring3.rotation.y = Math.PI / 2;
       group.add(ring1, ring2, ring3);
-
-      const light = new THREE.PointLight(0x00ffff, 2.5, 60);
-      group.add(light);
 
       return { mesh: group, refs: { rings: [ring1, ring2, ring3] } };
     },
@@ -126,14 +122,13 @@ export const playerDefs: Record<string, BulletDef> = {
     w: 64, h: 20, hw: 24, hh: 7, damage: 2, isPlayer: true, piercing: false, key: 'playerCharge',
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
-      const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
-        const mat = getMat(key, () => new THREE.MeshPhongMaterial({
-          color: colorVal, emissive: emissiveVal, specular: specVal, shininess: shine, flatShading: flat,
-        })) as THREE.MeshPhongMaterial;
+      const getBulletMat = (key: string, colorVal: number, _emissiveVal: number, _specVal = 0xffffff, _shine = 30, _flat = false) => {
+        const mat = getMat(key, () => new THREE.MeshBasicMaterial({
+          color: colorVal,
+        })) as THREE.MeshBasicMaterial;
         if (tint) {
           const cloned = mat.clone();
           cloned.color.set(tint);
-          cloned.emissive.set(tint).multiplyScalar(0.4);
           cloned.userData = { cloned: true };
           return cloned;
         }
@@ -147,17 +142,14 @@ export const playerDefs: Record<string, BulletDef> = {
       group.add(new THREE.Mesh(coreGeo, coreMat));
 
       const ringGeo = getGeo('chargeSideRingGeo', () => new THREE.TorusGeometry(15, 1.5, 4, 16));
-      const ringMat = getMat('chargeSideRingMat', () => new THREE.MeshPhongMaterial({
-        color: 0x00ff88, emissive: 0x004422, transparent: true, opacity: 0.75, shininess: 60,
+      const ringMat = getMat('chargeSideRingMat', () => new THREE.MeshBasicMaterial({
+        color: 0x00ff88, transparent: true, opacity: 0.75,
       }));
 
       const ring1 = new THREE.Mesh(ringGeo, ringMat);
       const ring2 = new THREE.Mesh(ringGeo, ringMat);
       ring2.rotation.x = Math.PI / 2;
       group.add(ring1, ring2);
-
-      const light = new THREE.PointLight(0x00ffff, 1.8, 48);
-      group.add(light);
 
       return { mesh: group, refs: { rings: [ring1, ring2] } };
     },
