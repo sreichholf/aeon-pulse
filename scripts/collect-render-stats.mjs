@@ -246,7 +246,9 @@ const results = [];
 for (const scenario of scenarios) {
   console.error(`running ${scenario.name}`);
   const result = await runScenario(scenario);
-  results.push({ ...result, summary: summarize(result) });
+  const summary = summarize(result);
+  console.error(`finished ${scenario.name}`);
+  console.log(JSON.stringify(summary, null, 2));
+  results.push({ ...result, summary });
 }
 
-console.log(JSON.stringify(results.map((result) => result.summary), null, 2));

@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import type { GetPositionFn, IAudio, IScene } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
 
 const SPEED         = 110;
 const SINE_AMP      = 80;
@@ -233,12 +238,19 @@ export class EnemySine extends Enemy {
 
     // Segmented Carapace Panels: Top, Bottom, and Rear bands (Radius ~12.4)
     const topPanelGeo = new THREE.SphereGeometry(12.4, 16, 8, 0, Math.PI * 2, 0, Math.PI / 3);
-    const topPanel = new THREE.Mesh(topPanelGeo, hullMat);
-    visuals.add(topPanel);
-
     const bottomPanelGeo = new THREE.SphereGeometry(12.4, 16, 8, 0, Math.PI * 2, Math.PI * 2 / 3, Math.PI / 3);
-    const bottomPanel = new THREE.Mesh(bottomPanelGeo, hullMat);
-    visuals.add(bottomPanel);
+    const panelGeos = [
+      ensureNonIndexed(topPanelGeo),
+      ensureNonIndexed(bottomPanelGeo),
+    ];
+    const mergedPanelGeo = mergeGeometries(panelGeos);
+    const panelsMesh = new THREE.Mesh(mergedPanelGeo, hullMat);
+    visuals.add(panelsMesh);
+
+    // Clean up temporary geometries
+    panelGeos.forEach(g => g.dispose());
+    topPanelGeo.dispose();
+    bottomPanelGeo.dispose();
 
     const rearPanelGeo = new THREE.SphereGeometry(12.2, 16, 8, Math.PI / 2, Math.PI, Math.PI / 4, Math.PI / 2);
     const rearPanel = new THREE.Mesh(rearPanelGeo, brightMat);
@@ -279,15 +291,20 @@ export class EnemySine extends Enemy {
     const shieldTF = new THREE.Mesh(shieldGeo, hullMat);
     shieldTF.position.set(-6, 4, 0);
     shieldTF.rotation.z = 0.2;
-    const spikeTF = new THREE.Mesh(spikeGeo, engineMetalMat);
-    spikeTF.position.set(-13, 2.6, 0);
-    spikeTF.rotation.z = 0.5;
-    const hingeTF = new THREE.Mesh(hingeGeo, engineMetalMat);
-    hingeTF.position.set(0, 0, 0);
+
+    const spikeTFCloned = ensureNonIndexed(spikeGeo);
+    spikeTFCloned.rotateZ(0.5);
+    spikeTFCloned.translate(-13, 2.6, 0);
+    const hingeTFCloned = ensureNonIndexed(hingeGeo);
+    const clawTFGeos = [spikeTFCloned, hingeTFCloned];
+    const mergedClawTFGeo = mergeGeometries(clawTFGeos);
+    const clawTFMesh = new THREE.Mesh(mergedClawTFGeo, engineMetalMat);
+
     this._clawTF.add(shieldTF);
-    this._clawTF.add(spikeTF);
-    this._clawTF.add(hingeTF);
+    this._clawTF.add(clawTFMesh);
     visuals.add(this._clawTF);
+
+    clawTFGeos.forEach(g => g.dispose());
 
     // Claw 2: Top-Back (TB) - Pivot Group centered at hinge joint (2, 11, 0)
     this._clawTB = new THREE.Group();
@@ -295,15 +312,20 @@ export class EnemySine extends Enemy {
     const shieldTB = new THREE.Mesh(shieldGeo, hullMat);
     shieldTB.position.set(6, 4, 0);
     shieldTB.rotation.z = -0.2;
-    const spikeTB = new THREE.Mesh(spikeGeo, engineMetalMat);
-    spikeTB.position.set(13, 2.6, 0);
-    spikeTB.rotation.z = -0.5;
-    const hingeTB = new THREE.Mesh(hingeGeo, engineMetalMat);
-    hingeTB.position.set(0, 0, 0);
+
+    const spikeTBCloned = ensureNonIndexed(spikeGeo);
+    spikeTBCloned.rotateZ(-0.5);
+    spikeTBCloned.translate(13, 2.6, 0);
+    const hingeTBCloned = ensureNonIndexed(hingeGeo);
+    const clawTBGeos = [spikeTBCloned, hingeTBCloned];
+    const mergedClawTBGeo = mergeGeometries(clawTBGeos);
+    const clawTBMesh = new THREE.Mesh(mergedClawTBGeo, engineMetalMat);
+
     this._clawTB.add(shieldTB);
-    this._clawTB.add(spikeTB);
-    this._clawTB.add(hingeTB);
+    this._clawTB.add(clawTBMesh);
     visuals.add(this._clawTB);
+
+    clawTBGeos.forEach(g => g.dispose());
 
     // Claw 3: Bottom-Front (BF) - Pivot Group centered at hinge joint (-2, -11, 0)
     this._clawBF = new THREE.Group();
@@ -311,15 +333,20 @@ export class EnemySine extends Enemy {
     const shieldBF = new THREE.Mesh(shieldGeo, hullMat);
     shieldBF.position.set(-6, -4, 0);
     shieldBF.rotation.z = -0.2;
-    const spikeBF = new THREE.Mesh(spikeGeo, engineMetalMat);
-    spikeBF.position.set(-13, -2.6, 0);
-    spikeBF.rotation.z = -0.5;
-    const hingeBF = new THREE.Mesh(hingeGeo, engineMetalMat);
-    hingeBF.position.set(0, 0, 0);
+
+    const spikeBFCloned = ensureNonIndexed(spikeGeo);
+    spikeBFCloned.rotateZ(-0.5);
+    spikeBFCloned.translate(-13, -2.6, 0);
+    const hingeBFCloned = ensureNonIndexed(hingeGeo);
+    const clawBFGeos = [spikeBFCloned, hingeBFCloned];
+    const mergedClawBFGeo = mergeGeometries(clawBFGeos);
+    const clawBFMesh = new THREE.Mesh(mergedClawBFGeo, engineMetalMat);
+
     this._clawBF.add(shieldBF);
-    this._clawBF.add(spikeBF);
-    this._clawBF.add(hingeBF);
+    this._clawBF.add(clawBFMesh);
     visuals.add(this._clawBF);
+
+    clawBFGeos.forEach(g => g.dispose());
 
     // Claw 4: Bottom-Back (BB) - Pivot Group centered at hinge joint (2, -11, 0)
     this._clawBB = new THREE.Group();
@@ -327,15 +354,20 @@ export class EnemySine extends Enemy {
     const shieldBB = new THREE.Mesh(shieldGeo, hullMat);
     shieldBB.position.set(6, -4, 0);
     shieldBB.rotation.z = 0.2;
-    const spikeBB = new THREE.Mesh(spikeGeo, engineMetalMat);
-    spikeBB.position.set(13, -2.6, 0);
-    spikeBB.rotation.z = 0.5;
-    const hingeBB = new THREE.Mesh(hingeGeo, engineMetalMat);
-    hingeBB.position.set(0, 0, 0);
+
+    const spikeBBCloned = ensureNonIndexed(spikeGeo);
+    spikeBBCloned.rotateZ(0.5);
+    spikeBBCloned.translate(13, -2.6, 0);
+    const hingeBBCloned = ensureNonIndexed(hingeGeo);
+    const clawBBGeos = [spikeBBCloned, hingeBBCloned];
+    const mergedClawBBGeo = mergeGeometries(clawBBGeos);
+    const clawBBMesh = new THREE.Mesh(mergedClawBBGeo, engineMetalMat);
+
     this._clawBB.add(shieldBB);
-    this._clawBB.add(spikeBB);
-    this._clawBB.add(hingeBB);
+    this._clawBB.add(clawBBMesh);
     visuals.add(this._clawBB);
+
+    clawBBGeos.forEach(g => g.dispose());
 
     // ── 4. DUAL THRUST-VECTORING THRUSTERS (2x Scaled) ───────────────────────
     const nozzleGeo = new THREE.CylinderGeometry(3.2, 2.0, 7.0, 12);

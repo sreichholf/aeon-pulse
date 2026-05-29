@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { BulletType, type GetPositionFn, type IBullet, type IScene } from '../types.ts';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import { Bullet } from './Bullet.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
 
 const SLIDE_SPEED  = 80;
 const CHARGE_SPEED = 320;
@@ -84,47 +89,126 @@ export class RockDrake extends Enemy {
       color: 0xffaa00, // Glowing amber eyes
     });
 
+    // Helper to build splayed transformed leg geometries relative to the segment group origin
+    const getLegGeos = (legX: number, legY: number, legZ: number, signZ: number) => {
+      // Thigh: angles outwards and upwards
+      const thighGeo = new THREE.CylinderGeometry(2.5, 1.8, 9, 4);
+      const thighCloned = ensureNonIndexed(thighGeo);
+      thighCloned.rotateX(signZ * Math.PI / 6); // thigh splayed out in Z
+      thighCloned.rotateZ(-Math.PI / 12); // slightly angled forward
+      thighCloned.translate(0, 3.5, signZ * 2.0);
+      thighCloned.translate(legX, legY, legZ); // transform to segment space
+      thighGeo.dispose();
+
+      // Shin: angles further outwards/upwards
+      const shinGeo = new THREE.CylinderGeometry(1.8, 1.2, 8, 4);
+      const shinCloned = ensureNonIndexed(shinGeo);
+      shinCloned.rotateX(signZ * Math.PI / 3); // shin angled more heavily in Z
+      shinCloned.translate(0, 9.0, signZ * 5.0);
+      shinCloned.translate(legX, legY, legZ);
+      shinGeo.dispose();
+
+      // Splayed stone claws
+      const clawGeo = new THREE.ConeGeometry(1.2, 5, 4);
+
+      const claw1Cloned = ensureNonIndexed(clawGeo);
+      claw1Cloned.rotateX(signZ * Math.PI / 2.2); // angled towards terrain surface
+      claw1Cloned.translate(-1.8, 12.0, signZ * 7.5);
+      claw1Cloned.translate(legX, legY, legZ);
+
+      const claw2Cloned = ensureNonIndexed(clawGeo);
+      claw2Cloned.rotateX(signZ * Math.PI / 2.2);
+      claw2Cloned.translate(1.8, 12.0, signZ * 7.5);
+      claw2Cloned.translate(legX, legY, legZ);
+
+      clawGeo.dispose();
+
+      return {
+        rockGeos: [thighCloned, shinCloned],
+        clawGeos: [claw1Cloned, claw2Cloned]
+      };
+    };
+
     // 2. Segmented Basalt Body Parts (tapered, faceted with low-poly segments)
     // Head Segment (Segment 0)
     const headGroup = new THREE.Group();
     headGroup.position.set(-20, 0, 0);
     const headGeo = new THREE.CylinderGeometry(2, 7, 10, 5);
-    headGeo.rotateZ(Math.PI / 2); // align horizontally pointing left
-    const headMesh = new THREE.Mesh(headGeo, rockMat);
+    const headCloned = ensureNonIndexed(headGeo);
+    headCloned.rotateZ(Math.PI / 2); // align horizontally pointing left
+    const headMesh = new THREE.Mesh(headCloned, rockMat);
     headGroup.add(headMesh);
 
     // Eyes on head (symmetrical left and right in Z)
     const eyeGeo = new THREE.SphereGeometry(1.6, 8, 8);
-    const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
-    eyeR.position.set(-3, 2, 4.5);
-    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-    eyeL.position.set(-3, 2, -4.5);
-    headGroup.add(eyeR);
-    headGroup.add(eyeL);
+    const eyeRCloned = ensureNonIndexed(eyeGeo);
+    eyeRCloned.translate(-3, 2, 4.5);
+    const eyeLCloned = ensureNonIndexed(eyeGeo);
+    eyeLCloned.translate(-3, 2, -4.5);
+
+    const eyeGeos = [eyeRCloned, eyeLCloned];
+    const mergedEyeGeo = mergeGeometries(eyeGeos);
+    const eyesMesh = new THREE.Mesh(mergedEyeGeo, eyeMat);
+    headGroup.add(eyesMesh);
     group.add(headGroup);
     this._segmentMeshes.push(headGroup);
+
+    // Clean up Head geometries
+    eyeGeos.forEach(g => g.dispose());
+    headCloned.dispose();
+    headGeo.dispose();
+    eyeGeo.dispose();
 
     // Chest Segment (Segment 1)
     const chestGroup = new THREE.Group();
     chestGroup.position.set(-10, 0, 0);
     const chestGeo = new THREE.SphereGeometry(9.5, 5, 4);
-    const chestMesh = new THREE.Mesh(chestGeo, rockMat);
-    chestGroup.add(chestMesh);
+    const chestCloned = ensureNonIndexed(chestGeo);
+
+    // Get splayed leg geometries
+    const frontLegRGeos = getLegGeos(0, 2, 7.5, 1);
+    const frontLegLGeos = getLegGeos(0, 2, -7.5, -1);
+
+    const chestRockGeos = [
+      chestCloned,
+      ...frontLegRGeos.rockGeos,
+      ...frontLegLGeos.rockGeos
+    ];
+    const mergedChestRockGeo = mergeGeometries(chestRockGeos);
+    const chestRockMesh = new THREE.Mesh(mergedChestRockGeo, rockMat);
+    chestGroup.add(chestRockMesh);
+
+    // Dorsal Spine Spikes + Stone Claws
+    const spineGeo = new THREE.ConeGeometry(2, 6, 4);
+    const spine1aCloned = ensureNonIndexed(spineGeo);
+    spine1aCloned.translate(-2, 9, 3.5);
+    const spine1bCloned = ensureNonIndexed(spineGeo);
+    spine1bCloned.translate(-2, 9, -3.5);
+
+    const chestClawGeos = [
+      spine1aCloned,
+      spine1bCloned,
+      ...frontLegRGeos.clawGeos,
+      ...frontLegLGeos.clawGeos
+    ];
+    const mergedChestClawGeo = mergeGeometries(chestClawGeos);
+    const chestClawMesh = new THREE.Mesh(mergedChestClawGeo, clawMat);
+    chestGroup.add(chestClawMesh);
+
     // Overlapping Segmented Armor
     const chestPlateGeo = new THREE.BoxGeometry(10, 3.5, 18);
     const chestPlate = new THREE.Mesh(chestPlateGeo, armorMat);
     chestPlate.position.set(0, 7.5, 0);
     chestGroup.add(chestPlate);
-    // Dorsal Spine Spikes
-    const spineGeo = new THREE.ConeGeometry(2, 6, 4);
-    const spine1a = new THREE.Mesh(spineGeo, clawMat);
-    spine1a.position.set(-2, 9, 3.5);
-    const spine1b = new THREE.Mesh(spineGeo, clawMat);
-    spine1b.position.set(-2, 9, -3.5);
-    chestGroup.add(spine1a);
-    chestGroup.add(spine1b);
+
     group.add(chestGroup);
     this._segmentMeshes.push(chestGroup);
+
+    // Clean up Chest geometries
+    chestRockGeos.forEach(g => g.dispose());
+    chestClawGeos.forEach(g => g.dispose());
+    chestGeo.dispose();
+    spineGeo.dispose();
 
     // Mid-Body Segment (Segment 2)
     const midGroup = new THREE.Group();
@@ -132,41 +216,81 @@ export class RockDrake extends Enemy {
     const midGeo = new THREE.SphereGeometry(8.0, 5, 4);
     const midMesh = new THREE.Mesh(midGeo, rockMat);
     midGroup.add(midMesh);
+
     // Overlapping Segmented Armor
     const midPlateGeo = new THREE.BoxGeometry(9, 3, 15);
     const midPlate = new THREE.Mesh(midPlateGeo, armorMat);
     midPlate.position.set(0, 6.2, 0);
     midGroup.add(midPlate);
+
     // Dorsal Spine Spikes
-    const spine2a = new THREE.Mesh(spineGeo, clawMat);
-    spine2a.position.set(-1, 7.5, 2.5);
-    const spine2b = new THREE.Mesh(spineGeo, clawMat);
-    spine2b.position.set(-1, 7.5, -2.5);
-    midGroup.add(spine2a);
-    midGroup.add(spine2b);
+    const spineGeo2 = new THREE.ConeGeometry(2, 6, 4);
+    const spine2aCloned = ensureNonIndexed(spineGeo2);
+    spine2aCloned.translate(-1, 7.5, 2.5);
+    const spine2bCloned = ensureNonIndexed(spineGeo2);
+    spine2bCloned.translate(-1, 7.5, -2.5);
+
+    const midSpineGeos = [spine2aCloned, spine2bCloned];
+    const mergedMidSpineGeo = mergeGeometries(midSpineGeos);
+    const midSpineMesh = new THREE.Mesh(mergedMidSpineGeo, clawMat);
+    midGroup.add(midSpineMesh);
     group.add(midGroup);
     this._segmentMeshes.push(midGroup);
+
+    // Clean up Mid geometries
+    midSpineGeos.forEach(g => g.dispose());
+    spineGeo2.dispose();
 
     // Rear Segment (Segment 3)
     const rearGroup = new THREE.Group();
     rearGroup.position.set(10, 0, 0);
     const rearGeo = new THREE.SphereGeometry(6.5, 5, 4);
-    const rearMesh = new THREE.Mesh(rearGeo, rockMat);
-    rearGroup.add(rearMesh);
+    const rearCloned = ensureNonIndexed(rearGeo);
+
+    // Get rear leg geometries
+    const rearLegRGeos = getLegGeos(0, 1.5, 5.5, 1);
+    const rearLegLGeos = getLegGeos(0, 1.5, -5.5, -1);
+
+    const rearRockGeos = [
+      rearCloned,
+      ...rearLegRGeos.rockGeos,
+      ...rearLegLGeos.rockGeos
+    ];
+    const mergedRearRockGeo = mergeGeometries(rearRockGeos);
+    const rearRockMesh = new THREE.Mesh(mergedRearRockGeo, rockMat);
+    rearGroup.add(rearRockMesh);
+
+    // Dorsal Spine Spikes + Leg Claws
+    const spineGeo3 = new THREE.ConeGeometry(2, 6, 4);
+    const spine3aCloned = ensureNonIndexed(spineGeo3);
+    spine3aCloned.translate(0, 6.0, 2.0);
+    const spine3bCloned = ensureNonIndexed(spineGeo3);
+    spine3bCloned.translate(0, 6.0, -2.0);
+
+    const rearClawGeos = [
+      spine3aCloned,
+      spine3bCloned,
+      ...rearLegRGeos.clawGeos,
+      ...rearLegLGeos.clawGeos
+    ];
+    const mergedRearClawGeo = mergeGeometries(rearClawGeos);
+    const rearClawMesh = new THREE.Mesh(mergedRearClawGeo, clawMat);
+    rearGroup.add(rearClawMesh);
+
     // Overlapping Segmented Armor
     const rearPlateGeo = new THREE.BoxGeometry(8, 2.5, 12);
     const rearPlate = new THREE.Mesh(rearPlateGeo, armorMat);
     rearPlate.position.set(0, 5.0, 0);
     rearGroup.add(rearPlate);
-    // Dorsal Spine Spikes
-    const spine3a = new THREE.Mesh(spineGeo, clawMat);
-    spine3a.position.set(0, 6.0, 2.0);
-    const spine3b = new THREE.Mesh(spineGeo, clawMat);
-    spine3b.position.set(0, 6.0, -2.0);
-    rearGroup.add(spine3a);
-    rearGroup.add(spine3b);
+
     group.add(rearGroup);
     this._segmentMeshes.push(rearGroup);
+
+    // Clean up Rear geometries
+    rearRockGeos.forEach(g => g.dispose());
+    rearClawGeos.forEach(g => g.dispose());
+    rearGeo.dispose();
+    spineGeo3.dispose();
 
     // Tail Segment (Segment 4)
     const tailGroup = new THREE.Group();

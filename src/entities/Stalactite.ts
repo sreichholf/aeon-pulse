@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { BulletType, type GetPositionFn, type IBullet, type ITerrain, type IAudio, type IScene } from '../types.ts';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import { Bullet } from './Bullet.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
 
 const FALL_SPEED = 320;
 const SCROLL_SPD = 140;
@@ -134,89 +139,100 @@ export class Stalactite extends Enemy {
     this._segments = [];
     this._joints = [];
 
-    // Segment 1 (Top / Base): Large hollow-looking cylinder/cone
-    const seg1Group = new THREE.Group();
-    seg1Group.position.set(0, 20, 0);
+    // 1. Rock Segment (Top, Middle, Bottom merged)
     const geo1 = new THREE.CylinderGeometry(15, 12, 16, 5);
-    const mesh1 = new THREE.Mesh(geo1, rockMat);
-    seg1Group.add(mesh1);
+    const geo1Cloned = ensureNonIndexed(geo1);
+    geo1Cloned.translate(0, 20, 0);
 
-    // Top segment armor plate (band wrapper)
-    const armor1Geo = new THREE.CylinderGeometry(16.5, 13.5, 6, 5);
-    const armor1 = new THREE.Mesh(armor1Geo, armorMat);
-    armor1.position.set(0, 2, 0);
-    seg1Group.add(armor1);
-
-    // Splayed spikes on Segment 1
-    const spikeGeo = new THREE.ConeGeometry(2.5, 8, 4);
-    spikeGeo.rotateZ(Math.PI / 3);
-    const spike1a = new THREE.Mesh(spikeGeo, spikeMat);
-    spike1a.position.set(13, 0, 0);
-    const spike1b = new THREE.Mesh(spikeGeo, spikeMat);
-    spike1b.position.set(-13, 0, 0);
-    spike1b.rotation.z = -Math.PI / 3;
-    seg1Group.add(spike1a);
-    seg1Group.add(spike1b);
-
-    group.add(seg1Group);
-    this._segments.push(seg1Group);
-
-    // Joint 1: Molten connector sphere between Segment 1 and Segment 2
-    const joint1 = new THREE.Mesh(new THREE.SphereGeometry(8, 8, 8), this._jointMat);
-    joint1.position.set(0, 10, 0);
-    group.add(joint1);
-    this._joints.push(joint1);
-
-    // Segment 2 (Middle): Medium cone
-    const seg2Group = new THREE.Group();
-    seg2Group.position.set(0, 0, 0);
     const geo2 = new THREE.CylinderGeometry(10, 7.5, 16, 5);
-    const mesh2 = new THREE.Mesh(geo2, rockMat);
-    seg2Group.add(mesh2);
+    const geo2Cloned = ensureNonIndexed(geo2);
+    geo2Cloned.translate(0, 0, 0);
 
-    // Middle armor plate
-    const armor2Geo = new THREE.CylinderGeometry(11.5, 9, 5, 5);
-    const armor2 = new THREE.Mesh(armor2Geo, armorMat);
-    armor2.position.set(0, 1.5, 0);
-    seg2Group.add(armor2);
-
-    // Spikes on Segment 2
-    const spike2Geo = new THREE.ConeGeometry(2, 6, 4);
-    spike2Geo.rotateZ(Math.PI / 4);
-    const spike2a = new THREE.Mesh(spike2Geo, spikeMat);
-    spike2a.position.set(8.5, -1, 0);
-    const spike2b = new THREE.Mesh(spike2Geo, spikeMat);
-    spike2b.position.set(-8.5, -1, 0);
-    spike2b.rotation.z = -Math.PI / 4;
-    seg2Group.add(spike2a);
-    seg2Group.add(spike2b);
-
-    group.add(seg2Group);
-    this._segments.push(seg2Group);
-
-    // Joint 2: Molten connector sphere between Segment 2 and Segment 3
-    const joint2 = new THREE.Mesh(new THREE.SphereGeometry(5.5, 8, 8), this._jointMat);
-    joint2.position.set(0, -10, 0);
-    group.add(joint2);
-    this._joints.push(joint2);
-
-    // Segment 3 (Bottom Tip): A tapering cone with a superheated tip
-    const seg3Group = new THREE.Group();
-    seg3Group.position.set(0, -20, 0);
     const geo3 = new THREE.ConeGeometry(6, 20, 5);
-    geo3.rotateZ(Math.PI);
-    const mesh3 = new THREE.Mesh(geo3, rockMat);
-    seg3Group.add(mesh3);
+    const geo3Cloned = ensureNonIndexed(geo3);
+    geo3Cloned.rotateZ(Math.PI);
+    geo3Cloned.translate(0, -20, 0);
 
-    // Searing molten glowing tip
+    const rockGeos = [geo1Cloned, geo2Cloned, geo3Cloned];
+    const mergedRockGeo = mergeGeometries(rockGeos);
+    const stalactiteRockMesh = new THREE.Mesh(mergedRockGeo, rockMat);
+    group.add(stalactiteRockMesh);
+
+    rockGeos.forEach(g => g.dispose());
+    geo1.dispose();
+    geo2.dispose();
+    geo3.dispose();
+
+    // 2. Armor Crust Plates merged
+    const armor1Geo = new THREE.CylinderGeometry(16.5, 13.5, 6, 5);
+    const armor1Cloned = ensureNonIndexed(armor1Geo);
+    armor1Cloned.translate(0, 22, 0);
+
+    const armor2Geo = new THREE.CylinderGeometry(11.5, 9, 5, 5);
+    const armor2Cloned = ensureNonIndexed(armor2Geo);
+    armor2Cloned.translate(0, 1.5, 0);
+
+    const armorGeos = [armor1Cloned, armor2Cloned];
+    const mergedArmorGeo = mergeGeometries(armorGeos);
+    const stalactiteCrustMesh = new THREE.Mesh(mergedArmorGeo, armorMat);
+    group.add(stalactiteCrustMesh);
+
+    armorGeos.forEach(g => g.dispose());
+    armor1Geo.dispose();
+    armor2Geo.dispose();
+
+    // 3. Spikes merged
+    const spikeGeo = new THREE.ConeGeometry(2.5, 8, 4);
+
+    const spike1aCloned = ensureNonIndexed(spikeGeo);
+    spike1aCloned.rotateZ(Math.PI / 3);
+    spike1aCloned.translate(13, 20, 0);
+
+    const spike1bCloned = ensureNonIndexed(spikeGeo);
+    spike1bCloned.translate(-13, 20, 0);
+
+    const spike2Geo = new THREE.ConeGeometry(2, 6, 4);
+
+    const spike2aCloned = ensureNonIndexed(spike2Geo);
+    spike2aCloned.rotateZ(Math.PI / 4);
+    spike2aCloned.translate(8.5, -1, 0);
+
+    const spike2bCloned = ensureNonIndexed(spike2Geo);
+    spike2bCloned.translate(-8.5, -1, 0);
+
+    const spikeGeos = [spike1aCloned, spike1bCloned, spike2aCloned, spike2bCloned];
+    const mergedSpikeGeo = mergeGeometries(spikeGeos);
+    const stalactiteSpikeMesh = new THREE.Mesh(mergedSpikeGeo, spikeMat);
+    group.add(stalactiteSpikeMesh);
+
+    spikeGeos.forEach(g => g.dispose());
+    spikeGeo.dispose();
+    spike2Geo.dispose();
+
+    // 4. Molten joints merged
+    const joint1Geo = new THREE.SphereGeometry(8, 8, 8);
+    const joint1Cloned = ensureNonIndexed(joint1Geo);
+    joint1Cloned.translate(0, 10, 0);
+
+    const joint2Geo = new THREE.SphereGeometry(5.5, 8, 8);
+    const joint2Cloned = ensureNonIndexed(joint2Geo);
+    joint2Cloned.translate(0, -10, 0);
+
+    const jointGeos = [joint1Cloned, joint2Cloned];
+    const mergedJointGeo = mergeGeometries(jointGeos);
+    const stalactiteJointMesh = new THREE.Mesh(mergedJointGeo, this._jointMat);
+    group.add(stalactiteJointMesh);
+
+    jointGeos.forEach(g => g.dispose());
+    joint1Geo.dispose();
+    joint2Geo.dispose();
+
+    // 5. Searing molten glowing tip (separate because it scales dynamically)
     const tipGeo = new THREE.SphereGeometry(3.5, 8, 8);
     const tip = new THREE.Mesh(tipGeo, this._lavaTipMat);
-    tip.position.set(0, -10, 0);
-    seg3Group.add(tip);
+    tip.position.set(0, -30, 0);
+    group.add(tip);
     this._tipMesh = tip;
-
-    group.add(seg3Group);
-    this._segments.push(seg3Group);
 
     // Add point light at the magma tip
     const light = new THREE.PointLight(0xff6600, 2.2, 45);

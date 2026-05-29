@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { Enemy, HALF_H } from './Enemy.ts';
 import type { GetPositionFn, IAudio, IScene } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
 
 const SPEED        = 150;
 const STOP_X       = 100;
@@ -139,24 +144,26 @@ export class EnemyCharger extends Enemy {
     body.position.set(-2, 0, 0);
     this._shipGroup.add(body);
 
-    // Glowing energy stripe down the middle spine
+    // Glowing energy stripe down the middle spine + nose cap + reactor core
     const spineGeo = this._trackResource(new THREE.BoxGeometry(22, 2.5, 4.5));
-    const spine = new THREE.Mesh(spineGeo, neonMat);
-    spine.position.set(-1, 0, 0);
-    this._shipGroup.add(spine);
+    const spineCloned = ensureNonIndexed(spineGeo);
+    spineCloned.translate(-1, 0, 0);
 
-    // Sleek nose cap (White-hot energy tip)
     const noseGeo = this._trackResource(new THREE.ConeGeometry(4.5, 10, 8));
-    noseGeo.rotateZ(Math.PI / 2);
-    const nose = new THREE.Mesh(noseGeo, neonMat);
-    nose.position.set(-22, 0, 0);
-    this._shipGroup.add(nose);
+    const noseCloned = ensureNonIndexed(noseGeo);
+    noseCloned.rotateZ(Math.PI / 2);
+    noseCloned.translate(-22, 0, 0);
 
-    // Spherical Reactor Core
     const reactorGeo = this._trackResource(new THREE.SphereGeometry(7, 16, 16));
-    const reactor = new THREE.Mesh(reactorGeo, neonMat);
-    reactor.position.set(6, 0, 0);
-    this._shipGroup.add(reactor);
+    const reactorCloned = ensureNonIndexed(reactorGeo);
+    reactorCloned.translate(6, 0, 0);
+
+    const energyGeos = [spineCloned, noseCloned, reactorCloned];
+    const mergedEnergyGeo = this._trackResource(mergeGeometries(energyGeos));
+    const energyMesh = new THREE.Mesh(mergedEnergyGeo, neonMat);
+    this._shipGroup.add(energyMesh);
+
+    energyGeos.forEach(g => g.dispose());
 
     // Reactor Metal Vent Ring
     const ventGeo = this._trackResource(new THREE.CylinderGeometry(5.5, 5.5, 2, 8));

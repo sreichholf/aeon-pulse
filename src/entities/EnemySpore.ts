@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { Enemy } from './Enemy.ts';
 import { Bullet } from './Bullet.ts';
 import { BulletType, type GetPositionFn, type IScene } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
 
 export class EnemySpore extends Enemy {
   private _vx: number;
@@ -62,7 +67,9 @@ export class EnemySpore extends Enemy {
       { r: 3.2, x: 0, y: 0, z: -12 }
     ];
 
+    const noduleGeos: THREE.BufferGeometry[] = [];
     const noduleGeoCache: Record<string, THREE.BufferGeometry> = {};
+
     noduleCoords.forEach((c, idx) => {
       const key = `${c.r.toFixed(1)}_${idx % 2}`;
       if (!noduleGeoCache[key]) {
@@ -70,10 +77,18 @@ export class EnemySpore extends Enemy {
           ? new THREE.OctahedronGeometry(c.r)
           : new THREE.TetrahedronGeometry(c.r);
       }
-      const nodule = new THREE.Mesh(noduleGeoCache[key], noduleMat);
-      nodule.position.set(c.x, c.y, c.z);
-      group.add(nodule);
+      const noduleCloned = ensureNonIndexed(noduleGeoCache[key]);
+      noduleCloned.translate(c.x, c.y, c.z);
+      noduleGeos.push(noduleCloned);
     });
+
+    const mergedNoduleGeo = mergeGeometries(noduleGeos);
+    const satelliteMesh = new THREE.Mesh(mergedNoduleGeo, noduleMat);
+    group.add(satelliteMesh);
+
+    // Clean up nodule geometries
+    noduleGeos.forEach(g => g.dispose());
+    Object.values(noduleGeoCache).forEach(g => g.dispose());
 
     // Pre-populate origColor for flash traversal
     group.traverse(child => {

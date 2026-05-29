@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import { Bullet } from './Bullet.ts';
 import { BulletType, type GetPositionFn, type IAudio, type IScene } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
 
 const SPEED         = 120;
 const FIRE_INTERVAL = 2.5;
@@ -128,15 +133,24 @@ export class EnemyTurret extends Enemy {
     group.add(axle);
 
     const ringGeo = new THREE.TorusGeometry(12.5, 2.0, 10, 24);
-    ringGeo.rotateY(Math.PI / 2); // Wrap around the Z-axis axle
+    const ringGeos: THREE.BufferGeometry[] = [];
 
-    const ringFront = new THREE.Mesh(ringGeo, this._ringMat);
-    ringFront.position.set(0, 0, -10);
-    group.add(ringFront);
+    const ringFrontCloned = ensureNonIndexed(ringGeo);
+    ringFrontCloned.rotateY(Math.PI / 2);
+    ringFrontCloned.translate(0, 0, -10);
+    ringGeos.push(ringFrontCloned);
 
-    const ringRear = new THREE.Mesh(ringGeo, this._ringMat);
-    ringRear.position.set(0, 0, -18);
-    group.add(ringRear);
+    const ringRearCloned = ensureNonIndexed(ringGeo);
+    ringRearCloned.rotateY(Math.PI / 2);
+    ringRearCloned.translate(0, 0, -18);
+    ringGeos.push(ringRearCloned);
+
+    const mergedRingGeo = mergeGeometries(ringGeos);
+    const ringMesh = new THREE.Mesh(mergedRingGeo, this._ringMat);
+    group.add(ringMesh);
+
+    ringGeos.forEach(g => g.dispose());
+    ringGeo.dispose();
 
     // 3. Pivoting Turret Head Group (rotates dynamically around the Z-axis)
     this._headGroup = new THREE.Group();
@@ -159,39 +173,47 @@ export class EnemyTurret extends Enemy {
       bevelSize: 0.8,
       bevelThickness: 0.8,
     });
-    rimGeo.translate(0, 0, -2.5); // Center on local Z axis
-    const rim = new THREE.Mesh(rimGeo, gearMat);
-    this._headGroup.add(rim);
+    const rimCloned = ensureNonIndexed(rimGeo);
+    rimCloned.translate(0, 0, -2.5); // Center on local Z axis
 
     // Smooth central hub cylinder
     const hubGeo = new THREE.CylinderGeometry(6.5, 6.5, 6.6, 24);
-    hubGeo.rotateX(Math.PI / 2);
-    const hub = new THREE.Mesh(hubGeo, gearMat);
-    this._headGroup.add(hub);
+    const hubCloned = ensureNonIndexed(hubGeo);
+    hubCloned.rotateX(Math.PI / 2);
 
     // Cylindrical Spokes connecting hub and rim, acting as heavy rounded tubes that catch metallic specular lines
     const spokeGeoV = new THREE.CylinderGeometry(2.0, 2.0, 32.0, 16);
-    const spokeV = new THREE.Mesh(spokeGeoV, gearMat); // Vertical spoke tube
-    this._headGroup.add(spokeV);
+    const spokeVCloned = ensureNonIndexed(spokeGeoV);
 
     const spokeGeoH = new THREE.CylinderGeometry(2.0, 2.0, 32.0, 16);
-    spokeGeoH.rotateZ(Math.PI / 2); // Horizontal spoke tube
-    const spokeH = new THREE.Mesh(spokeGeoH, gearMat);
-    this._headGroup.add(spokeH);
+    const spokeHCloned = ensureNonIndexed(spokeGeoH);
+    spokeHCloned.rotateZ(Math.PI / 2); // Horizontal spoke tube
+
+    const gearGeos = [rimCloned, hubCloned, spokeVCloned, spokeHCloned];
 
     // 3B. 16 Cylindrical Sprocket teeth evenly distributed around the gear rim
     // Cylinder bodies have curved profiles that glitter dynamically as the gear rotates
-    const teethGroup = new THREE.Group();
     const toothGeo = new THREE.CylinderGeometry(1.2, 1.2, 3.5, 12);
-    toothGeo.rotateZ(Math.PI / 2); // Point length radially outward
     for (let i = 0; i < 16; i++) {
       const angle = (i / 16) * Math.PI * 2;
-      const tooth = new THREE.Mesh(toothGeo, gearMat);
-      tooth.position.set(Math.cos(angle) * 23.0, Math.sin(angle) * 23.0, 0);
-      tooth.rotation.z = angle;
-      teethGroup.add(tooth);
+      const toothCloned = ensureNonIndexed(toothGeo);
+      toothCloned.rotateZ(angle);
+      toothCloned.rotateZ(Math.PI / 2); // original toothGeo.rotateZ(Math.PI / 2)
+      toothCloned.translate(Math.cos(angle) * 23.0, Math.sin(angle) * 23.0, 0);
+      gearGeos.push(toothCloned);
     }
-    this._headGroup.add(teethGroup);
+
+    const mergedGearGeo = mergeGeometries(gearGeos);
+    const gearMesh = new THREE.Mesh(mergedGearGeo, gearMat);
+    this._headGroup.add(gearMesh);
+
+    // Clean up gear geometries
+    gearGeos.forEach(g => g.dispose());
+    rimGeo.dispose();
+    hubGeo.dispose();
+    spokeGeoV.dispose();
+    spokeGeoH.dispose();
+    toothGeo.dispose();
 
     // 3C. Armored Railgun Sleeve (Sliding Group for recoil feedback)
     // Mounted on the front face of the gear at z = 4.0
@@ -207,25 +229,41 @@ export class EnemyTurret extends Enemy {
 
     // Layer 2: Flanking slate-steel outer plates (top and bottom armor sleeves)
     const plateGeo = new THREE.BoxGeometry(26, 3.0, 10.0);
+    const sleeveGeos: THREE.BufferGeometry[] = [];
 
-    const plateTop = new THREE.Mesh(plateGeo, sleeveMat);
-    plateTop.position.set(-10, 4.5, 0);
-    this._cannonGroup.add(plateTop);
+    const plateTopCloned = ensureNonIndexed(plateGeo);
+    plateTopCloned.translate(-10, 4.5, 0);
+    sleeveGeos.push(plateTopCloned);
 
-    const plateBottom = new THREE.Mesh(plateGeo, sleeveMat);
-    plateBottom.position.set(-10, -4.5, 0);
-    this._cannonGroup.add(plateBottom);
+    const plateBottomCloned = ensureNonIndexed(plateGeo);
+    plateBottomCloned.translate(-10, -4.5, 0);
+    sleeveGeos.push(plateBottomCloned);
+
+    const mergedSleeveGeo = mergeGeometries(sleeveGeos);
+    const sleeveMesh = new THREE.Mesh(mergedSleeveGeo, sleeveMat);
+    this._cannonGroup.add(sleeveMesh);
+
+    sleeveGeos.forEach(g => g.dispose());
+    plateGeo.dispose();
 
     // Recessed warning-orange/red heat vents flanking the armor
     const ventGeo = new THREE.BoxGeometry(16, 1.2, 10.2);
+    const ventGeos: THREE.BufferGeometry[] = [];
 
-    const ventTop = new THREE.Mesh(ventGeo, this._ventMat);
-    ventTop.position.set(-10, 6.2, 0);
-    this._cannonGroup.add(ventTop);
+    const ventTopCloned = ensureNonIndexed(ventGeo);
+    ventTopCloned.translate(-10, 6.2, 0);
+    ventGeos.push(ventTopCloned);
 
-    const ventBottom = new THREE.Mesh(ventGeo, this._ventMat);
-    ventBottom.position.set(-10, -6.2, 0);
-    this._cannonGroup.add(ventBottom);
+    const ventBottomCloned = ensureNonIndexed(ventGeo);
+    ventBottomCloned.translate(-10, -6.2, 0);
+    ventGeos.push(ventBottomCloned);
+
+    const mergedVentGeo = mergeGeometries(ventGeos);
+    const ventMesh = new THREE.Mesh(mergedVentGeo, this._ventMat);
+    this._cannonGroup.add(ventMesh);
+
+    ventGeos.forEach(g => g.dispose());
+    ventGeo.dispose();
 
     // 4 Copper Coils wrapping around the exposed central barrel
     const coilGeo = new THREE.TorusGeometry(5.8, 1.0, 10, 24);

@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { Enemy } from './Enemy.ts';
 import type { IScene } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
 
 export class Obstacle extends Enemy {
   constructor(scene: IScene, sprites: Record<string, THREE.Texture>, x: number, y: number) {
@@ -48,31 +53,33 @@ export class Obstacle extends Enemy {
       { x: -20, y: -10, z: 15 },
       { x: 10, y: -35, z: -23 }
     ];
-    nubs.forEach(pos => {
-      const nub = new THREE.Mesh(nubGeo, sporeMat);
-      nub.position.set(pos.x, pos.y, pos.z);
-      group.add(nub);
+    const nubGeos = nubs.map(pos => {
+      const g = ensureNonIndexed(nubGeo);
+      g.translate(pos.x, pos.y, pos.z);
+      return g;
     });
+    const mergedNubGeo = mergeGeometries(nubGeos);
+    const nubMesh = new THREE.Mesh(mergedNubGeo, sporeMat);
+    group.add(nubMesh);
+
+    nubGeos.forEach(g => g.dispose());
+    nubGeo.dispose();
 
     // 3. Fleshy magenta vein rings wrapping the column
-    const veinGeo1 = new THREE.TorusGeometry(25.5, 1.2, 8, 16);
-    const veinGeo2 = new THREE.TorusGeometry(25.5, 1.2, 8, 16);
-    const veinGeo3 = new THREE.TorusGeometry(25.5, 1.2, 8, 16);
+    const veinGeo = new THREE.TorusGeometry(25.5, 1.2, 8, 16);
+    const positionsY = [28, 0, -28];
+    const veinGeos = positionsY.map(y => {
+      const g = ensureNonIndexed(veinGeo);
+      g.rotateX(Math.PI / 2);
+      g.translate(0, y, 0);
+      return g;
+    });
+    const mergedVeinGeo = mergeGeometries(veinGeos);
+    const veinMesh = new THREE.Mesh(mergedVeinGeo, veinMat);
+    group.add(veinMesh);
 
-    const vein1 = new THREE.Mesh(veinGeo1, veinMat);
-    vein1.rotation.x = Math.PI / 2;
-    vein1.position.set(0, 28, 0);
-    group.add(vein1);
-
-    const vein2 = new THREE.Mesh(veinGeo2, veinMat);
-    vein2.rotation.x = Math.PI / 2;
-    vein2.position.set(0, 0, 0);
-    group.add(vein2);
-
-    const vein3 = new THREE.Mesh(veinGeo3, veinMat);
-    vein3.rotation.x = Math.PI / 2;
-    vein3.position.set(0, -28, 0);
-    group.add(vein3);
+    veinGeos.forEach(g => g.dispose());
+    veinGeo.dispose();
 
     // Pre-populate origColor for flash traversal
     group.traverse((child: THREE.Object3D) => {

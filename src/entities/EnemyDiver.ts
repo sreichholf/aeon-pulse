@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import type { GetPositionFn, IAudio, IScene } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geo.index ? geo.toNonIndexed() : geo.clone();
+}
 
 const SPEED         = 150;
 const VERT_SPEED    = 210;
@@ -130,7 +135,7 @@ export class EnemyDiver extends Enemy {
       shininess:   30,
     });
 
-    // ── 1. HEAVY FUSELAGE (LATHE) ─────────────────────────────────────────────
+    // ── 1. HEAVY FUSELAGE (LATHE) + OUTER WING TIPS (hullMat) ─────────────────
     // Fatter, more imposing profile than the interceptor — this is a bomber.
     // LatheGeometry rotates around Y; rotateZ(PI/2) swings nose to -X (left).
     const lathePoints = [
@@ -142,31 +147,50 @@ export class EnemyDiver extends Enemy {
       new THREE.Vector2(4,  -14),  // tail end
     ];
     const latheGeo = new THREE.LatheGeometry(lathePoints, 18);
-    latheGeo.rotateZ(Math.PI / 2);
-    const fuselage = new THREE.Mesh(latheGeo, hullMat);
-    group.add(fuselage);
+    const fuselageGeo = ensureNonIndexed(latheGeo);
+    fuselageGeo.rotateZ(Math.PI / 2);
 
-    // ── 2. SWEPT DORSAL & VENTRAL FINS ────────────────────────────────────────
+    const tipGeo = new THREE.BoxGeometry(9, 2, 5);
+    const hullGeos = [fuselageGeo];
+
+    for (const side of [1, -1]) {
+      const tipCloned = ensureNonIndexed(tipGeo);
+      tipCloned.rotateZ(side * -0.25);
+      tipCloned.translate(-3, side * 19, 0);
+      hullGeos.push(tipCloned);
+    }
+
+    const mergedHullGeo = mergeGeometries(hullGeos);
+    const hullMesh = new THREE.Mesh(mergedHullGeo, hullMat);
+    group.add(hullMesh);
+
+    // Clean up hull geometries
+    hullGeos.forEach(g => g.dispose());
+    latheGeo.dispose();
+    tipGeo.dispose();
+
+    // ── 2. SWEPT DORSAL & VENTRAL FINS (brightMat) ────────────────────────────
     // BoxGeometry fins with real Z-depth (7 units) so they look solid from every
     // angle and rotate naturally when the ship dives. These replace the old flat
     // ExtrudeGeometry blade wings that looked like spinning cards.
     // Each fin is a swept trapezoid approximated by two boxes — a wide root slab
     // and a narrower outer tip — giving a classic swept-fin silhouette.
+    const rootGeo = new THREE.BoxGeometry(14, 3, 7);
+    const brightGeos: THREE.BufferGeometry[] = [];
     for (const side of [1, -1]) {
       // Root slab — wide, attached to body
-      const rootGeo = new THREE.BoxGeometry(14, 3, 7);
-      const root = new THREE.Mesh(rootGeo, brightMat);
-      root.position.set(-1, side * 12, 0);
-      root.rotation.z = side * -0.15; // slight angle toward nose
-      group.add(root);
-
-      // Outer tip — narrower, further out, creates a tapered swept fin shape
-      const tipGeo = new THREE.BoxGeometry(9, 2, 5);
-      const tip = new THREE.Mesh(tipGeo, hullMat);
-      tip.position.set(-3, side * 19, 0);
-      tip.rotation.z = side * -0.25;
-      group.add(tip);
+      const rootCloned = ensureNonIndexed(rootGeo);
+      rootCloned.rotateZ(side * -0.15);
+      rootCloned.translate(-1, side * 12, 0);
+      brightGeos.push(rootCloned);
     }
+    const mergedBrightGeo = mergeGeometries(brightGeos);
+    const rootMesh = new THREE.Mesh(mergedBrightGeo, brightMat);
+    group.add(rootMesh);
+
+    // Clean up bright geometries
+    brightGeos.forEach(g => g.dispose());
+    rootGeo.dispose();
 
     // ── 3. COCKPIT DOME ────────────────────────────────────────────────────────
     // Raised prominently in Z so it's clearly visible — platinum/silver dome
@@ -178,13 +202,15 @@ export class EnemyDiver extends Enemy {
     group.add(cockpit);
 
     // ── 4. DUAL ENGINE NOZZLES & FLAMES ──────────────────────────────────────
+    const nozzleGeo = new THREE.CylinderGeometry(2.8, 2.2, 7, 12);
+    const engineGeos: THREE.BufferGeometry[] = [];
+
     this._flames = [];
     for (const side of [1, -1]) {
-      const nozzleGeo = new THREE.CylinderGeometry(2.8, 2.2, 7, 12);
-      nozzleGeo.rotateZ(Math.PI / 2);
-      const nozzle = new THREE.Mesh(nozzleGeo, engineMat);
-      nozzle.position.set(13, side * 5, 0);
-      group.add(nozzle);
+      const nozzleCloned = ensureNonIndexed(nozzleGeo);
+      nozzleCloned.rotateZ(Math.PI / 2);
+      nozzleCloned.translate(13, side * 5, 0);
+      engineGeos.push(nozzleCloned);
 
       const flameGeo = new THREE.ConeGeometry(2.0, 9, 12);
       flameGeo.rotateZ(-Math.PI / 2);
@@ -193,6 +219,12 @@ export class EnemyDiver extends Enemy {
       group.add(flame);
       this._flames.push(flame);
     }
+    const mergedEngineGeo = mergeGeometries(engineGeos);
+    const nozzleMesh = new THREE.Mesh(mergedEngineGeo, engineMat);
+    group.add(nozzleMesh);
+
+    engineGeos.forEach(g => g.dispose());
+    nozzleGeo.dispose();
 
     return group;
   }
