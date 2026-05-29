@@ -10,6 +10,7 @@ export interface WorldState {
   bullets: IBullet[];
   powerups: IPowerUp[];
   effects: IEffect[];
+  destroyOrReleaseBullet?: (bullet: IBullet) => void;
 }
 
 export function tickGameplay(world: WorldState, dt: number): void {
@@ -58,7 +59,14 @@ export function tickGameplay(world: WorldState, dt: number): void {
   // Bullets
   for (const b of world.bullets) b.update(dt);
   world.bullets = world.bullets.filter(b => {
-    if (b.isOffscreen || !b.active) { b.destroy(); return false; }
+    if (b.isOffscreen || !b.active) {
+      if (world.destroyOrReleaseBullet) {
+        world.destroyOrReleaseBullet(b);
+      } else {
+        b.destroy();
+      }
+      return false;
+    }
     return true;
   });
 

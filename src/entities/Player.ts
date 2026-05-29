@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BulletType, DifficultyMode, type IBullet, type TerrainBounds, type Vec2, type IScene } from '../types.ts';
+import { BulletType, DifficultyMode, type IBullet, type ProjectileFactoryFn, type TerrainBounds, type Vec2, type IScene } from '../types.ts';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { Action } from '../systems/InputManager.ts';
 import { Bullet } from './Bullet.ts';
@@ -63,6 +63,7 @@ export class Player {
   private _sprites: unknown;
   private _input: InputManager;
   private _audio: PlayerAudio;
+  private _projectileFactory: ProjectileFactoryFn | null;
   private _mode: DifficultyMode;
   private _shieldMax: number;
   private _shieldPips: number;
@@ -82,11 +83,19 @@ export class Player {
   private _exitMode: ExitMode;
   private _exitSpeed: number;
 
-  constructor(scene: IScene, sprites: unknown, input: InputManager, audio: PlayerAudio, mode?: DifficultyMode) {
+  constructor(
+    scene: IScene,
+    sprites: unknown,
+    input: InputManager,
+    audio: PlayerAudio,
+    mode?: DifficultyMode,
+    projectileFactory: ProjectileFactoryFn | null = null,
+  ) {
     this._scene   = scene;
     this._sprites = sprites;
     this._input   = input;
     this._audio   = audio;
+    this._projectileFactory = projectileFactory;
 
     this.weaponTier      = WeaponTier.RAPID;
     this.chargeLevel     = 0;       // 0–1, exposed for HUD
@@ -597,7 +606,8 @@ export class Player {
 
   private _spawn(type: string, x: number, y: number, vx: number, vy: number, tint: string | null = null, dmgOverride: number | null = null): void {
     const tintNum = tint ? parseInt(tint.replace('#', ''), 16) : null;
-    this._newBullets.push(new Bullet(this._scene, this._sprites, type, x, y, vx, vy, null, tintNum, dmgOverride));
+    const spawn = { type, x, y, vx, vy, getTargetPos: null, tint: tintNum, damageOverride: dmgOverride };
+    this._newBullets.push(this._projectileFactory?.(spawn) ?? new Bullet(this._scene, this._sprites, type, x, y, vx, vy, null, tintNum, dmgOverride));
   }
 
   // ── INVINCIBILITY / FLICKER ────────────────────────────────────────────────

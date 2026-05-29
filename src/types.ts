@@ -89,6 +89,19 @@ export interface EntityMetadata {
 export type GetPositionFn = () => Vec2;
 export type SpawnEnemyFn  = (type: EnemyType, x: number, y: number) => void;
 
+export interface ProjectileSpawn {
+  type: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  getTargetPos?: GetPositionFn | null;
+  tint?: number | null;
+  damageOverride?: number | null;
+}
+
+export type ProjectileFactoryFn = (spawn: ProjectileSpawn) => IBullet;
+
 // ── Scene (minimal interface so entities never depend on THREE.Scene directly) ─
 export interface IScene {
   camera: THREE.Camera;

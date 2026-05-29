@@ -47,6 +47,7 @@ export class Bullet implements IBullet {
   private _animRefs: BulletAnimRefs;
   private _inScene: boolean;
   private _waveTime: number;
+  private _disposed: boolean;
 
   constructor(
     scene: IScene,
@@ -77,6 +78,7 @@ export class Bullet implements IBullet {
     this._vy            = vy;
     this._scene         = scene;
     this.type           = def.id;
+    this._disposed      = false;
 
     const built = this._build3DProjectile(tint);
     this._mesh     = built.mesh;
@@ -100,6 +102,24 @@ export class Bullet implements IBullet {
 
   private _build3DProjectile(tint: number | null) {
     return this._definition.presentation.build(tint, CACHE, getMaterial, getGeometry);
+  }
+
+  reset(x: number, y: number, vx: number, vy: number, getTargetPos: GetPositionFn | null = null): void {
+    if (this._disposed) {
+      throw new Error('Cannot reset a disposed projectile');
+    }
+
+    this.active = true;
+    this._inScene = true;
+    this._getTargetPos = getTargetPos;
+    this._vx = vx;
+    this._vy = vy;
+    this._waveTime = 0;
+    this._mesh.position.set(x, y, 1);
+    this._mesh.rotation.set(0, 0, 0);
+    this._mesh.scale.set(1, 1, 1);
+    this._alignToVelocity();
+    this._scene.add(this._mesh);
   }
 
   update(dt: number): void {
@@ -155,10 +175,9 @@ export class Bullet implements IBullet {
   }
 
   destroy(): void {
-    if (!this._inScene) return;
-    this._inScene = false;
-    this.active = false;
-    this._scene.remove(this._mesh);
+    if (this._disposed) return;
+    this.releaseFromScene();
+    this._disposed = true;
 
     // Safe traversal to dispose of cloned (tinted) materials only
     this._mesh.traverse((child: THREE.Object3D) => {
@@ -168,5 +187,16 @@ export class Bullet implements IBullet {
         }
       }
     });
+  }
+
+  releaseFromScene(): void {
+    if (!this._inScene) {
+      this.active = false;
+      return;
+    }
+
+    this._inScene = false;
+    this.active = false;
+    this._scene.remove(this._mesh);
   }
 }

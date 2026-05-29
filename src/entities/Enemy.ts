@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { Bullet } from './Bullet.ts';
 import { Entity } from './Entity.ts';
-import { BulletType, type HitResult, type GetPositionFn, type TerrainBounds, type IBullet, type EntityMetadata, type IEnemy, type IScene } from '../types.ts';
+import { BulletType, type HitResult, type GetPositionFn, type TerrainBounds, type IBullet, type EntityMetadata, type IEnemy, type IScene, type ProjectileFactoryFn } from '../types.ts';
 
 export const HALF_W = GAME_WIDTH  / 2;
 export const HALF_H = GAME_HEIGHT / 2;
@@ -18,6 +18,7 @@ export class Enemy extends Entity implements IEnemy {
   protected _hitCooldownDur: number;
   protected _hitFlashTimer: number;
   protected _dropChance: number;
+  protected _projectileFactory: ProjectileFactoryFn | null;
   score: number;
   _getPlayerPos: GetPositionFn | null;
   terrainBounds: TerrainBounds | null;
@@ -49,6 +50,7 @@ export class Enemy extends Entity implements IEnemy {
     this._hitCooldownDur = 0;
     this._hitFlashTimer  = 0;
     this._dropChance     = 0;
+    this._projectileFactory = null;
     this.score           = 0;
     this._getPlayerPos   = null;
     this.terrainBounds   = null;
@@ -95,6 +97,10 @@ export class Enemy extends Entity implements IEnemy {
   get viewerXOffset(): number { return 0; }
 
   get isBoss(): false { return false; }
+
+  setProjectileFactory(projectileFactory: ProjectileFactoryFn | null): void {
+    this._projectileFactory = projectileFactory;
+  }
 
   update(dt: number): IBullet[] {
     this._newBullets     = [...this._pendingBullets];
@@ -164,8 +170,9 @@ export class Enemy extends Entity implements IEnemy {
     const { x: px, y: py } = this._getPlayerPos();
     const dx = px - this.x, dy = py - this.y;
     const len = Math.hypot(dx, dy) || 1;
+    const spawn = { type, x: this.x, y: this.y, vx: (dx / len) * speed, vy: (dy / len) * speed };
     this._newBullets.push(
-      new Bullet(this._scene, this._sprites, type, this.x, this.y, (dx / len) * speed, (dy / len) * speed),
+      this._projectileFactory?.(spawn) ?? new Bullet(this._scene, this._sprites, type, this.x, this.y, spawn.vx, spawn.vy),
     );
   }
 
@@ -175,8 +182,9 @@ export class Enemy extends Entity implements IEnemy {
     const base = Math.atan2(py - this.y, px - this.x);
     for (let i = -1; i <= 1; i++) {
       const a = base + i * spread;
+      const spawn = { type: BulletType.ENEMY, x: this.x, y: this.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed };
       this._newBullets.push(
-        new Bullet(this._scene, this._sprites, BulletType.ENEMY, this.x, this.y, Math.cos(a) * speed, Math.sin(a) * speed),
+        this._projectileFactory?.(spawn) ?? new Bullet(this._scene, this._sprites, BulletType.ENEMY, this.x, this.y, spawn.vx, spawn.vy),
       );
     }
   }

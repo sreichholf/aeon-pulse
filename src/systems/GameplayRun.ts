@@ -4,6 +4,7 @@ import { AudioManager } from './audio/AudioManager.ts';
 import { ScoreManager } from './ScoreManager.ts';
 import { tickGameplay, type WorldState } from './Gameplay.ts';
 import { checkCollisions, HitCause, HitEventKind, type HitEvent } from './Collisions.ts';
+import { ProjectilePool } from './ProjectilePool.ts';
 import { Player } from '../entities/Player.ts';
 import type { WeaponTierValue } from '../entities/Player.ts';
 import { PowerUp } from '../entities/PowerUp.ts';
@@ -61,6 +62,7 @@ export class GameplayRun implements LevelGameHost {
   private _levelManager: LevelManager | null;
   private _terrain: ITerrain | null;
   private _playfieldBounds: PlayfieldBounds | null;
+  private _projectilePool: ProjectilePool;
   private _deps: GameplayRunDeps;
   private _level: CampaignLevelRecord | null;
   private _isExitingLevel: boolean;
@@ -80,6 +82,7 @@ export class GameplayRun implements LevelGameHost {
     this._levelManager = null;
     this._terrain = null;
     this._playfieldBounds = null;
+    this._projectilePool = new ProjectilePool(deps.scene, deps.sprites);
     this._level = null;
     this._isExitingLevel = false;
     this._levelExitHoldTimer = 0;
@@ -101,7 +104,14 @@ export class GameplayRun implements LevelGameHost {
     this._levelExitHoldTimer = 0;
     this._levelExitTimer = 0;
     this._levelExitFlyoutStarted = false;
-    this._player = new Player(this._deps.scene, this._deps.sprites, this._deps.input, this._deps.audio, mode);
+    this._player = new Player(
+      this._deps.scene,
+      this._deps.sprites,
+      this._deps.input,
+      this._deps.audio,
+      mode,
+      (spawn) => this._projectilePool.create(spawn),
+    );
 
     if (savedWeaponTier > 1) {
       this._player.weaponTier = savedWeaponTier as WeaponTierValue;
@@ -130,6 +140,7 @@ export class GameplayRun implements LevelGameHost {
       bullets: this._bullets,
       powerups: this._powerups,
       effects: this._effects,
+      destroyOrReleaseBullet: (bullet) => this._projectilePool.destroyOrRelease(bullet),
     };
 
     tickGameplay(world, dt);
@@ -182,8 +193,9 @@ export class GameplayRun implements LevelGameHost {
     for (const enemy of this._enemies) enemy.destroy();
     this._enemies = [];
 
-    for (const bullet of this._bullets) bullet.destroy();
+    for (const bullet of this._bullets) this._projectilePool.destroyOrRelease(bullet);
     this._bullets = [];
+    this._projectilePool.clear();
 
     for (const powerup of this._powerups) powerup.destroy();
     this._powerups = [];
@@ -232,6 +244,9 @@ export class GameplayRun implements LevelGameHost {
     });
 
     if (enemy) {
+      if ('setProjectileFactory' in enemy && typeof enemy.setProjectileFactory === 'function') {
+        enemy.setProjectileFactory((spawn) => this._projectilePool.create(spawn));
+      }
       if (this._playfieldBounds) {
         enemy.terrainBounds = this._playfieldBounds;
       }
@@ -290,7 +305,7 @@ export class GameplayRun implements LevelGameHost {
   private _clearHostileBullets(): void {
     this._bullets = this._bullets.filter((bullet) => {
       if (bullet.isPlayerBullet) return true;
-      bullet.destroy();
+      this._projectilePool.destroyOrRelease(bullet);
       return false;
     });
   }
@@ -322,7 +337,7 @@ export class GameplayRun implements LevelGameHost {
     for (const bullet of this._bullets) bullet.update(dt);
     this._bullets = this._bullets.filter((bullet) => {
       if (bullet.isOffscreen || !bullet.active) {
-        bullet.destroy();
+        this._projectilePool.destroyOrRelease(bullet);
         return false;
       }
       return true;

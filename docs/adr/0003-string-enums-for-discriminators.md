@@ -94,6 +94,14 @@ Internal projectile variants may still use non-canonical source keys, such as `e
 
 Future projectile variants should be added through the projectile definition catalog. Avoid adding new `Bullet.ts` booleans such as `isAcid`, `wiggles`, or `spins`; represent those as named movement or presentation definitions instead.
 
+## Amendment — Projectile Pooling Boundary
+
+**Date:** 2026-05-29
+
+High-volume projectile creation should go through a run-scoped projectile factory so pooled projectiles can be reused within a gameplay run without leaking ownership across runs or into the Tactical Database viewer.
+
+Direct `new Bullet(...)` construction remains acceptable for non-pooled projectile types and special presentation projectiles until they are deliberately migrated. The first pooling pass should target projectiles with linear movement and simple presentation reset semantics, such as basic player and enemy shots.
+
 ## Amendment — Difficulty Mode Enum
 
 **Date:** 2026-05-28
