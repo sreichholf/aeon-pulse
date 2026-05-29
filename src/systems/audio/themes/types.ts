@@ -2,6 +2,7 @@ export enum ThemeId {
   MEGASTRUCTURE = 'megastructure',
   INDUSTRIAL = 'industrial',
   HIVE = 'hive',
+  VOLCANIC = 'volcanic',
 }
 
 export interface DrumScore {

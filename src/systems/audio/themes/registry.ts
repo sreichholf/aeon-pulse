@@ -3,11 +3,13 @@ import { hiveTheme } from './hiveTheme.ts';
 import { industrialTheme } from './industrialTheme.ts';
 import { megastructureTheme } from './megastructureTheme.ts';
 import { ThemeId, type NoteEvent, type ThemeDefinition } from './types.ts';
+import { volcanicTheme } from './volcanicTheme.ts';
 
 const THEME_DEFINITIONS: Record<ThemeId, ThemeDefinition> = {
   [ThemeId.MEGASTRUCTURE]: megastructureTheme,
   [ThemeId.INDUSTRIAL]: industrialTheme,
   [ThemeId.HIVE]: hiveTheme,
+  [ThemeId.VOLCANIC]: volcanicTheme,
 };
 
 const MUSIC_CUE_TO_THEME_ID: Record<MusicCue, ThemeId> = {
@@ -15,7 +17,7 @@ const MUSIC_CUE_TO_THEME_ID: Record<MusicCue, ThemeId> = {
   [MusicCue.CHAPTER_MEGASTRUCTURE]: ThemeId.MEGASTRUCTURE,
   [MusicCue.CHAPTER_INDUSTRIAL]: ThemeId.INDUSTRIAL,
   [MusicCue.CHAPTER_HIVE]: ThemeId.HIVE,
-  [MusicCue.CHAPTER_VOLCANIC]: ThemeId.MEGASTRUCTURE,
+  [MusicCue.CHAPTER_VOLCANIC]: ThemeId.VOLCANIC,
 };
 
 function assertStep(step: number, loopLength: number, lane: string, themeId: ThemeId): void {
