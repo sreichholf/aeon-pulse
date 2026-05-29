@@ -28,13 +28,14 @@ export class Terrain implements ITerrain {
   private _beamGeo: THREE.BoxGeometry;
   private _stripGeo: THREE.BoxGeometry;
 
-  // ── Pools ──
   private _sliceWidth: number;
   private _numSlices: number;
-  private _topPanels: THREE.Group[];
-  private _botPanels: THREE.Group[];
-  private _topPillars: THREE.Group[];
-  private _botPillars: THREE.Group[];
+  private _panelPlateMesh: THREE.InstancedMesh;
+  private _panelGlowMesh: THREE.InstancedMesh;
+  private _panelConduitMesh: THREE.InstancedMesh;
+  private _pillarBeamMesh: THREE.InstancedMesh;
+  private _pillarStripMesh: THREE.InstancedMesh;
+  private _instanceHelper: THREE.Object3D;
 
   constructor(scene: IScene, points: ControlPoint[]) {
     this._scene  = scene;
@@ -71,75 +72,56 @@ export class Terrain implements ITerrain {
     this._beamGeo    = new THREE.BoxGeometry(10, 1.0, 26);
     this._stripGeo   = new THREE.BoxGeometry(3, 1.01, 28);
 
-    // ── 3. Initialize Reusable Pools ──
     this._sliceWidth = 70;
     this._numSlices  = 18;
 
-    this._topPanels  = [];
-    this._botPanels  = [];
-    this._topPillars = [];
-    this._botPillars = [];
+    const panelCount = this._numSlices * 2;
+    const panelGlowCount = panelCount * 2;
 
-    for (let i = 0; i < this._numSlices; i++) {
-      // Build Ceiling Panel and Floor Panel
-      const topP = this._buildPanel(this._baseMat, this._glowMat);
-      const botP = this._buildPanel(this._baseMat, this._glowMat);
-      markRenderCategory(topP, RenderCategory.TERRAIN);
-      markRenderCategory(botP, RenderCategory.TERRAIN);
-      this._scene.add(topP);
-      this._scene.add(botP);
-      this._topPanels.push(topP);
-      this._botPanels.push(botP);
+    this._panelPlateMesh = new THREE.InstancedMesh(this._plateGeo, this._baseMat, panelCount);
+    this._panelGlowMesh = new THREE.InstancedMesh(this._glowGeo, this._glowMat, panelGlowCount);
+    this._panelConduitMesh = new THREE.InstancedMesh(this._conduitGeo, this._pillarMat, panelCount);
+    this._pillarBeamMesh = new THREE.InstancedMesh(this._beamGeo, this._pillarMat, panelCount);
+    this._pillarStripMesh = new THREE.InstancedMesh(this._stripGeo, this._glowMat, panelCount);
 
-      // Build Support Pillars (placed at the seams between panels)
-      const topCol = this._buildPillar(this._pillarMat, this._glowMat);
-      const botCol = this._buildPillar(this._pillarMat, this._glowMat);
-      markRenderCategory(topCol, RenderCategory.TERRAIN);
-      markRenderCategory(botCol, RenderCategory.TERRAIN);
-      this._scene.add(topCol);
-      this._scene.add(botCol);
-      this._topPillars.push(topCol);
-      this._botPillars.push(botCol);
+    for (const mesh of [
+      this._panelPlateMesh,
+      this._panelGlowMesh,
+      this._panelConduitMesh,
+      this._pillarBeamMesh,
+      this._pillarStripMesh,
+    ]) {
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     }
+
+    markRenderCategory(this._panelPlateMesh, RenderCategory.TERRAIN, 'terrain.panel');
+    markRenderCategory(this._panelGlowMesh, RenderCategory.TERRAIN, 'terrain.panel');
+    markRenderCategory(this._panelConduitMesh, RenderCategory.TERRAIN, 'terrain.panel');
+    markRenderCategory(this._pillarBeamMesh, RenderCategory.TERRAIN, 'terrain.pillar');
+    markRenderCategory(this._pillarStripMesh, RenderCategory.TERRAIN, 'terrain.pillar');
+
+    this._scene.add(this._panelPlateMesh);
+    this._scene.add(this._panelGlowMesh);
+    this._scene.add(this._panelConduitMesh);
+    this._scene.add(this._pillarBeamMesh);
+    this._scene.add(this._pillarStripMesh);
+
+    this._instanceHelper = new THREE.Object3D();
 
     this.update(0);
   }
 
-  // ── 3D Modular Terrain Builders ──
-
-  private _buildPanel(baseMat: THREE.MeshPhongMaterial, glowMat: THREE.MeshBasicMaterial): THREE.Group {
-    const group = new THREE.Group();
-
-    // Main structural box panel
-    const plate = new THREE.Mesh(this._plateGeo, baseMat);
-    group.add(plate);
-
-    // Glowing warning amber seams at the left/right edges
-    const leftGlow = new THREE.Mesh(this._glowGeo, glowMat);
-    leftGlow.position.x = -33;
-    const rightGlow = new THREE.Mesh(this._glowGeo, glowMat);
-    rightGlow.position.x = 33;
-    group.add(leftGlow, rightGlow);
-
-    // Recessed conduit center plate
-    const conduit = new THREE.Mesh(this._conduitGeo, this._pillarMat);
-    group.add(conduit);
-
-    return group;
-  }
-
-  private _buildPillar(pillarMat: THREE.MeshPhongMaterial, glowMat: THREE.MeshBasicMaterial): THREE.Group {
-    const group = new THREE.Group();
-
-    // Heavy steel bracket column
-    const beam = new THREE.Mesh(this._beamGeo, pillarMat);
-    group.add(beam);
-
-    // Glowing indicator strip down the center
-    const strip = new THREE.Mesh(this._stripGeo, glowMat);
-    group.add(strip);
-
-    return group;
+  private _setInstanceTransform(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    position: THREE.Vector3Tuple,
+    scale: THREE.Vector3Tuple,
+  ): void {
+    this._instanceHelper.position.set(...position);
+    this._instanceHelper.rotation.set(0, 0, 0);
+    this._instanceHelper.scale.set(...scale);
+    this._instanceHelper.updateMatrix();
+    mesh.setMatrixAt(index, this._instanceHelper.matrix);
   }
 
   // ── Linear Interpolation for Collision Walls ──
@@ -168,7 +150,11 @@ export class Terrain implements ITerrain {
   // ── Infinite Scrolling & Real-time Scaling Update Loop ──
 
   update(scrollX: number): void {
-    for (const [i, topPanel] of this._topPanels.entries()) {
+    let panelIndex = 0;
+    let glowIndex = 0;
+    let pillarIndex = 0;
+
+    for (let i = 0; i < this._numSlices; i++) {
       // Infinite wrapping X coordinate relative to the camera viewport
       const localX = (i * this._sliceWidth - (scrollX % this._sliceWidth)) - (HALF_W + 100);
 
@@ -178,14 +164,19 @@ export class Terrain implements ITerrain {
 
       // --- 1. Ceiling Panels (top) ---
       const hTop = Math.max(1, HALF_H - top);
-      topPanel.scale.y = hTop;
-      topPanel.position.set(localX, top + hTop / 2, -10);
+      this._setInstanceTransform(this._panelPlateMesh, panelIndex, [localX, top + hTop / 2, -10], [1, hTop, 1]);
+      this._setInstanceTransform(this._panelConduitMesh, panelIndex, [localX, top + hTop / 2, -10], [1, hTop, 1]);
+      this._setInstanceTransform(this._panelGlowMesh, glowIndex++, [localX - 33, top + hTop / 2, -10], [1, hTop, 1]);
+      this._setInstanceTransform(this._panelGlowMesh, glowIndex++, [localX + 33, top + hTop / 2, -10], [1, hTop, 1]);
+      panelIndex++;
 
       // --- 2. Floor Panels (bottom) ---
       const hBot = Math.max(1, bottom + HALF_H);
-      const botPanel = this._botPanels[i]!;
-      botPanel.scale.y = hBot;
-      botPanel.position.set(localX, bottom - hBot / 2, -10);
+      this._setInstanceTransform(this._panelPlateMesh, panelIndex, [localX, bottom - hBot / 2, -10], [1, hBot, 1]);
+      this._setInstanceTransform(this._panelConduitMesh, panelIndex, [localX, bottom - hBot / 2, -10], [1, hBot, 1]);
+      this._setInstanceTransform(this._panelGlowMesh, glowIndex++, [localX - 33, bottom - hBot / 2, -10], [1, hBot, 1]);
+      this._setInstanceTransform(this._panelGlowMesh, glowIndex++, [localX + 33, bottom - hBot / 2, -10], [1, hBot, 1]);
+      panelIndex++;
 
       // --- 3. Ceiling Support Pillars (placed at the seams) ---
       const seamLocalX = localX + this._sliceWidth / 2;
@@ -193,28 +184,38 @@ export class Terrain implements ITerrain {
       const seamWalls  = this.getWallsAt(seamWorldX);
 
       const hTopPillar = Math.max(1, HALF_H - seamWalls.top + 10);
-      const topPillar  = this._topPillars[i]!;
-      topPillar.scale.y = hTopPillar;
-      // Positioned with a 5px protrusion past the panel edge to frame it beautifully
-      topPillar.position.set(seamLocalX, seamWalls.top - 5 + hTopPillar / 2, -7);
+      this._setInstanceTransform(this._pillarBeamMesh, pillarIndex, [seamLocalX, seamWalls.top - 5 + hTopPillar / 2, -7], [1, hTopPillar, 1]);
+      this._setInstanceTransform(this._pillarStripMesh, pillarIndex, [seamLocalX, seamWalls.top - 5 + hTopPillar / 2, -7], [1, hTopPillar, 1]);
+      pillarIndex++;
 
       // --- 4. Floor Support Pillars ---
       const hBotPillar = Math.max(1, seamWalls.bottom + HALF_H + 10);
-      const botPillar  = this._botPillars[i]!;
-      botPillar.scale.y = hBotPillar;
-      botPillar.position.set(seamLocalX, seamWalls.bottom + 5 - hBotPillar / 2, -7);
+      this._setInstanceTransform(this._pillarBeamMesh, pillarIndex, [seamLocalX, seamWalls.bottom + 5 - hBotPillar / 2, -7], [1, hBotPillar, 1]);
+      this._setInstanceTransform(this._pillarStripMesh, pillarIndex, [seamLocalX, seamWalls.bottom + 5 - hBotPillar / 2, -7], [1, hBotPillar, 1]);
+      pillarIndex++;
     }
+
+    this._panelPlateMesh.count = panelIndex;
+    this._panelConduitMesh.count = panelIndex;
+    this._panelGlowMesh.count = glowIndex;
+    this._pillarBeamMesh.count = pillarIndex;
+    this._pillarStripMesh.count = pillarIndex;
+
+    this._panelPlateMesh.instanceMatrix.needsUpdate = true;
+    this._panelConduitMesh.instanceMatrix.needsUpdate = true;
+    this._panelGlowMesh.instanceMatrix.needsUpdate = true;
+    this._pillarBeamMesh.instanceMatrix.needsUpdate = true;
+    this._pillarStripMesh.instanceMatrix.needsUpdate = true;
   }
 
   // ── GPU Memory Clean-up ──
 
   destroy(): void {
-    for (let i = 0; i < this._numSlices; i++) {
-      this._scene.remove(this._topPanels[i]!);
-      this._scene.remove(this._botPanels[i]!);
-      this._scene.remove(this._topPillars[i]!);
-      this._scene.remove(this._botPillars[i]!);
-    }
+    this._scene.remove(this._panelPlateMesh);
+    this._scene.remove(this._panelGlowMesh);
+    this._scene.remove(this._panelConduitMesh);
+    this._scene.remove(this._pillarBeamMesh);
+    this._scene.remove(this._pillarStripMesh);
 
     // Dispose shared geometries
     this._plateGeo.dispose();
@@ -227,10 +228,5 @@ export class Terrain implements ITerrain {
     this._baseMat.dispose();
     this._glowMat.dispose();
     this._pillarMat.dispose();
-
-    this._topPanels  = [];
-    this._botPanels  = [];
-    this._topPillars = [];
-    this._botPillars = [];
   }
 }
