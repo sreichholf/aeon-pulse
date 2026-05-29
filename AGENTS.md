@@ -10,7 +10,7 @@ npm run build    # production build to dist/
 npm run preview  # serve the production build locally
 ```
 
-There is no test suite. Verification is manual browser testing at http://localhost:5173.
+There is no test suite. Verification is browser-based testing at http://localhost:5173, and agents may perform that verification directly using the available in-app browser tooling.
 
 ## Git
 
@@ -118,4 +118,3 @@ Custom agent workflows and design patterns are installed in `.agents/skills/` in
 - **`improve-codebase-architecture`** — Focuses on refactoring shallow pass-through modules into deep interfaces, generating before/after graphs in temp HTML reports.
 - **`diagnose`** — Implements a disciplined debugging loop (reproduce $\to$ minimize $\to$ falsifiable hypotheses $\to$ instrument $\to$ fix $\to$ regression-test).
 - **`grill-me`** / **`zoom-out`** / **`prototype`** / **`handoff`** — Governing workflows for sequential interviews, system map abstractions, throwaway UI/logic prototypes, and conversation compaction respectively.
-
