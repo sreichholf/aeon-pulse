@@ -6,7 +6,12 @@ import { ScoreManager } from './systems/ScoreManager.ts';
 import { GameplayRun } from './systems/GameplayRun.ts';
 import { UI } from './ui/UI.ts';
 import { TacticalDatabase } from './viewer/TacticalDatabase.ts';
-import { ENABLE_ADVANCED_TITLE_OPTIONS } from './constants.ts';
+import {
+  ENABLE_ADVANCED_TITLE_OPTIONS,
+  ENABLE_INVINCIBLE_PLAYER,
+  ENABLE_RENDER_STATS,
+  isRuntimeFlagEnabled,
+} from './constants.ts';
 import { GameState, DifficultyMode, MusicCue } from './types.ts';
 import {
   getFirstImplementedLevel,
@@ -29,6 +34,8 @@ export class Game {
   input: InputManager;
   audio: AudioManager;
   private _showAdvancedTitleOptions: boolean;
+  private _showRenderStats: boolean;
+  private _debugInvinciblePlayer: boolean;
   private _mode: DifficultyMode;
   score: ScoreManager;
   ui: UI;
@@ -59,6 +66,8 @@ export class Game {
     this.input = new InputManager();
     this.audio = new AudioManager();
     this._showAdvancedTitleOptions = ENABLE_ADVANCED_TITLE_OPTIONS;
+    this._showRenderStats = isRuntimeFlagEnabled('renderStats', ENABLE_RENDER_STATS);
+    this._debugInvinciblePlayer = isRuntimeFlagEnabled('invincible', ENABLE_INVINCIBLE_PLAYER);
     this._mode = DifficultyMode.ROOKIE;
     this.score = new ScoreManager(this._mode);
     this.ui = new UI(uiOverlay, this.scene, this.audio, this._showAdvancedTitleOptions);
@@ -104,7 +113,7 @@ export class Game {
     this._frameCount++;
     if (timestamp - this._lastFpsTime >= 1000) {
       if (this._fpsElement) {
-        this._fpsElement.innerText = `${this._frameCount} FPS`;
+        this._fpsElement.innerText = this._formatFpsText();
       }
       this._frameCount = 0;
       this._lastFpsTime = timestamp;
@@ -115,6 +124,35 @@ export class Game {
     this.scene.render(dt);
 
     requestAnimationFrame((t) => this._loop(t));
+  }
+
+  private _formatFpsText(): string {
+    const fps = `${this._frameCount} FPS`;
+    if (!this._showRenderStats) return fps;
+
+    const renderInfo = this.scene.getRenderInfo();
+    const bulletStats = this._run?.getBulletStatsSnapshot();
+    if (!bulletStats) {
+      return `${fps} | calls ${renderInfo.calls}`;
+    }
+
+    const sourceStats = Object.entries(bulletStats.renderUnitsBySourceKey)
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, units]) => `${key}:${bulletStats.bySourceKey[key] ?? 0}/${units}`)
+      .join(' ');
+
+    const objectStats = this.scene.getSceneObjectStats();
+    const categoryStats = Object.entries(objectStats.byCategory)
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, units]) => `${key}:${units}`)
+      .join(' ');
+    const detailStats = Object.entries(objectStats.byDetail)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([key, units]) => `${key}:${units}`)
+      .join(' ');
+
+    return `${fps} | calls ${renderInfo.calls} | objects ${objectStats.total}${categoryStats ? ` | cats ${categoryStats}` : ''}${detailStats ? ` | details ${detailStats}` : ''} | bullets ${bulletStats.total}/${bulletStats.renderUnits}${sourceStats ? ` | ${sourceStats}` : ''}`;
   }
 
   // ── STATE MACHINE ──────────────────────────────────────────────────────────
@@ -263,6 +301,7 @@ export class Game {
       audio: this.audio,
       score: this.score,
       onLevelComplete: () => this.onLevelComplete(),
+      invinciblePlayer: this._debugInvinciblePlayer,
     });
     this._run.start(this.currentLevel, this._savedWeaponTier, this._mode);
     this.ui.updateHUD(this._run.getHUDSnapshot());

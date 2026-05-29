@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { IScene } from '../types.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 interface ExplosionOptions {
   count?:    number;
@@ -51,6 +52,7 @@ export class Explosion {
       color, size, sizeAttenuation: false, transparent: true, opacity: 1, depthWrite: false,
     });
     this._pts = new THREE.Points(geo, mat);
+    markRenderCategory(this._pts, RenderCategory.EFFECT);
     scene.add(this._pts);
   }
 

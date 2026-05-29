@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { STANDARD_VERT } from './ShaderChunks.ts';
 import type { IBackground, IScene } from '../types.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 const BACKDROP_FRAG = `
   uniform float uTime;
@@ -112,6 +113,7 @@ export class Background4 implements IBackground {
       depthWrite: false,
     });
     this._backdropMesh = new THREE.Mesh(this._backdropGeo, this._backdropMat);
+    markRenderCategory(this._backdropMesh, RenderCategory.BACKGROUND, 'background.backdrop');
     this._backdropMesh.position.set(0, 0, -95);
     this._backdropMesh.scale.set(1.4, 1.4, 1.0); // Scale up to ensure full screen coverage under tilt
     this._scene.add(this._backdropMesh);
@@ -135,6 +137,7 @@ export class Background4 implements IBackground {
       const isTop = i % 2 === 0;
       const geo = isTop ? this._spireGeoTop : this._spireGeoBot;
       const mesh = new THREE.Mesh(geo, this._spireMat);
+      markRenderCategory(mesh, RenderCategory.BACKGROUND, 'background.spire');
 
       // Orient ceiling spires to point down
       if (isTop) {
@@ -167,6 +170,7 @@ export class Background4 implements IBackground {
     const geyserCount = 4;
     for (let i = 0; i < geyserCount; i++) {
       const mesh = new THREE.Mesh(this._geyserGeo, this._geyserMat);
+      markRenderCategory(mesh, RenderCategory.BACKGROUND, 'background.geyser');
       const x = (i - geyserCount / 2) * (GAME_WIDTH / (geyserCount - 0.5)) + (Math.random() - 0.5) * 50;
       const y = -GAME_HEIGHT / 2 + 14;
       mesh.position.set(x, y, -65);
@@ -187,6 +191,7 @@ export class Background4 implements IBackground {
 
     for (let i = 0; i < 25; i++) {
       const mesh = new THREE.Mesh(this._particleGeo, this._particleMat);
+      markRenderCategory(mesh, RenderCategory.BACKGROUND, 'background.geyserParticle');
       mesh.visible = false;
       this._scene.add(mesh);
 
@@ -219,6 +224,7 @@ export class Background4 implements IBackground {
     const plateCount = 5;
     for (let i = 0; i < plateCount; i++) {
       const group = new THREE.Group();
+      markRenderCategory(group, RenderCategory.BACKGROUND, 'background.rockPlate');
 
       // Main chunky boulder
       const mainMesh = new THREE.Mesh(this._mainRockGeo, this._plateMat);
@@ -288,6 +294,7 @@ export class Background4 implements IBackground {
         opacity: 0.5,
       });
       const mesh = new THREE.Mesh(this._emberGeo, mat);
+      markRenderCategory(mesh, RenderCategory.BACKGROUND, 'background.ember');
 
       const x = (Math.random() - 0.5) * GAME_WIDTH;
       const y = (Math.random() - 0.5) * GAME_HEIGHT;

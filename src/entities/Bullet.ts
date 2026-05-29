@@ -3,6 +3,7 @@ import { BulletType, type IBullet, type GetPositionFn, type IScene } from '../ty
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import type { BulletAnimRefs, CacheStore } from './BulletsPlayer.ts';
 import { getProjectileDefinition, ProjectileFaction, ProjectileMotionKind, type ProjectileDefinition, type ProjectileMovement } from './ProjectileDefinitions.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 const HALF_W = GAME_WIDTH / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -37,6 +38,8 @@ export class Bullet implements IBullet {
   readonly hw: number;
   readonly hh: number;
   readonly type: BulletType;
+  readonly sourceKey: string;
+  readonly renderUnitCount: number;
   private _definition: ProjectileDefinition;
   private _movement: ProjectileMovement;
   private _getTargetPos: GetPositionFn | null;
@@ -78,11 +81,14 @@ export class Bullet implements IBullet {
     this._vy            = vy;
     this._scene         = scene;
     this.type           = def.id;
+    this.sourceKey      = def.sourceKey;
     this._disposed      = false;
 
     const built = this._build3DProjectile(tint);
     this._mesh     = built.mesh;
     this._animRefs = built.refs ?? {};
+    markRenderCategory(this._mesh, RenderCategory.BULLET, this.sourceKey);
+    this.renderUnitCount = this._countRenderUnits(this._mesh);
     this._mesh.position.set(x, y, 1);
 
     this._alignToVelocity();
@@ -102,6 +108,22 @@ export class Bullet implements IBullet {
 
   private _build3DProjectile(tint: number | null) {
     return this._definition.presentation.build(tint, CACHE, getMaterial, getGeometry);
+  }
+
+  private _countRenderUnits(object: THREE.Object3D): number {
+    let count = 0;
+    object.traverse((child: THREE.Object3D) => {
+      if (
+        child instanceof THREE.Mesh ||
+        child instanceof THREE.Line ||
+        child instanceof THREE.Points ||
+        child instanceof THREE.Sprite
+      ) {
+        count++;
+      }
+    });
+
+    return Math.max(1, count);
   }
 
   reset(x: number, y: number, vx: number, vy: number, getTargetPos: GetPositionFn | null = null): void {

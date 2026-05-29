@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { Explosion } from './Explosion.ts';
 import { Entity } from './Entity.ts';
 import type { GetPositionFn, IBullet, EntityMetadata, IAudio, IScene, IBoss, HitZone, ICollidable, PlayfieldBounds } from '../types.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 const HALF_W = GAME_WIDTH / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -80,6 +81,7 @@ export abstract class BossBase extends Entity implements IBoss {
   // subclass fields are assigned — ensures _build3DModel() has full context.
   protected _init(): void {
     this._mesh = this._build3DModel();
+    markRenderCategory(this._mesh, RenderCategory.BOSS);
     this._mesh.position.set(HALF_W + this._displayW / 2 + 10, 0, 0);
     this._scene.add(this._mesh);
     this._captureOriginalColors();

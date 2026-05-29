@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import type { ITerrain, TerrainBounds, IScene } from '../types.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 const PULSE_RISE_DURATION  = 1.5; // seconds to rise
 const PULSE_HOLD_DURATION  = 1.0; // seconds to hold
@@ -153,6 +154,7 @@ export class Terrain4 implements ITerrain {
 
         // Top Column
         const topMesh = new THREE.Mesh(this._topColumnGeo, this._rockMat);
+        markRenderCategory(topMesh, RenderCategory.TERRAIN, 'terrain.column');
         topMesh.rotation.set(slantX, rotY, slantZ);
         topMesh.visible = false;
         this._scene.add(topMesh);
@@ -170,6 +172,7 @@ export class Terrain4 implements ITerrain {
 
         // Bottom Column
         const botMesh = new THREE.Mesh(this._botColumnGeo, this._rockMat);
+        markRenderCategory(botMesh, RenderCategory.TERRAIN, 'terrain.column');
         botMesh.rotation.set(slantX, rotY, slantZ);
         botMesh.visible = false;
         this._scene.add(botMesh);
@@ -198,11 +201,13 @@ export class Terrain4 implements ITerrain {
 
     for (let i = 0; i < this._slotCount; i++) {
       const tBack = new THREE.Mesh(this._backingGeo, this._lavaPlaneMat);
+      markRenderCategory(tBack, RenderCategory.TERRAIN, 'terrain.backing');
       tBack.visible = false;
       this._scene.add(tBack);
       this._topBackings.push(tBack);
 
       const bBack = new THREE.Mesh(this._backingGeo, this._lavaPlaneMat);
+      markRenderCategory(bBack, RenderCategory.TERRAIN, 'terrain.backing');
       bBack.visible = false;
       this._scene.add(bBack);
       this._botBackings.push(bBack);
@@ -214,6 +219,7 @@ export class Terrain4 implements ITerrain {
 
     for (let i = 0; i < 30; i++) {
       const mesh = new THREE.Mesh(this._debrisGeo, this._rockMat);
+      markRenderCategory(mesh, RenderCategory.TERRAIN, 'terrain.debris');
       mesh.visible = false;
       this._scene.add(mesh);
 

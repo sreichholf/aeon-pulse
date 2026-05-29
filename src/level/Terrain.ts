@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import type { ITerrain, TerrainBounds, IScene } from '../types.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 const HALF_W = GAME_WIDTH / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -83,6 +84,8 @@ export class Terrain implements ITerrain {
       // Build Ceiling Panel and Floor Panel
       const topP = this._buildPanel(this._baseMat, this._glowMat);
       const botP = this._buildPanel(this._baseMat, this._glowMat);
+      markRenderCategory(topP, RenderCategory.TERRAIN);
+      markRenderCategory(botP, RenderCategory.TERRAIN);
       this._scene.add(topP);
       this._scene.add(botP);
       this._topPanels.push(topP);
@@ -91,6 +94,8 @@ export class Terrain implements ITerrain {
       // Build Support Pillars (placed at the seams between panels)
       const topCol = this._buildPillar(this._pillarMat, this._glowMat);
       const botCol = this._buildPillar(this._pillarMat, this._glowMat);
+      markRenderCategory(topCol, RenderCategory.TERRAIN);
+      markRenderCategory(botCol, RenderCategory.TERRAIN);
       this._scene.add(topCol);
       this._scene.add(botCol);
       this._topPillars.push(topCol);

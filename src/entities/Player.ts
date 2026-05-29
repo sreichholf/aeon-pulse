@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { BulletType, DifficultyMode, type IBullet, type ProjectileFactoryFn, type TerrainBounds, type Vec2, type IScene } from '../types.ts';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { Action } from '../systems/InputManager.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 import { Bullet } from './Bullet.ts';
 
 const HALF_W = GAME_WIDTH / 2;
@@ -64,6 +65,7 @@ export class Player {
   private _input: InputManager;
   private _audio: PlayerAudio;
   private _projectileFactory: ProjectileFactoryFn | null;
+  private _debugInvincible: boolean;
   private _mode: DifficultyMode;
   private _shieldMax: number;
   private _shieldPips: number;
@@ -90,12 +92,14 @@ export class Player {
     audio: PlayerAudio,
     mode?: DifficultyMode,
     projectileFactory: ProjectileFactoryFn | null = null,
+    debugInvincible = false,
   ) {
     this._scene   = scene;
     this._sprites = sprites;
     this._input   = input;
     this._audio   = audio;
     this._projectileFactory = projectileFactory;
+    this._debugInvincible = debugInvincible;
 
     this.weaponTier      = WeaponTier.RAPID;
     this.chargeLevel     = 0;       // 0–1, exposed for HUD
@@ -122,6 +126,7 @@ export class Player {
     this._chargeOrb = null;
     this._shieldAura = null;
     this._mesh = this._build3DPlayerShip();
+    markRenderCategory(this._mesh, RenderCategory.PLAYER);
     this._mesh.position.set(RESPAWN_X, RESPAWN_Y, 2);
     scene.add(this._mesh);
   }
@@ -684,6 +689,7 @@ export class Player {
 
   /** Called by collision detection. Returns true if a life was consumed. */
   hit(): boolean {
+    if (this._debugInvincible) return false;
     if (this.isInvincible) return false;
     this._audio.play('playerHit');
     this._audio.stopChargeHum();

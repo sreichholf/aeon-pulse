@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { Bullet } from './Bullet.ts';
 import { Entity } from './Entity.ts';
 import { BulletType, type HitResult, type GetPositionFn, type TerrainBounds, type IBullet, type EntityMetadata, type IEnemy, type IScene, type ProjectileFactoryFn } from '../types.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 export const HALF_W = GAME_WIDTH  / 2;
 export const HALF_H = GAME_HEIGHT / 2;
@@ -67,12 +68,14 @@ export class Enemy extends Entity implements IEnemy {
         depthWrite: false,
       });
       this._mesh = new THREE.Mesh(geo, mat);
+      markRenderCategory(this._mesh, RenderCategory.ENEMY);
       this._mesh.position.set(x, y, 0);
       scene.add(this._mesh);
     } else {
       // 3D enemy: lightweight position-only placeholder.
       // The subclass constructor will replace this with its 3D group.
       this._mesh = new THREE.Group();
+      markRenderCategory(this._mesh, RenderCategory.ENEMY);
       this._mesh.position.set(x, y, 0);
     }
   }
@@ -103,6 +106,9 @@ export class Enemy extends Entity implements IEnemy {
   }
 
   update(dt: number): IBullet[] {
+    if (this._mesh && !this._mesh.userData['renderCategory']) {
+      markRenderCategory(this._mesh, RenderCategory.ENEMY);
+    }
     this._newBullets     = [...this._pendingBullets];
     this._pendingBullets = [];
     if (!this._alive) return this._newBullets;

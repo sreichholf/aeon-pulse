@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { STANDARD_VERT } from './ShaderChunks.ts';
 import type { IBackground, IScene } from '../types.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 const HALF_W = GAME_WIDTH / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -99,6 +100,7 @@ export class Background implements IBackground {
     });
     const nebulaGeo  = new THREE.PlaneGeometry(GAME_WIDTH, GAME_HEIGHT);
     this._nebulaMesh = new THREE.Mesh(nebulaGeo, nebulaMat);
+    markRenderCategory(this._nebulaMesh, RenderCategory.BACKGROUND);
     this._nebulaMesh.position.z = -100;
     this._nebulaMesh.scale.set(1.4, 1.4, 1.0); // Scale up to ensure full screen coverage under tilt
     scene.add(this._nebulaMesh);
@@ -145,6 +147,7 @@ export class Background implements IBackground {
         0,
         -22
       );
+      markRenderCategory(arch, RenderCategory.BACKGROUND);
       scene.add(arch);
       this._structures.push({
         mesh: arch,
@@ -167,6 +170,7 @@ export class Background implements IBackground {
       if (ySign === 1) {
         tower.rotation.z = Math.PI; // flip overhead
       }
+      markRenderCategory(tower, RenderCategory.BACKGROUND);
       scene.add(tower);
       this._structures.push({
         mesh: tower,
@@ -186,6 +190,7 @@ export class Background implements IBackground {
         yOffset,
         zDepth
       );
+      markRenderCategory(pipe, RenderCategory.BACKGROUND);
       scene.add(pipe);
       this._structures.push({
         mesh: pipe,
@@ -207,6 +212,7 @@ export class Background implements IBackground {
       if (ySign === 1) {
         spire.rotation.z = Math.PI;
       }
+      markRenderCategory(spire, RenderCategory.BACKGROUND);
       scene.add(spire);
       this._structures.push({
         mesh: spire,
@@ -223,6 +229,7 @@ export class Background implements IBackground {
         (Math.random() - 0.5) * 90,
         -90
       );
+      markRenderCategory(ring, RenderCategory.BACKGROUND);
       scene.add(ring);
       this._structures.push({
         mesh: ring,
@@ -272,6 +279,7 @@ export class Background implements IBackground {
       const ry = (Math.random() - 0.5) * 2.2;
       const rz = (Math.random() - 0.5) * 2.2;
 
+      markRenderCategory(mesh, RenderCategory.BACKGROUND);
       scene.add(mesh);
       this._dust.push({ mesh, speedMult, rx, ry, rz });
     }

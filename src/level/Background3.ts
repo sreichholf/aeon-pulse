@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { STANDARD_VERT } from './ShaderChunks.ts';
 import type { IBackground, IScene } from '../types.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 const HALF_W = GAME_WIDTH  / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -90,6 +91,7 @@ export class Background3 implements IBackground {
     });
     const geo = new THREE.PlaneGeometry(GAME_WIDTH, GAME_HEIGHT);
     this._bgMesh = new THREE.Mesh(geo, mat);
+    markRenderCategory(this._bgMesh, RenderCategory.BACKGROUND);
     this._bgMesh.position.z = -100;
     this._bgMesh.scale.set(1.4, 1.4, 1.0); // Scale up to ensure full screen coverage under tilt
     scene.add(this._bgMesh);

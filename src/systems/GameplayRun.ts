@@ -42,6 +42,14 @@ export interface HUDSnapshot {
   shieldRegenPct: number;
 }
 
+export interface BulletStatsSnapshot {
+  total: number;
+  renderUnits: number;
+  byType: Record<string, number>;
+  bySourceKey: Record<string, number>;
+  renderUnitsBySourceKey: Record<string, number>;
+}
+
 interface GameplayRunDeps {
   scene: IScene;
   sprites: Record<string, THREE.Texture>;
@@ -49,6 +57,7 @@ interface GameplayRunDeps {
   audio: AudioManager;
   score: ScoreManager;
   onLevelComplete: () => void;
+  invinciblePlayer?: boolean;
 }
 
 export class GameplayRun implements LevelGameHost {
@@ -111,6 +120,7 @@ export class GameplayRun implements LevelGameHost {
       this._deps.audio,
       mode,
       (spawn) => this._projectilePool.create(spawn),
+      this._deps.invinciblePlayer ?? false,
     );
 
     if (savedWeaponTier > 1) {
@@ -181,6 +191,30 @@ export class GameplayRun implements LevelGameHost {
 
   getSavedWeaponTier(): number {
     return this._player?.weaponTier ?? 1;
+  }
+
+  getBulletStatsSnapshot(): BulletStatsSnapshot {
+    const byType: Record<string, number> = {};
+    const bySourceKey: Record<string, number> = {};
+    const renderUnitsBySourceKey: Record<string, number> = {};
+    let renderUnits = 0;
+
+    for (const bullet of this._bullets) {
+      byType[bullet.type] = (byType[bullet.type] ?? 0) + 1;
+      const sourceKey = bullet.sourceKey ?? bullet.type;
+      const bulletRenderUnits = bullet.renderUnitCount ?? 1;
+      bySourceKey[sourceKey] = (bySourceKey[sourceKey] ?? 0) + 1;
+      renderUnitsBySourceKey[sourceKey] = (renderUnitsBySourceKey[sourceKey] ?? 0) + bulletRenderUnits;
+      renderUnits += bulletRenderUnits;
+    }
+
+    return {
+      total: this._bullets.length,
+      renderUnits,
+      byType,
+      bySourceKey,
+      renderUnitsBySourceKey,
+    };
   }
 
   clear(): void {

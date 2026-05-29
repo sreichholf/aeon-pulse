@@ -4,6 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { GAME_WIDTH, GAME_HEIGHT } from './constants.ts';
+import { RenderCategory } from './systems/RenderStats.ts';
 
 const ChromaShader = {
   uniforms: {
@@ -45,6 +46,7 @@ export class Scene {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
     this.renderer.setPixelRatio(1);
     this.renderer.setClearColor(0x000000, 1);
+    this.renderer.info.autoReset = false;
 
     const hw = GAME_WIDTH / 2;
     const hh = GAME_HEIGHT / 2;
@@ -137,6 +139,8 @@ export class Scene {
   }
 
   render(dt: number = 0): void {
+    this.renderer.info.reset();
+
     if (this._flashMesh.visible) {
       this._flashTimer += dt;
       const t = Math.min(this._flashTimer / this._flashDur, 1);
@@ -153,6 +157,65 @@ export class Scene {
     } else {
       this.renderer.render(this.scene, this.camera);
     }
+  }
+
+  getRenderInfo() {
+    return this.renderer.info.render;
+  }
+
+  getSceneObjectStats() {
+    const byCategory: Record<string, number> = {};
+    const byDetail: Record<string, number> = {};
+    let total = 0;
+
+    this.scene.traverse((object) => {
+      if (!this._isRenderable(object) || !this._isEffectivelyVisible(object)) return;
+
+      const category = this._findRenderMetadata(object, 'renderCategory') ?? RenderCategory.UNCATEGORIZED;
+      const detail = this._findRenderMetadata(object, 'renderDetail');
+      const units = this._estimateRenderUnits(object);
+
+      byCategory[category] = (byCategory[category] ?? 0) + units;
+      if (detail) byDetail[detail] = (byDetail[detail] ?? 0) + units;
+      total += units;
+    });
+
+    return { total, byCategory, byDetail };
+  }
+
+  private _isRenderable(object: THREE.Object3D): boolean {
+    return (
+      object instanceof THREE.Mesh ||
+      object instanceof THREE.Line ||
+      object instanceof THREE.Points ||
+      object instanceof THREE.Sprite
+    );
+  }
+
+  private _isEffectivelyVisible(object: THREE.Object3D): boolean {
+    let cur: THREE.Object3D | null = object;
+    while (cur) {
+      if (!cur.visible) return false;
+      cur = cur.parent;
+    }
+    return true;
+  }
+
+  private _estimateRenderUnits(object: THREE.Object3D): number {
+    if (object instanceof THREE.Mesh && Array.isArray(object.material)) {
+      return Math.max(1, object.material.length);
+    }
+    return 1;
+  }
+
+  private _findRenderMetadata(object: THREE.Object3D, key: 'renderCategory' | 'renderDetail'): RenderCategory | string | undefined {
+    let cur: THREE.Object3D | null = object;
+    while (cur) {
+      const value = cur.userData[key] as RenderCategory | string | undefined;
+      if (value) return value;
+      cur = cur.parent;
+    }
+    return undefined;
   }
 
   get scale() { return this._scale; }

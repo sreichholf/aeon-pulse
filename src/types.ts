@@ -148,6 +148,8 @@ export interface IBullet extends ICollidable {
   readonly isPiercing: boolean;
   readonly isOffscreen: boolean;
   readonly type: BulletType;
+  readonly sourceKey?: string;
+  readonly renderUnitCount?: number;
   update(dt: number): void;
   destroy(): void;
 }

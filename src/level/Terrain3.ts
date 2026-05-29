@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import type { ITerrain, TerrainBounds, IScene } from '../types.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 const HALF_W = GAME_WIDTH / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -108,6 +109,8 @@ export class Terrain3 implements ITerrain {
       // Build organic ceiling and floor panels
       const topP = this._buildPanel(this._baseMat, this._glowMat, this._sporeGlowMat);
       const botP = this._buildPanel(this._baseMat, this._glowMat, this._sporeGlowMat);
+      markRenderCategory(topP, RenderCategory.TERRAIN);
+      markRenderCategory(botP, RenderCategory.TERRAIN);
       this._scene.add(topP);
       this._scene.add(botP);
       this._topPanels.push(topP);
@@ -116,6 +119,8 @@ export class Terrain3 implements ITerrain {
       // Build calcified bone spikes at the seams
       const topSpk = this._buildSpike(this._boneMat, this._sporeGlowMat);
       const botSpk = this._buildSpike(this._boneMat, this._sporeGlowMat);
+      markRenderCategory(topSpk, RenderCategory.TERRAIN);
+      markRenderCategory(botSpk, RenderCategory.TERRAIN);
       this._scene.add(topSpk);
       this._scene.add(botSpk);
       this._topSpikes.push(topSpk);
