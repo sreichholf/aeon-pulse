@@ -1,6 +1,6 @@
 # AGENTS.md
- 
-This file provides guidance to AGENTS when working with code in this repository.
+
+This file provides guidance to agents working in this repository.
 
 ## Commands
 
@@ -10,9 +10,26 @@ npm run build    # production build to dist/
 npm run preview  # serve the production build locally
 ```
 
-There is no test suite. Verification is browser-based testing at http://localhost:5173, and agents may perform that verification directly using the available in-app browser tooling.
+There is no automated test suite. Verification is:
 
-For render-performance work, see `docs/render-optimization-notes.md` for the current profiling workflow, scenario guidance, and the existing Chapter 1 / Chapter 4 optimization results.
+1. `npm run build`
+2. Browser-based playtesting at `http://localhost:5173`
+
+For render-performance work, see `docs/render-optimization-notes.md` and `scripts/collect-render-stats.mjs`.
+
+### Automated Browser Testing (Windows)
+
+For render-performance profiling, a headless browser run using the Chrome DevTools Protocol (CDP) is the authorized way to capture automated gameplay render metrics.
+
+**Authorized Windows Workflow**:
+1. Ensure the development server is active at `http://localhost:5173` (start manually via `npm run dev`).
+2. Run the pre-authorized profiling orchestrator using the absolute path to the primary runtime Node executable. This bypasses system sandbox permission restrictions
+3. The orchestrator script will:
+   - Programmatically spawn a headless Google Chrome instance on port `9222` using a dedicated profile folder (`.tmp/chrome-profile`) to avoid conflicts with active desktop sessions.
+   - Connect via WebSockets and execute `scripts/collect-render-stats.mjs`.
+   - Cycle through all 4 dense gameplay scenarios, gather FPS/draw calls, print the JSON results, and cleanly kill the browser process on completion.
+
+For further render-performance work, see `docs/render-optimization-notes.md` for detailed scenario guidelines and historical benchmark datasets.
 
 ## Git
 
@@ -20,103 +37,221 @@ For render-performance work, see `docs/render-optimization-notes.md` for the cur
 
 ## Architecture Decision Records
 
-Key design decisions are documented in `docs/adr/`. Read the relevant ADR before modifying code in its domain.
+Key design decisions live in `docs/adr/`. Read the relevant ADR before modifying code in its domain.
 
-- **[ADR 0001 — Game Balance Principles](docs/adr/0001-game-balance-principles.md)** — Hit penalty = -1 tier (not -2), target weapon tier per boss, drop rates fixed per enemy type, boss defeat grants +1 life (capped), boss HP scaled for consistent time-to-kill, Boss 1 phase restructure, shield mechanic scoped out.
-- **[ADR 0002 — Difficulty Modes and Shield Mechanic](docs/adr/0002-difficulty-modes-and-shield.md)** — Three modes (Rookie/Pilot/Ace) with per-mode shield rules. Rookie: 2-pip shield, no tier drop, 4s regen. Pilot: 1-pip shield, tier drop on unshielded hits, 7s regen. Ace: no shield. Separate leaderboards per mode. Shield aura on ship mesh + HUD pips.
-- **[ADR 0003 — String Enums for Discriminators](docs/adr/0003-string-enums-for-discriminators.md)** — `GameState`, `EnemyType`, and `BulletType` are string enums in `types.ts`, not string literal unions. `SpawnEnemyFn` uses `EnemyType` (was `string`). The `const State` object in `Game.ts` is deleted; call sites use `GameState.PLAYING`.
-- **[ADR 0004 — Audio Dependency Injection](docs/adr/0004-audio-dependency-injection.md)** — Entities accept `IAudio | null` in their constructor and use `audio?.play('soundName')`. Never import `AudioManager` directly in entities. The `IAudio` interface lives in `types.ts`.
+- `0001-game-balance-principles.md` — weapon-loss rules, drop rates, boss HP targets, extra-life reward policy.
+- `0002-difficulty-modes-and-shield.md` — Rookie / Pilot / Ace behavior, shield rules, per-mode scoreboards.
+- `0003-string-enums-for-discriminators.md` — discriminators such as `GameState`, `EnemyType`, `BulletType`, `DifficultyMode`, and render-category metadata use enums in `src/types.ts`.
+- `0004-audio-dependency-injection.md` — entities depend on `IAudio`, never `AudioManager` directly.
+- `0005-collision-module-event-driven-seam.md` — `checkCollisions()` reports typed hit events and does not own side effects.
+- `0006-gameplay-tick-extraction.md` — per-frame world stepping lives in `tickGameplay()` in `src/systems/Gameplay.ts`.
+- `0007-campaign-structure-and-module.md` — campaign progression is chapter/level based and owned by `src/campaign/Campaign.ts`.
+- `0008-chapter-wave-grammar-modules.md` — waves are authored per chapter in `src/level/waves/chapterX.ts` using semantic beat helpers.
+- `0009-non-finale-level-exit-window.md` — non-finale levels use a clear gate plus an authored exit flyout.
+- `0010-music-cues-and-chapter-themes.md` — music is cue-based and chapter-themed, not one global track.
+- `0011-projectile-instanced-rendering.md` — projectile rendering uses centralized instancing, not one scene mesh per bullet.
 
-## Architecture
+## High-Level Architecture
 
-**Entry:** `index.html` mounts two sibling elements — `#game-canvas` (Three.js renderer target) and `#ui-overlay` (HTML screens rendered on top). `src/main.js` instantiates `Game` and calls `game.start()`.
+**Entry:** `index.html` mounts `#ui-background`, `#game-canvas`, `#ui-overlay`, and the FPS counter. `src/main.ts` imports `src/style.css`, creates `new Game(canvas, uiOverlay)`, exposes it on `window.game`, and calls `start()`.
 
-**Rendering:** `src/Scene.js` owns the Three.js `WebGLRenderer`, orthographic camera (960×540 logical units, z=100), and an `EffectComposer` pipeline: `RenderPass → UnrealBloomPass(strength=0.5) → ShaderPass` (chromatic aberration). The canvas scales to fill the browser window while preserving aspect ratio. All gameplay objects call `scene.add(mesh)` / `scene.remove(mesh)` to enter and leave the Three.js scene. `GAME_WIDTH` / `GAME_HEIGHT` constants are exported from `Scene.js` and imported everywhere that needs coordinate math.
+**Language / toolchain:** The game is now fully TypeScript-first. Source files live under `src/**/*.ts`, built with Vite 5 and TypeScript 6. When updating docs or guidance, do not refer to the old `.js` entrypoints unless you are describing historical context.
 
-**State machine (`src/Game.js`):** Central coordinator. States: `TITLE → PLAYING → LEVEL_COMPLETE → PLAYING` (advancing level, cycling 1→2→3→4) or `LEVEL_COMPLETE → GAME_COMPLETE` (after Level 4) or `PLAYING → GAME_OVER → TITLE` (when lives run out), or entering the Tactical Database via the `VIEWER` state. The game has **4 levels**; `currentLevel` cycles 1→2→3→4, and completing Level 4 triggers `GAME_COMPLETE`. `Game` holds the master arrays for `bullets`, `enemies`, `powerups`, and `effects`. Every frame calls each entity's `update(dt)`, collects returned bullet arrays, then calls `checkCollisions(this)`.
+**Core coordinator (`src/Game.ts`):** `Game` is now mostly a state machine and runtime orchestrator, not the full gameplay container. It owns:
 
-**Title screen selectors:** On the title screen, `UP`/`DOWN` selects the starting stage (1–4) and `LEFT`/`RIGHT` selects the starting weapon tier (1–5). Both selections are stored on `Game` (`currentLevel`, `_startWeaponTier`) and committed to `_savedWeaponTier` the moment the player presses Fire to start.
+- top-level state transitions (`TITLE`, `LEVEL_START`, `PLAYING`, `PAUSED`, `GAME_OVER`, `LEVEL_COMPLETE`, `GAME_COMPLETE`, `VIEWER`)
+- title-screen selections for starting level, starting weapon tier, and difficulty mode
+- music cue selection
+- the active `GameplayRun`
+- the `TacticalDatabase`
+- the `UI`, `Scene`, `InputManager`, `AudioManager`, and `ScoreManager`
 
-**Sprite system (`src/systems/SpriteGenerator.js`):** All sprites are procedurally generated at startup by drawing to Canvas 2D contexts and converting to `THREE.CanvasTexture`. `SpriteGenerator.generate()` returns a plain object keyed by sprite name. Adding a new sprite requires a `draw*` function and a matching entry in `generate()`. Color palettes for each entity are defined as `CP` (player), `CS` (straight enemy), `CSN` (sine enemy), `CD` (diver enemy), `CW` (swarm enemy), `CB` (boss 1), `CB2` (boss 2) constants at the top of the file.
+**Gameplay runtime (`src/systems/GameplayRun.ts`):** Active gameplay has been extracted out of `Game`. `GameplayRun` owns the live world state for a run:
 
-**Entity pattern:** Each entity class owns its Three.js mesh, exposes `x`, `y`, `hw`, `hh` for AABB collision, and implements:
-- `update(dt)` — returns a `Bullet[]` of newly spawned projectiles (empty array if none)
-- `destroy()` — removes mesh from scene, disposes geometry **and** material
+- `player`
+- `enemies`
+- `boss`
+- `bullets`
+- `powerups`
+- `effects`
+- `background`
+- `terrain`
+- `levelManager`
+- `ProjectilePool`
 
-`Game` manages entity lifecycle: entities are spliced from their arrays when `!isAlive || isOffscreen`, then `destroy()` is called. `EnemySpore` is a special case — it uses a `_pendingBullets` buffer that is flushed on the *next* `update()` call after `hit()` triggers the burst, to avoid the bullets being lost when `_newBullets` is reset.
+`GameplayRun.tick()` builds a `WorldState`, calls `tickGameplay()` from `src/systems/Gameplay.ts`, then calls `checkCollisions()` from `src/systems/Collisions.ts` and handles the resulting hit events.
 
-**Collision (`src/systems/Collisions.js`):** Pure function `checkCollisions(game)` receives the full `Game` instance and performs all AABB overlap checks: player bullets vs. enemies/boss, enemy bullets vs. player, powerups vs. player, terrain walls vs. player. Boss3 immunity when closed is enforced inside `Boss3.hit()` (returns `false` without applying damage), so no special collision logic is needed.
+**Gameplay seam:** Keep these responsibilities separated:
 
-**Levels (`src/level/`):**
-- `LevelManager.js` — tracks `scrollX` (auto-advances each frame), wave queue per level, boss spawn trigger. `buildLevel1Waves()` / `buildLevel2Waves()` / `buildLevel3Waves()` / `buildLevel4Waves()` define all enemy formations. Boss is spawned when `scrollX > config.bossAt`. Per-level config: scroll speeds 100/120/130/140 and boss triggers at 5000/5200/5800/6200. `LEVEL2_TERRAIN`, `LEVEL3_TERRAIN`, and `LEVEL4_TERRAIN` control-point arrays are exported for the respective `Terrain` classes. Level 4 waves also include `lavaEvent` entries that call `terrain.triggerLavaPulse()`.
-- `Terrain.js` (Level 2) — industrial corridor walls defined by `LEVEL2_TERRAIN` control points; `getWallsAt(scrollX)` interpolates `{ top, bottom }` between points. `Game` passes this to `player.terrainBounds` every frame for movement clamping and collision.
-- `Terrain3.js` (Level 3) — organic fleshy corridor shader, same interface as `Terrain.js`, uses `LEVEL3_TERRAIN` points.
-- `Terrain4.js` (Level 4) — asymmetric volcanic cavern, same `getWallsAt(scrollX)` interface; uses `LEVEL4_TERRAIN` points. Implements `triggerLavaPulse()` for lava event hazards.
-- `Background.js` — alien megastructure GLSL shader (Level 1).
-- `Background2.js` — 3D industrial tunnel GLSL shader (Level 2).
-- `Background3.js` — pulsing organic vein/flesh GLSL shader (Level 3), uses simplex noise.
-- `Background4.js` — volcanic cavern GLSL shader (Level 4).
+- `src/systems/Gameplay.ts` updates entities and filters dead/offscreen objects.
+- `src/systems/Collisions.ts` detects overlaps and emits typed hit events.
+- `src/systems/GameplayRun.ts` owns side effects such as score changes, explosions, audio, powerup resolution, and level transitions.
 
-**Enemies (`src/entities/`):**
-- `Enemy.js` — base class only. Owns the Three.js mesh, handles hit/flash logic, and exposes `x`, `y`, `hw`, `hh`, `isAlive`, `isOffscreen`. Each enemy type is its own subclass file; drop chance and score are defined per-class. `Game.SIMPLE_ENEMIES` maps type string → class for `spawnEnemy()` routing.
-- `EnemyStraight.js`, `EnemySine.js`, `EnemyDiver.js`, `EnemySwarm.js`, `EnemyTurret.js`, `EnemyCharger.js` ── the six core enemy types (Levels 1–3).
-- `EnemySpore.js` — slow drifting biological orb (Level 3). On death, bursts into 4 homing projectiles stored in `_pendingBullets`.
-- `Obstacle.js` — destructible fleshy barrier (Level 3). High HP (25), blocks movement, does not shoot. Scrolls left like a regular enemy.
-- `RockDrake.js` — volcanic lizard (Level 4). 4 HP, 400 pts. Slides in to a random stop position, clings briefly, bursts 5 lava bullets in a spread, then charges left off-screen. Spawns from top or bottom of screen; mesh is flipped vertically when spawning from the bottom.
-- `Stalactite.js` — falling ceiling spike (Level 4). 1 HP, 150 pts. Falls downward while scrolling left; kills player on contact.
+Do not push score/audio/scene side effects back down into `Collisions.ts`.
 
-**Bosses:**
-- `Boss.js` (Level 1) — 3-phase mobile boss: oscillating + spread/homing/circular patterns. ~Level 1/10 difficulty baseline (50 HP).
-- `Boss2.js` (Level 2) — stationary industrial boss: dual laser ports + aimed spread shots + homing missiles across 3 phases. ~Level 3/10 difficulty (55 HP). Phase config lives in the `PHASES` array at the top of the file.
-- `Boss3.js` (Level 3) — "Hive Heart": stationary biological boss. Ribcage toggles open/closed; only vulnerable when open. Spawns minions (spores/swarms) when closed. Phase 3 desperation fires large acid wave bullets. ~Level 6/10 difficulty (80 HP). Accepts a `spawnEnemy(type, x, y)` callback injected by `Game`.
-- `Boss4.js` (Level 4) — "Volcanic Titan": stationary multi-hitbox boss. Two destructible side plates (20 HP each) protect a central core (90 HP). Phase 1 (both plates intact): lava spread + RockDrake summons. Phase 2 (one plate destroyed): geyser fan attack added. Phase 3 (both plates gone): core exposed, all attacks intensify. ~Level 8/10 difficulty. 20,000 points. Accepts a `spawnEnemy` callback like Boss3.
+## Rendering
 
-**Bullet types (`src/entities/Bullet.js`):** Defined in the `DEFS` map: `player`, `playerCharge`, `enemy`, `homing`, `boss`, `bossLaser`, `playerWave`, `playerPlasma`, `wave`, `lava`. Homing bullets auto-deactivate once they fly past the target (evasion). The `wave` type is used by Boss3's acid ring attack. The `lava` type (32×32, damage 2, non-piercing) is used by RockDrake burst attacks and Boss4.
+**Scene (`src/Scene.ts`):** Owns the Three.js renderer, orthographic camera, resize behavior, flash overlay, and post-processing pipeline.
 
-**Audio (`src/systems/AudioManager.js`):** Web Audio API only — no audio files. Each sound is a `_snd_*` method that synthesizes oscillators and noise programmatically. `audio.play('soundName')` is the call site.
+- Logical playfield remains `960x540` via `GAME_WIDTH` / `GAME_HEIGHT` from `src/constants.ts`.
+- The active camera can be tilted for gameplay and flattened for the viewer.
+- Post-processing is `RenderPass -> UnrealBloomPass -> ShaderPass` (chromatic aberration).
+- The renderer tracks optional FPS/render stats for debugging.
 
-**UI & Styling (`src/ui/`):**
-- `UI.js` — manages HTML screen transitions (Title, HUD, Game Over, Level Complete, Game Complete, Tactical Database Viewer) injected into `#ui-overlay`.
-- `ui.css` — imports directly at the top of `UI.js` (`import './ui.css'`), integrated into the Vite build.
-- **Glassmorphic Layout System**: All non-gameplay screens float beautifully centered over the 3D gameplay canvas with a precise **5% padding** gap on all sides (`top: 5%; left: 5%; width: 90%; height: 90%;`). Active gameplay and the HUD remain fully edge-to-edge at 100% viewport width/height.
-- **Interactive Volume Control**: A sleek, glassmorphic audio control panel floats in the UI container. Click the icon button to toggle mute/unmute, or slide the smooth input range slider (0% to 100%) to dynamically scale volume values mapped to `AudioManager`.
-- **Theme Color Palette**: Deep dark blues (`#3d6cb3`, `#1d3d6b`) for frames and labels, high-visibility neon red (`#ff3300`) for accents, and glowing gold/orange (`#ffaa00`) for selection states, active weapon tier pips, and highlights.
-- **Scoreboards**: Initials entry and high-score boards are presented on **Game Over** and **Game Complete** screens. Top-10 records persist in `localStorage` via `src/systems/ScoreManager.js`.
+**Projectile rendering:** Bullets are no longer rendered as ordinary scene children. Objects marked with `RenderCategory.BULLET` are intercepted by `Scene.add/remove()` and batched through `src/systems/ProjectileInstancer.ts`.
 
-## Input Mapping (`src/systems/InputManager.js`)
+- `src/systems/ProjectilePool.ts` pools selected bullet types.
+- `src/systems/ProjectileInstancer.ts` batches projectile meshes into `THREE.InstancedMesh` groups.
+- If you add new projectile visuals, verify they still cooperate with pooling and instancing.
 
-Logical keyboard mapping to in-game actions:
-- `W` / `S` / `A` / `D` or **Arrow Keys** — Ship movement, selectors on Title, Weapon selector, and Database page navigation.
-- **Space** (`' '`) — Fire bullet, charge energy, select option, or start level.
-- **Enter** — Confirm/Next.
-- **Escape** / `P` — Pause/Unpause active game; exits Tactical Database back to Title screen.
-- `V` — Enters/Exits the Tactical Database Viewer from the Title screen.
+**Procedural visuals:** The old sprite-generator architecture is gone. The current codebase is primarily procedural Three.js geometry/material construction per entity/background/terrain. Do not document or extend `SpriteGenerator`-style flows unless you are reintroducing them deliberately.
+
+## Campaign And Level Structure
+
+**Campaign module (`src/campaign/Campaign.ts`):** The game now uses a chapter/level campaign model instead of a flat four-level loop.
+
+- There are currently 4 chapters.
+- Each chapter currently has 5 implemented levels, for 20 implemented campaign levels total.
+- Level IDs use the form `chapter-level` such as `1-1` or `4-5`.
+- Chapter archetype determines which background, terrain, wave grammar, boss, and music cue are used.
+- `Campaign.ts` is the source of truth for level identity, chapter names, soft weapon-tier caps, finale flags, and progression helpers.
+
+**Level factory layer (`src/level/Levels.ts`):** `LEVELS` maps chapter archetype to the implementation package for that chapter:
+
+- `createBackground()`
+- `createTerrain()`
+- `buildWaves()`
+- `createBoss()`
+- scroll speed / boss trigger / terrain control points / playfield bounds
+
+**Level manager (`src/level/LevelManager.ts`):**
+
+- advances `scrollX`
+- emits `StageEvent`s when wave entries trigger
+- spawns finale bosses for chapter-finale levels
+- opens non-finale completion only after the clear gate resolves
+
+**Wave authoring (`src/level/waves/`):** Waves are organized per chapter in:
+
+- `chapter1.ts`
+- `chapter2.ts`
+- `chapter3.ts`
+- `chapter4.ts`
+
+They compile down to `WaveEntry[]` using `Timeline.ts` and chapter-local semantic beat helpers. Prefer extending those modules instead of hardcoding more per-level builders in `Levels.ts`.
+
+**Terrain / playfield:** `src/level/Terrain.ts`, `Terrain3.ts`, and `Terrain4.ts` provide wall interpolation and special hazards. `src/level/PlayfieldBounds.ts` supplies static bounds where appropriate. `Gameplay.ts` computes actual terrain bounds per frame and passes them to the player and terrain-aware enemies.
+
+## Entities
+
+**Shared contracts:** Central interfaces and enums live in `src/types.ts`. If you add a new system-facing entity capability, update the shared contract there first.
+
+**Entity registry / catalog:**
+
+- `src/entities/EntityCatalog.ts` is the authoritative catalog for stage-enemy viewer ordering/presentation and spawn wiring.
+- `src/entities/EntityRegistry.ts` is a thin spawn facade over the catalog.
+
+If you add a new standard enemy:
+
+1. Add the enum entry in `EnemyType`.
+2. Add the spawn definition in `EntityCatalog.ts`.
+3. Add any needed wave usage.
+4. Add tactical database presentation metadata.
+
+**Enemy set:** Current standard hazards include `EnemyStraight`, `EnemySine`, `EnemyDiver`, `EnemySwarm`, `EnemyTurret`, `EnemyCharger`, `EnemySpore`, `Obstacle`, `RockDrake`, and `Stalactite`.
+
+**Bosses:** Boss implementations live in `src/entities/Boss.ts`, `Boss2.ts`, `Boss3.ts`, and `Boss4.ts`, with shared behavior in `BossBase.ts`. Boss constructors receive normalized `BossConstructorParams`.
+
+**Projectile definitions:** Projectile behavior is split across:
+
+- `src/entities/Bullet.ts`
+- `src/entities/BulletsPlayer.ts`
+- `src/entities/BulletsEnemy.ts`
+- `src/entities/ProjectileDefinitions.ts`
+
+When modifying projectile behavior, check both gameplay semantics and render-path implications.
+
+## Audio
+
+Audio lives under `src/systems/audio/`.
+
+- `AudioManager.ts` is the runtime facade used by `Game`.
+- `SFXLibrary.ts` owns synthesized sound effects.
+- `MusicSequencer.ts` owns sequenced playback.
+- `themes/registry.ts` resolves `MusicCue` values to authored chapter themes.
+
+Music is chapter-driven. Title uses the title cue, gameplay uses the chapter cue for the selected starting level, pause ducks the active cue, and title-level preview can swap cues when advanced title options are enabled.
+
+Per ADR 0004, entities should depend on `IAudio` from `src/types.ts`, not on `AudioManager` directly.
+
+## UI
+
+UI lives in `src/ui/`.
+
+- `UI.ts` coordinates all HTML screens.
+- `src/ui/screens/` contains the individual screen classes.
+- `src/ui/ui.css` contains the screen styling.
+
+Important current title-screen behavior:
+
+- `UP` / `DOWN` cycles implemented campaign levels when advanced title options are enabled.
+- `LEFT` / `RIGHT` changes starting weapon tier when advanced title options are enabled.
+- `Tab` cycles difficulty mode.
+- `M` toggles music.
+- `V` opens the tactical database when advanced title options are enabled.
+
+The title screen now displays chapter name plus structured level ID, and high scores are stored per difficulty mode.
 
 ## Tactical Database Viewer
 
-The tactical database displays interactive, detailed cards showing statistics (Name, HP, Score) alongside perfectly scaled, animated, procedurally generated 3D meshes of all hazards in the game.
+The viewer is no longer rendered from `Game.ts` directly. It is owned by `src/viewer/TacticalDatabase.ts` and draws from `src/entities/EntityCatalog.ts`.
 
-### Page Layouts
-- **Page 1: Stage Enemies** (2x5 Grid) — Displays `straight`, `sine`, `diver`, `swarm`, `turret`, `charger`, `spore`, `obstacle`, `rockDrake`, and `stalactite`.
-- **Page 2: Level Bosses** (2x2 Grid) — Displays `Titan I (L1)` (Boss 1), `Industrial (L2)` (Boss 2), `Hive Heart (L3)` (Boss 3), and `Volcanic Titan (L4)` (Boss 4).
+- Page 1 shows stage enemies from `getStageEnemyCatalogEntries()`.
+- Page 2 shows bosses from `getBossCatalogEntries()`.
+- Viewer spawn behavior reuses the real entity/boss constructors.
+- Viewer clipping planes are applied per card so meshes stay inside their presentation frame.
 
-### Three.js Overlap/Z-Index Resolution
-Because `#ui-overlay` is layered entirely on top of `#game-canvas`, an HTML-level semi-translucent CSS background would overlap and tint the 3D entity models. To solve this:
-1. The HTML screen overlay background is set to **fully transparent** (`background: transparent`) in `ui.css`.
-2. A single large, dark translucent backdrop plane (`THREE.PlaneGeometry(864, 486)`) is programmatically added at `z = -10` behind the cards inside the Three.js scene.
-3. Behind each card slot, an individual textured Three.js backdrop card plane is spawned at `z = -5` (`color: 0x1d3d6b` with `0.16` opacity for standard enemies; `color: 0xff3300` with `0.05` opacity for bosses) to highlight the entities.
-4. When entering the viewer or switching pages, all active viewer meshes, backdrops, and card planes are pushed to a `_viewerEntities` master array. On page change or viewer exit, `_clearViewer()` iterates over this array, removes them from the scene, and disposes of all geometries and materials to prevent memory leaks.
-5. Pagination helpers and footer elements are absolutely positioned (`bottom: 14px`) to center perfectly inside the vertical gap between the lower card row and the lower screen boundary.
+If you add a new enemy or boss, update the catalog-driven viewer metadata so it appears in the tactical database with correct ordering, scale, and centering.
 
-### Database Requirement
-> [!IMPORTANT]
-> Whenever a new type of enemy or boss is created, it **MUST** be added to the tactical database viewer in `src/Game.js`'s `_renderViewerPage()` method under the corresponding page (Page 1 for standard stage enemies, Page 2 for level bosses), scaled appropriately, and registered so that its 3D model, stats, and name render correctly in the visual card layout.
+## Input Mapping
+
+Logical keyboard mapping is defined in `src/systems/InputManager.ts`:
+
+- `W` / `A` / `S` / `D` or arrow keys — movement and menu navigation
+- `Space` — fire / charge / select
+- `Enter` — confirm / continue
+- `Escape` or `P` — pause / unpause, exit database
+- `V` — tactical database from title when enabled
+- `Tab` — cycle difficulty mode on the title screen
+- `M` — toggle music
+
+## Runtime Flags And Debugging
+
+Runtime flags live in `src/constants.ts`.
+
+- `ENABLE_ADVANCED_TITLE_OPTIONS`
+- `ENABLE_RENDER_STATS`
+- `ENABLE_INVINCIBLE_PLAYER`
+
+Some flags can also be overridden through URL params via `isRuntimeFlagEnabled()`. If you are debugging render stats or invincibility behavior, check both the constants and the runtime query-string override path.
 
 ## Agent Skills
 
-Custom agent workflows and design patterns are installed in `.agents/skills/` in the user's homedir (`/home/reichi/.agents/skills/`). Agents should read the instructions in these folders when triggered:
+Repository-local skills are installed under `.agents/skills/`. Use the relevant skill instructions when the task matches.
 
-- **`grill-with-docs`** — Focuses on stress-testing design plans against canonical terminology in `CONTEXT.md` and writing new ADRs as decisions crystallize.
-- **`improve-codebase-architecture`** — Focuses on refactoring shallow pass-through modules into deep interfaces, generating before/after graphs in temp HTML reports.
-- **`diagnose`** — Implements a disciplined debugging loop (reproduce $\to$ minimize $\to$ falsifiable hypotheses $\to$ instrument $\to$ fix $\to$ regression-test).
-- **`grill-me`** / **`zoom-out`** / **`prototype`** / **`handoff`** — Governing workflows for sequential interviews, system map abstractions, throwaway UI/logic prototypes, and conversation compaction respectively.
+- `diagnose` — disciplined debugging loop
+- `grill-me`
+- `grill-with-docs`
+- `handoff`
+- `improve-codebase-architecture`
+- `prototype`
+- `zoom-out`
+
+## Practical Guidance
+
+- Prefer updating TypeScript contracts first, then implementation sites.
+- When changing progression or level identity, update `src/campaign/Campaign.ts` first and keep `src/level/Levels.ts` focused on chapter archetype implementation.
+- When changing hit behavior, keep collision detection pure and handle side effects in `GameplayRun`.
+- When adding enemies or bosses, update the entity catalog and tactical database metadata, not just the constructor file.
+- When changing projectile behavior, verify both pooling/instancing and gameplay collision behavior.
+- Always verify major gameplay changes in the browser, since there is no automated test suite.

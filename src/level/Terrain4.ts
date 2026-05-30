@@ -64,14 +64,17 @@ interface PlateEntry {
 }
 
 interface DebrisEntry {
-  mesh: THREE.Mesh;
   x: number;
   y: number;
   z: number;
   vx: number;
   vy: number;
+  rotX: number;
+  rotY: number;
+  rotZ: number;
   rotSpeedX: number;
   rotSpeedY: number;
+  scale: number;
   active: boolean;
 }
 
@@ -102,6 +105,7 @@ export class Terrain4 implements ITerrain {
 
   private _debrisPool: DebrisEntry[];
   private _debrisGeo: THREE.ConeGeometry;
+  private _debrisMesh: THREE.InstancedMesh;
 
   private _scrollX: number;
   private _time: number;
@@ -205,22 +209,25 @@ export class Terrain4 implements ITerrain {
     // 5. Pre-allocate pool of 30 falling rock debris chunks
     this._debrisPool = [];
     this._debrisGeo = new THREE.ConeGeometry(4, 8, 4); // 4-sided low-poly cones
+    this._debrisMesh = new THREE.InstancedMesh(this._debrisGeo, this._rockMat, 30);
+    this._debrisMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    markRenderCategory(this._debrisMesh, RenderCategory.TERRAIN, 'terrain.debris');
+    this._debrisMesh.count = 0;
+    this._scene.add(this._debrisMesh);
 
     for (let i = 0; i < 30; i++) {
-      const mesh = new THREE.Mesh(this._debrisGeo, this._rockMat);
-      markRenderCategory(mesh, RenderCategory.TERRAIN, 'terrain.debris');
-      mesh.visible = false;
-      this._scene.add(mesh);
-
       this._debrisPool.push({
-        mesh,
         x: 0,
         y: 0,
         z: 0,
         vx: 0,
         vy: 0,
+        rotX: 0,
+        rotY: 0,
+        rotZ: 0,
         rotSpeedX: 0,
         rotSpeedY: 0,
+        scale: 1,
         active: false,
       });
     }
@@ -491,14 +498,18 @@ export class Terrain4 implements ITerrain {
         freeDebris.z = -25 + Math.random() * 40;
         freeDebris.vx = -40 - Math.random() * 60;
         freeDebris.vy = -80 - Math.random() * 120;
+        freeDebris.rotX = Math.random() * Math.PI * 2;
+        freeDebris.rotY = Math.random() * Math.PI * 2;
+        freeDebris.rotZ = Math.random() * Math.PI * 2;
         freeDebris.rotSpeedX = (Math.random() - 0.5) * 8;
         freeDebris.rotSpeedY = (Math.random() - 0.5) * 8;
-        freeDebris.mesh.scale.setScalar(0.7 + Math.random() * 0.8);
-        freeDebris.mesh.visible = true;
+        freeDebris.scale = 0.7 + Math.random() * 0.8;
       }
     }
 
     // Update active debris
+    let activeDebrisCount = 0;
+    const tempEuler = new THREE.Euler();
     for (const d of this._debrisPool) {
       if (!d.active) continue;
 
@@ -506,21 +517,26 @@ export class Terrain4 implements ITerrain {
       d.x += d.vx * dt;
       d.y += d.vy * dt;
 
-      d.mesh.rotation.x += d.rotSpeedX * dt;
-      d.mesh.rotation.y += d.rotSpeedY * dt;
-
-      d.mesh.position.set(d.x - scrollX, d.y, d.z);
+      d.rotX += d.rotSpeedX * dt;
+      d.rotY += d.rotSpeedY * dt;
 
       const dWalls = this.getWallsAt(d.x);
-      if (d.y - 4 <= dWalls.bottom || d.y < -GAME_HEIGHT / 2 - 20) {
+      if (d.y - 4 <= dWalls.bottom || d.y < -GAME_HEIGHT / 2 - 20 || d.x - scrollX < -GAME_WIDTH / 2 - 50) {
         d.active = false;
-        d.mesh.visible = false;
+        continue;
       }
-      if (d.x - scrollX < -GAME_WIDTH / 2 - 50) {
-        d.active = false;
-        d.mesh.visible = false;
-      }
+
+      tempEuler.set(d.rotX, d.rotY, d.rotZ);
+      this._setInstanceTransform(
+        this._debrisMesh,
+        activeDebrisCount++,
+        [d.x - scrollX, d.y, d.z],
+        tempEuler,
+        [d.scale, d.scale, d.scale]
+      );
     }
+    this._debrisMesh.count = activeDebrisCount;
+    this._debrisMesh.instanceMatrix.needsUpdate = true;
   }
 
   destroy(): void {
@@ -539,9 +555,7 @@ export class Terrain4 implements ITerrain {
     this._botColumnGeo.dispose();
 
     // Clean up debris
-    for (const d of this._debrisPool) {
-      this._scene.remove(d.mesh);
-    }
+    this._scene.remove(this._debrisMesh);
     this._debrisGeo.dispose();
 
     this._rockMat.dispose();
