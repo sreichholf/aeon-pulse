@@ -316,54 +316,8 @@ export class RockDrake extends Enemy {
     createJoint(5,   5.8); // Mid to Rear
     createJoint(15,  4.5); // Rear to Tail
 
-    // 4. Clinging legs reaching ceiling/floor (reaches +Y to grip terrain)
-    const buildLeg = (legX: number, legY: number, legZ: number, signZ: number): THREE.Group => {
-      const legGroup = new THREE.Group();
-      legGroup.position.set(legX, legY, legZ);
 
-      // Thigh: angles outwards and upwards
-      const thighGeo = new THREE.CylinderGeometry(2.5, 1.8, 9, 4);
-      thighGeo.rotateX(signZ * Math.PI / 6); // thigh splayed out in Z
-      thighGeo.rotateZ(-Math.PI / 12); // slightly angled forward
-      const thigh = new THREE.Mesh(thighGeo, rockMat);
-      thigh.position.set(0, 3.5, signZ * 2.0);
-      legGroup.add(thigh);
 
-      // Shin: angles further outwards/upwards
-      const shinGeo = new THREE.CylinderGeometry(1.8, 1.2, 8, 4);
-      shinGeo.rotateX(signZ * Math.PI / 3); // shin angled more heavily in Z
-      const shin = new THREE.Mesh(shinGeo, rockMat);
-      shin.position.set(0, 9.0, signZ * 5.0);
-      legGroup.add(shin);
-
-      // Splayed stone claws
-      const clawGeo = new THREE.ConeGeometry(1.2, 5, 4);
-      clawGeo.rotateX(signZ * Math.PI / 2.2); // angled towards terrain surface
-
-      const claw1 = new THREE.Mesh(clawGeo, clawMat);
-      claw1.position.set(-1.8, 12.0, signZ * 7.5);
-
-      const claw2 = new THREE.Mesh(clawGeo, clawMat);
-      claw2.position.set(1.8, 12.0, signZ * 7.5);
-
-      legGroup.add(claw1);
-      legGroup.add(claw2);
-
-      return legGroup;
-    };
-
-    // Attach 4 legs to appropriate segments so they ripple dynamically with the segment wiggles!
-    // Front legs attached to Chest Segment (Segment 1)
-    const frontLegR = buildLeg(0, 2, 7.5, 1);
-    const frontLegL = buildLeg(0, 2, -7.5, -1);
-    chestGroup.add(frontLegR);
-    chestGroup.add(frontLegL);
-
-    // Rear legs attached to Rear Segment (Segment 3)
-    const rearLegR = buildLeg(0, 1.5, 5.5, 1);
-    const rearLegL = buildLeg(0, 1.5, -5.5, -1);
-    rearGroup.add(rearLegR);
-    rearGroup.add(rearLegL);
 
     // Pre-populate origColor for flash traversal
     group.traverse((child: THREE.Object3D) => {
