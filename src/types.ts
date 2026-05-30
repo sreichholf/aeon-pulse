@@ -41,6 +41,25 @@ export enum BulletType {
   LAVA = 'lava',
 }
 
+export enum RenderCategory {
+  BACKGROUND = 'background',
+  TERRAIN = 'terrain',
+  PLAYER = 'player',
+  ENEMY = 'enemy',
+  BOSS = 'boss',
+  BULLET = 'bullet',
+  EFFECT = 'effect',
+  UI = 'ui',
+  ENGINE = 'engine',
+  UNCATEGORIZED = 'uncategorized',
+}
+
+export enum UserDataKey {
+  RENDER_CATEGORY = 'renderCategory',
+  RENDER_DETAIL = 'renderDetail',
+  COMPILED_MESHES = 'compiledMeshes',
+}
+
 export enum DifficultyMode {
   ROOKIE = 'rookie',
   PILOT = 'pilot',

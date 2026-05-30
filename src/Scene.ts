@@ -4,7 +4,10 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { GAME_WIDTH, GAME_HEIGHT } from './constants.ts';
-import { RenderCategory } from './systems/RenderStats.ts';
+import { RenderCategory, UserDataKey } from './types.ts';
+
+
+import { ProjectileInstancer } from './systems/ProjectileInstancer.ts';
 
 const ChromaShader = {
   uniforms: {
@@ -41,6 +44,8 @@ export class Scene {
   private _flashDur: number;
   private _flashMesh!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   private _composer!: EffectComposer;
+  private _projectileInstancer: ProjectileInstancer;
+  private _activeBullets: Set<THREE.Object3D>;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
@@ -97,6 +102,9 @@ export class Scene {
     const chroma = new ShaderPass(ChromaShader);
     this._composer.addPass(chroma);
 
+    this._projectileInstancer = new ProjectileInstancer(this.scene);
+    this._activeBullets = new Set();
+
     window.addEventListener('resize', () => this._resize());
   }
 
@@ -112,8 +120,21 @@ export class Scene {
     this._composer?.setSize(w, h);
   }
 
-  add(object: THREE.Object3D): void    { this.scene.add(object); }
-  remove(object: THREE.Object3D): void { this.scene.remove(object); }
+  add(object: THREE.Object3D): void {
+    if (object.userData[UserDataKey.RENDER_CATEGORY] === RenderCategory.BULLET) {
+      this._activeBullets.add(object);
+    } else {
+      this.scene.add(object);
+    }
+  }
+
+  remove(object: THREE.Object3D): void {
+    if (object.userData[UserDataKey.RENDER_CATEGORY] === RenderCategory.BULLET) {
+      this._activeBullets.delete(object);
+    } else {
+      this.scene.remove(object);
+    }
+  }
 
   setClearAlpha(alpha: number): void {
     this.renderer.setClearColor(0x000000, alpha);
@@ -141,6 +162,14 @@ export class Scene {
   render(dt: number = 0): void {
     this.renderer.info.reset();
 
+    // 1. Process active bullets through ProjectileInstancer
+    this._projectileInstancer.beginFrame();
+    this._activeBullets.forEach((bullet) => {
+      this._projectileInstancer.addBullet(bullet);
+    });
+    this._projectileInstancer.endFrame();
+
+    // 2. Main render logic
     if (this._flashMesh.visible) {
       this._flashTimer += dt;
       const t = Math.min(this._flashTimer / this._flashDur, 1);
