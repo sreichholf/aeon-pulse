@@ -341,13 +341,18 @@ export class TacticalDatabase {
       if (Array.isArray(child.material)) {
         child.material = child.material.map((mat: THREE.Material) => {
           const m = mat.clone();
+          m.onBeforeCompile = mat.onBeforeCompile;
+          m.customProgramCacheKey = mat.customProgramCacheKey;
           m.clippingPlanes = planes;
           m.clipShadows = true;
           this._clonedMaterials.push(m);
           return m;
         });
       } else {
-        const m = (child.material as THREE.Material).clone();
+        const mat = child.material as THREE.Material;
+        const m = mat.clone();
+        m.onBeforeCompile = mat.onBeforeCompile;
+        m.customProgramCacheKey = mat.customProgramCacheKey;
         m.clippingPlanes = planes;
         m.clipShadows = true;
         child.material = m;

@@ -310,6 +310,127 @@ export class EnemyStraight extends Enemy {
       flatShading: true,
     });
 
+    shipMat.customProgramCacheKey = () => 'EnemyStraightDecalsV1';
+    shipMat.onBeforeCompile = (shader) => {
+      // 1. Vertex Shader Injection: Pass local positions
+      shader.vertexShader = 'varying vec3 vLocalPosition;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        vLocalPosition = position.xyz;`
+      );
+
+      // 2. Fragment Shader Injection: Add procedural decal drawing helpers at the GLOBAL scope
+      shader.fragmentShader = `varying vec3 vLocalPosition;
+
+      float getLine(float val, float target, float thickness) {
+        return smoothstep(thickness, thickness * 0.4, abs(val - target));
+      }
+
+      float drawZero(vec2 uv) {
+        float outer = step(abs(uv.x), 0.5) * step(abs(uv.y), 0.7);
+        float inner = step(abs(uv.x), 0.25) * step(abs(uv.y), 0.45);
+        float split = step(abs(uv.y), 0.1);
+        return max(0.0, outer - inner - split);
+      }
+
+      float drawSeven(vec2 uv) {
+        float top = step(abs(uv.y - 0.55), 0.15) * step(abs(uv.x), 0.5);
+        float diag = step(abs(uv.x + uv.y * 0.6 - 0.1), 0.15) * step(abs(uv.y), 0.7);
+        return max(0.0, max(top, diag));
+      }\n` + shader.fragmentShader;
+
+      // 3. Fragment Shader Injection: Draw panel lines, rivets, bird decals, and serial numbers (branchless!)
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+
+        // --- 1. Procedural Panel Seams ---
+        float panelLine = 0.0;
+
+        // Lateral seams (made significantly thicker for visibility at scale)
+        panelLine = max(panelLine, getLine(vLocalPosition.x, -6.0, 0.4));
+        panelLine = max(panelLine, getLine(vLocalPosition.x, 1.0, 0.4));
+        panelLine = max(panelLine, getLine(vLocalPosition.x, 6.0, 0.4));
+        panelLine = max(panelLine, getLine(vLocalPosition.x, 12.0, 0.4));
+
+        // Longitudinal seams
+        panelLine = max(panelLine, getLine(abs(vLocalPosition.z), 2.8, 0.4));
+        panelLine = max(panelLine, getLine(abs(vLocalPosition.z), 5.0, 0.4));
+        panelLine = max(panelLine, getLine(abs(vLocalPosition.z), 11.5, 0.4));
+        panelLine = max(panelLine, getLine(abs(vLocalPosition.z), 22.2, 0.4));
+
+        // Swept wing panel lines (diagonal, branchless using step)
+        float isWing = step(3.0, abs(vLocalPosition.z));
+        float swept1 = abs(vLocalPosition.x - (2.5 + abs(vLocalPosition.z) * 0.5));
+        panelLine = max(panelLine, smoothstep(0.4, 0.1, swept1) * isWing);
+        
+        float swept2 = abs(vLocalPosition.x - (-3.0 + abs(vLocalPosition.z) * 0.6));
+        panelLine = max(panelLine, smoothstep(0.4, 0.1, swept2) * isWing);
+
+        // Apply panel lines as a dark groove
+        vec3 panelColor = diffuseColor.rgb * 0.35;
+        diffuseColor.rgb = mix(diffuseColor.rgb, panelColor, panelLine * 0.9);
+
+        // --- 2. Procedural Rivet Dots ---
+        float rivetVal = 0.0;
+        
+        float isLongSeam = step(abs(abs(vLocalPosition.z) - 2.8), 0.5);
+        float distX = abs(fract(vLocalPosition.x / 2.0 + 0.5) - 0.5) * 2.0;
+        rivetVal = max(rivetVal, smoothstep(0.35, 0.1, distX) * isLongSeam);
+        
+        float isWingSeam = step(abs(abs(vLocalPosition.z) - 11.5), 0.5);
+        float distWingX = abs(fract(vLocalPosition.x / 2.5 + 0.5) - 0.5) * 2.5;
+        rivetVal = max(rivetVal, smoothstep(0.35, 0.1, distWingX) * isWingSeam);
+        
+        // Apply rivets as recessed dark dots
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.08, 0.1), rivetVal * 0.95);
+
+        // --- 3. White Eagle Wing Decals (branchless!) ---
+        float decalBird = 0.0;
+        float inWingX = step(-3.0, vLocalPosition.x) * step(vLocalPosition.x, 8.0);
+        float inWingZ = step(5.5, abs(vLocalPosition.z)) * step(abs(vLocalPosition.z), 17.5);
+        
+        // Scaled up by roughly 3.3x (multiplying coordinates by 0.3)
+        vec2 pDecal = vec2(vLocalPosition.x - 2.5, abs(vLocalPosition.z) - 11.5) * 0.3;
+        pDecal.x *= 1.2;
+        float bodyDist = abs(pDecal.x) + abs(pDecal.y) * 2.0;
+        float body = smoothstep(0.6, 0.4, bodyDist);
+
+        float wingDist = abs(pDecal.y - (pDecal.x - 0.4) * 0.7);
+        float wingLimit = step(pDecal.x, 1.8) * step(-1.2, pDecal.x);
+        float wings = smoothstep(0.5, 0.3, wingDist) * wingLimit;
+
+        decalBird = max(body, wings) * inWingX * inWingZ;
+        
+        // Paint bird decal in vibrant tactical white/off-white (only on base steel blue / grey parts, avoiding red trims)
+        #ifdef USE_COLOR
+        if (vColor.r < 0.8) {
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 0.98), decalBird * 0.9);
+        }
+        #else
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 0.98), decalBird * 0.9);
+        #endif
+
+        // --- 4. Engine Nacelle "07" Serial Number Decal (branchless!) ---
+        float stencil = 0.0;
+        float inEngineX = step(0.0, vLocalPosition.x) * step(vLocalPosition.x, 10.0);
+        float inEngineZ = step(1.5, abs(vLocalPosition.z)) * step(abs(vLocalPosition.z), 4.5);
+        
+        vec2 uvDecal = vec2(vLocalPosition.x - 5.0, abs(vLocalPosition.z) - 2.8);
+        
+        // Scaled up by 4x (multiplying coordinates by 1.5 instead of 6.0)
+        vec2 p0 = (uvDecal - vec2(-1.2, 0.0)) * 1.5;
+        vec2 p7 = (uvDecal - vec2(1.2, 0.0)) * 1.5;
+        
+        stencil = (drawZero(p0) + drawSeven(p7)) * inEngineX * inEngineZ;
+        
+        // Paint engine serial number stencil in crisp tactical white/yellow
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95, 0.92, 0.55), stencil * 0.95);`
+      );
+    };
+
+
 
     const cockpitMat = new THREE.MeshPhongMaterial({
       color: 0x00d2ff, // Vibrant glowing cyan-blue canopy glass
