@@ -58,7 +58,9 @@ interface GameplayRunDeps {
   score: ScoreManager;
   onLevelComplete: () => void;
   invinciblePlayer?: boolean;
+  playerModel?: THREE.Group | null;
 }
+
 
 export class GameplayRun implements LevelGameHost {
   background: IBackgroundWithSpeed | null;
@@ -121,6 +123,7 @@ export class GameplayRun implements LevelGameHost {
       mode,
       (spawn) => this._projectilePool.create(spawn),
       this._deps.invinciblePlayer ?? false,
+      this._deps.playerModel,
     );
 
     if (savedWeaponTier > 1) {

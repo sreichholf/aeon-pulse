@@ -68,11 +68,11 @@ export class Scene {
     this._tilted = false;
 
     // Saturated ambient light to keep secondary surfaces and shadows beautifully colored
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.60);
     this.scene.add(ambientLight);
 
     // Front-top-right directional light to uniformly light the broad side-profiles of all ships across the screen
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.93);
     dirLight.position.set(80, 120, 600);
     this.scene.add(dirLight);
 

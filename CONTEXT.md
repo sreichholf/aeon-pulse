@@ -188,7 +188,12 @@ _Avoid_: Wasted powerup, forced upgrade
 The intended Tier 5 weapon identity: a peak upgrade that preserves strong center-lane piercing damage while reducing passive full-screen coverage. It should reward positioning and aim more than broad automatic lane deletion.
 _Avoid_: Screen-wide piercing coverage, passive spawn deletion
 
+**Player Model**:
+The 3D model asset (`player.glb`) used to render the player's aerospace fighter. It is loaded asynchronously at boot time and cloned when instantiating the Player entity, with a robust fallback to procedural geometry if the asset fails to load.
+_Avoid_: Procedural mesh, player sprite, static mesh
+
 ## Example Dialogue
 
 Dev: "Should `3-2` use the organic corridor?"
 Designer: "Yes. It belongs to Chapter 3, so it follows the Chapter 3 archetype, but its wave layout and terrain rhythm can differ from `3-1`."
+

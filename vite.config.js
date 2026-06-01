@@ -2,7 +2,9 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   base: './',
+  assetsInclude: ['**/*.glb'],
   build: {
+
     chunkSizeWarningLimit: 800, // Silences warnings for larger cacheable third-party chunks
     rollupOptions: {
       output: {

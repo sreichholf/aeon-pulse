@@ -22,6 +22,9 @@ import {
   toLevelLabel,
   type CampaignLevelRecord,
 } from './campaign/Campaign.ts';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import playerGlbUrl from './models/player.glb';
+
 
 const CLEAR_BONUS = 10000;
 const LIVES_BONUS = 2000;
@@ -33,6 +36,8 @@ export class Game {
   scene: Scene;
   input: InputManager;
   audio: AudioManager;
+  playerModel: THREE.Group | null = null;
+
   private _showAdvancedTitleOptions: boolean;
   private _showRenderStats: boolean;
   private _debugInvinciblePlayer: boolean;
@@ -99,9 +104,26 @@ export class Game {
 
   start() {
     this._running = true;
+    this._preloadAssets();
     this._setState(GameState.TITLE);
     requestAnimationFrame((t) => this._loop(t));
   }
+
+  private _preloadAssets(): void {
+    const loader = new GLTFLoader();
+    loader.load(
+      playerGlbUrl,
+      (gltf) => {
+        this.playerModel = gltf.scene;
+        console.log('Player GLB model preloaded successfully');
+      },
+      undefined,
+      (error) => {
+        console.error('Failed to preload player GLB model:', error);
+      }
+    );
+  }
+
 
   // ── LOOP ───────────────────────────────────────────────────────────────────
 
@@ -302,7 +324,9 @@ export class Game {
       score: this.score,
       onLevelComplete: () => this.onLevelComplete(),
       invinciblePlayer: this._debugInvinciblePlayer,
+      playerModel: this.playerModel,
     });
+
     this._run.start(this.currentLevel, this._savedWeaponTier, this._mode);
     this.ui.updateHUD(this._run.getHUDSnapshot());
   }

@@ -13,6 +13,16 @@ function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
 const HALF_W = GAME_WIDTH / 2;
 const HALF_H = GAME_HEIGHT / 2;
 
+// Configurable constants for fine-tuning the loaded GLB model alignment and scale
+const GLB_SCALE = 1.05; 
+const GLB_ROT_X = 0;
+const GLB_ROT_Y = -Math.PI / 2; // Facing -Z originally, rotate 90 deg around Y to point nose along +X (to the right)
+const GLB_ROT_Z = 0;
+const GLB_OFFSET_X = -4; // Shift backward slightly to center engine/canopy weight
+const GLB_OFFSET_Y = 0;
+const GLB_OFFSET_Z = 0;
+
+
 const SPEED             = 200;   // px/s
 const DISPLAY_W         = 80;
 const DISPLAY_H         = 72;
@@ -101,6 +111,7 @@ export class Player {
     mode?: DifficultyMode,
     projectileFactory: ProjectileFactoryFn | null = null,
     debugInvincible = false,
+    loadedModel?: THREE.Group | null,
   ) {
     this._scene   = scene;
     this._sprites = sprites;
@@ -136,18 +147,19 @@ export class Player {
     this._engineLight = null;
     this._chargeOrb = null;
     this._shieldAura = null;
-    this._mesh = this._build3DPlayerShip();
+    this._mesh = this._build3DPlayerShip(loadedModel);
     markRenderCategory(this._mesh, RenderCategory.PLAYER);
     this._mesh.position.set(RESPAWN_X, RESPAWN_Y, 2);
     scene.add(this._mesh);
   }
 
   /**
-   * Procedurally designs a highly cohesive, aerodynamic 3D aerospace fighter.
+   * Procedurally designs or loads a highly cohesive, aerodynamic 3D aerospace fighter.
    * Utilizes a Lathed central hull, extruded & beveled wings, and organically
    * merged structural prongs to look like a single molded fuselage rather than glued blocks.
+   * If a preloaded GLB model is provided, it centers, aligns, and scales it to fit.
    */
-  private _build3DPlayerShip(): THREE.Group {
+  private _build3DPlayerShip(loadedModel?: THREE.Group | null): THREE.Group {
     const group = new THREE.Group();
 
     // Glossy retro arcade style Phong materials for high visibility and vibrant specularity
@@ -204,114 +216,206 @@ export class Player {
       opacity: 0.8,
     });
 
-    // ── 1. UNIFIED CONTURED FUSELAGE (LATHE) ─────────────────────────────────
-    // We define a 2D profile curve that starts at a sharp nose tip (front),
-    // swells out for the main hull/canopy base, and tapers smoothly down to the exhaust port.
-    const lathePoints: THREE.Vector2[] = [];
-    lathePoints.push(new THREE.Vector2(0, 38));        // Nose tip
-    lathePoints.push(new THREE.Vector2(2.5, 32));      // Nose taper
-    lathePoints.push(new THREE.Vector2(5.5, 24));      // Sleek curve
-    lathePoints.push(new THREE.Vector2(8.5, 10));      // Cockpit swell
-    lathePoints.push(new THREE.Vector2(9.2, 0));       // Max width (center)
-    lathePoints.push(new THREE.Vector2(8.0, -10));     // Rear fuselage taper
-    lathePoints.push(new THREE.Vector2(6.0, -22));     // Tapering to tail
-    lathePoints.push(new THREE.Vector2(4.5, -30));     // Engine mount
+    if (loadedModel) {
+      const shipModel = loadedModel.clone();
+      const modelWrapper = new THREE.Group();
 
-    const latheGeo = new THREE.LatheGeometry(lathePoints, 24);
-    // Rotate lathe geometry to align along the longitudinal X-axis (pointing forward along +X)
-    latheGeo.rotateZ(-Math.PI / 2);
+      // Compute bounding box to automatically center and normalize scale
+      const box = new THREE.Box3().setFromObject(shipModel);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
 
-    // ── 2. SEAMLESSLY SUBMERGED CANOPY ───────────────────────────────────────
-    // Submerging the canopy capsule into the lathed fuselage so it integrates smoothly.
-    const cockpitGeo = new THREE.SphereGeometry(6.2, 24, 24);
-    cockpitGeo.scale(2.2, 1.0, 1.0); // Elongate along flight path
-    const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
-    cockpit.position.set(4, 3.8, 0); // Nestled into top-front of fuselage
-    group.add(cockpit);
+      // Center the model's geometry relative to the wrapper
+      shipModel.position.set(-center.x, -center.y, -center.z);
+      modelWrapper.add(shipModel);
 
-    // ── 3. CONTURED, BEVELED WINGS (EXTRUDE) ─────────────────────────────────
-    // Instead of boxes, we draw a custom swept-back wing in 2D and extrude it
-    // with beveling so the edges are smooth and catch highlights beautifully.
-    const wingShape = new THREE.Shape();
-    wingShape.moveTo(5, 0);             // Root attachment front
-    wingShape.lineTo(-12, 34);          // Sweeping back and out to tip
-    wingShape.lineTo(-24, 32);          // Wingtip trailing edge
-    wingShape.lineTo(-16, 0);           // Wing root attachment back
-    wingShape.lineTo(-24, -32);         // Symmetric sweep down/out
-    wingShape.lineTo(-12, -34);
-    wingShape.closePath();
+      // Apply rotation adjustments to point nose to +X, cockpit up +Y, wings in Z
+      modelWrapper.rotation.set(GLB_ROT_X, GLB_ROT_Y, GLB_ROT_Z);
 
-    const extrudeSettings = {
-      depth: 2.5,
-      bevelEnabled: true,
-      bevelSegments: 3,
-      steps: 1,
-      bevelSize: 1.2,
-      bevelThickness: 1.2
-    };
+      // Normalize size so its main horizontal dimension matches the gameplay length (72 units)
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scaleFactor = (72 / maxDim) * GLB_SCALE;
+      modelWrapper.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
-    const wingGeo = new THREE.ExtrudeGeometry(wingShape, extrudeSettings);
-    wingGeo.center(); // Center geometry
-    const wings = new THREE.Mesh(wingGeo, brightMat);
-    // Rotate so the wing profile spreads in the Z-axis (towards/away from screen)
-    wings.rotation.x = Math.PI / 2;
-    wings.position.set(-10, 0, 0);
-    group.add(wings);
+      // Apply any fine-tuned translation offsets
+      modelWrapper.position.set(GLB_OFFSET_X, GLB_OFFSET_Y, GLB_OFFSET_Z);
 
-    // ── 4. INTEGRATED TWIN PRONGS (VIC VIPER STYLE) ──────────────────────────
-    // Prongs are structured using sweeping support roots and red-tipped prongs
-    // that align beautifully with the wings to look like one molded assembly.
+      group.add(modelWrapper);
 
-    // Angled Wing struts (connects fuselage to prongs)
-    const strutGeo = new THREE.BoxGeometry(6, 12, 4);
-    strutGeo.rotateZ(-Math.PI / 6); // Angled forward
+      // Ensure model receives lighting correctly and tune PBR properties for satin diffuse rendering
+      shipModel.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
 
-    // Sleek continuous prongs
-    const prongGeo = new THREE.CylinderGeometry(1.8, 1.8, 48, 12);
-    prongGeo.rotateZ(Math.PI / 2); // Align along X axis
+          if (child.material) {
+            const processMaterial = (oldMat: THREE.Material): THREE.Material => {
+              if (oldMat instanceof THREE.MeshStandardMaterial || oldMat.type === 'MeshStandardMaterial') {
+                const stdMat = oldMat as THREE.MeshStandardMaterial;
+                
+                // Convert to MeshPhongMaterial to gain absolute, pixel-perfect control over specular highlights
+                const newMat = new THREE.MeshPhongMaterial({
+                  map: stdMat.map,
+                  normalMap: stdMat.normalMap,
+                  aoMap: stdMat.aoMap,
+                  side: THREE.DoubleSide,
+                  transparent: stdMat.transparent,
+                  opacity: stdMat.opacity,
+                  flatShading: stdMat.flatShading,
+                  vertexColors: stdMat.vertexColors,
+                });
 
-    // Merge static fuselage parts sharing hullMat
-    const hullGeos = [
-      ensureNonIndexed(latheGeo).translate(-2, 0, 0),
-      ensureNonIndexed(strutGeo).translate(-8, 7, 3),
-      ensureNonIndexed(strutGeo).translate(-8, -7, -3),
-      ensureNonIndexed(prongGeo).translate(12, 12, 3.5),
-      ensureNonIndexed(prongGeo).translate(12, -12, -3.5),
-    ];
-    const mergedHullGeo = mergeGeometries(hullGeos);
-    const hullMesh = new THREE.Mesh(mergedHullGeo, hullMat);
-    group.add(hullMesh);
+                // Deep, soft cobalt blue specular highlight to fully eliminate glaring white silhouette outlines
+                newMat.specular = new THREE.Color(0x002266);
+                newMat.shininess = 50; // Premium satin-smooth edge reflection
 
-    // Clean up temporary geometries
-    hullGeos.forEach(g => g.dispose());
-    latheGeo.dispose();
-    strutGeo.dispose();
-    prongGeo.dispose();
+                if (stdMat.map) {
+                  // Enable emissive mapping using the base texture so the ship glows in its exact authored colors
+                  newMat.emissiveMap = stdMat.map;
+                  newMat.emissive = new THREE.Color(0xffffff);
+                  // Calibrated 0.85 emissive multiplier for stunning vibrance
+                  newMat.emissive.multiplyScalar(0.85);
 
-    // Aerodynamic tapered prong tips (pointed red cones)
-    const prongTipGeo = new THREE.ConeGeometry(2.0, 10, 12);
-    prongTipGeo.rotateZ(-Math.PI / 2); // Point forward (+X)
+                  // Restore smooth trilinear filtering and mipmapping for perfectly anti-aliased silhouette edges
+                  stdMat.map.minFilter = THREE.LinearMipmapLinearFilter;
+                  stdMat.map.generateMipmaps = true;
+                  stdMat.map.wrapS = THREE.RepeatWrapping;
+                  stdMat.map.wrapT = THREE.RepeatWrapping;
+                  stdMat.map.needsUpdate = true;
+                } else if (stdMat.color) {
+                  newMat.color = stdMat.color.clone().multiplyScalar(1.65);
+                  newMat.emissive = newMat.color.clone().multiplyScalar(0.15);
+                } else {
+                  newMat.color = new THREE.Color(0xffffff);
+                }
 
-    const tipGeos = [
-      ensureNonIndexed(prongTipGeo).translate(37, 12, 3.5),
-      ensureNonIndexed(prongTipGeo).translate(37, -12, -3.5),
-    ];
-    const mergedTipGeo = mergeGeometries(tipGeos);
-    const tipMesh = new THREE.Mesh(mergedTipGeo, trimMat);
-    group.add(tipMesh);
+                oldMat.dispose();
+                return newMat;
+              }
+              return oldMat;
+            };
 
-    // Clean up temporary tip geometries
-    tipGeos.forEach(g => g.dispose());
-    prongTipGeo.dispose();
+            if (Array.isArray(child.material)) {
+              child.material = child.material.map(processMaterial);
+            } else {
+              child.material = processMaterial(child.material);
+            }
+          }
+        }
+      });
+    } else {
+      // ── 1. UNIFIED CONTURED FUSELAGE (LATHE) ─────────────────────────────────
+      // We define a 2D profile curve that starts at a sharp nose tip (front),
+      // swells out for the main hull/canopy base, and tapers smoothly down to the exhaust port.
+      const lathePoints: THREE.Vector2[] = [];
+      lathePoints.push(new THREE.Vector2(0, 38));        // Nose tip
+      lathePoints.push(new THREE.Vector2(2.5, 32));      // Nose taper
+      lathePoints.push(new THREE.Vector2(5.5, 24));      // Sleek curve
+      lathePoints.push(new THREE.Vector2(8.5, 10));      // Cockpit swell
+      lathePoints.push(new THREE.Vector2(9.2, 0));       // Max width (center)
+      lathePoints.push(new THREE.Vector2(8.0, -10));     // Rear fuselage taper
+      lathePoints.push(new THREE.Vector2(6.0, -22));     // Tapering to tail
+      lathePoints.push(new THREE.Vector2(4.5, -30));     // Engine mount
+
+      const latheGeo = new THREE.LatheGeometry(lathePoints, 24);
+      // Rotate lathe geometry to align along the longitudinal X-axis (pointing forward along +X)
+      latheGeo.rotateZ(-Math.PI / 2);
+
+      // ── 2. SEAMLESSLY SUBMERGED CANOPY ───────────────────────────────────────
+      // Submerging the canopy capsule into the lathed fuselage so it integrates smoothly.
+      const cockpitGeo = new THREE.SphereGeometry(6.2, 24, 24);
+      cockpitGeo.scale(2.2, 1.0, 1.0); // Elongate along flight path
+      const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
+      cockpit.position.set(4, 3.8, 0); // Nestled into top-front of fuselage
+      group.add(cockpit);
+
+      // ── 3. CONTURED, BEVELED WINGS (EXTRUDE) ─────────────────────────────────
+      // Instead of boxes, we draw a custom swept-back wing in 2D and extrude it
+      // with beveling so the edges are smooth and catch highlights beautifully.
+      const wingShape = new THREE.Shape();
+      wingShape.moveTo(5, 0);             // Root attachment front
+      wingShape.lineTo(-12, 34);          // Sweeping back and out to tip
+      wingShape.lineTo(-24, 32);          // Wingtip trailing edge
+      wingShape.lineTo(-16, 0);           // Wing root attachment back
+      wingShape.lineTo(-24, -32);         // Symmetric sweep down/out
+      wingShape.lineTo(-12, -34);
+      wingShape.closePath();
+
+      const extrudeSettings = {
+        depth: 2.5,
+        bevelEnabled: true,
+        bevelSegments: 3,
+        steps: 1,
+        bevelSize: 1.2,
+        bevelThickness: 1.2
+      };
+
+      const wingGeo = new THREE.ExtrudeGeometry(wingShape, extrudeSettings);
+      wingGeo.center(); // Center geometry
+      const wings = new THREE.Mesh(wingGeo, brightMat);
+      // Rotate so the wing profile spreads in the Z-axis (towards/away from screen)
+      wings.rotation.x = Math.PI / 2;
+      wings.position.set(-10, 0, 0);
+      group.add(wings);
+
+      // ── 4. INTEGRATED TWIN PRONGS (VIC VIPER STYLE) ──────────────────────────
+      // Prongs are structured using sweeping support roots and red-tipped prongs
+      // that align beautifully with the wings to look like one molded assembly.
+
+      // Angled Wing struts (connects fuselage to prongs)
+      const strutGeo = new THREE.BoxGeometry(6, 12, 4);
+      strutGeo.rotateZ(-Math.PI / 6); // Angled forward
+
+      // Sleek continuous prongs
+      const prongGeo = new THREE.CylinderGeometry(1.8, 1.8, 48, 12);
+      prongGeo.rotateZ(Math.PI / 2); // Align along X axis
+
+      // Merge static fuselage parts sharing hullMat
+      const hullGeos = [
+        ensureNonIndexed(latheGeo).translate(-2, 0, 0),
+        ensureNonIndexed(strutGeo).translate(-8, 7, 3),
+        ensureNonIndexed(strutGeo).translate(-8, -7, -3),
+        ensureNonIndexed(prongGeo).translate(12, 12, 3.5),
+        ensureNonIndexed(prongGeo).translate(12, -12, -3.5),
+      ];
+      const mergedHullGeo = mergeGeometries(hullGeos);
+      const hullMesh = new THREE.Mesh(mergedHullGeo, hullMat);
+      group.add(hullMesh);
+
+      // Clean up temporary geometries
+      hullGeos.forEach(g => g.dispose());
+      latheGeo.dispose();
+      strutGeo.dispose();
+      prongGeo.dispose();
+
+      // Aerodynamic tapered prong tips (pointed red cones)
+      const prongTipGeo = new THREE.ConeGeometry(2.0, 10, 12);
+      prongTipGeo.rotateZ(-Math.PI / 2); // Point forward (+X)
+
+      const tipGeos = [
+        ensureNonIndexed(prongTipGeo).translate(37, 12, 3.5),
+        ensureNonIndexed(prongTipGeo).translate(37, -12, -3.5),
+      ];
+      const mergedTipGeo = mergeGeometries(tipGeos);
+      const tipMesh = new THREE.Mesh(mergedTipGeo, trimMat);
+      group.add(tipMesh);
+
+      // Clean up temporary tip geometries
+      tipGeos.forEach(g => g.dispose());
+      prongTipGeo.dispose();
+
+      // ── 5. INTEGRATED ENGINE EXHAUST & GLOWING PLASMA PARTICLES ──────────────
+      // The engine nozzle is shaped to blend cleanly into the tail taper
+      const nozzleGeo = new THREE.CylinderGeometry(4.5, 3.8, 10, 16);
+      nozzleGeo.rotateZ(Math.PI / 2);
+      const nozzle = new THREE.Mesh(nozzleGeo, engineMetalMat);
+      nozzle.position.x = -34;
+      group.add(nozzle);
+    }
 
     // ── 5. INTEGRATED ENGINE EXHAUST & GLOWING PLASMA PARTICLES ──────────────
-    // The engine nozzle is shaped to blend cleanly into the tail taper
-    const nozzleGeo = new THREE.CylinderGeometry(4.5, 3.8, 10, 16);
-    nozzleGeo.rotateZ(Math.PI / 2);
-    const nozzle = new THREE.Mesh(nozzleGeo, engineMetalMat);
-    nozzle.position.x = -34;
-    group.add(nozzle);
-
     // Particle Group for dynamic volumetric fire effect
     const thrusterGroup = new THREE.Group();
     group.add(thrusterGroup);
@@ -359,7 +463,7 @@ export class Player {
       color: 0x00aaff,
       emissive: 0x002255,
       transparent: true,
-      opacity: 0.25,
+      opacity: 0.08,
       depthWrite: false,
     });
     this._shieldAura = new THREE.Mesh(new THREE.SphereGeometry(36, 16, 12), shieldMat);
