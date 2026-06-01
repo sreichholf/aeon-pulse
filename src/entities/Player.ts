@@ -89,6 +89,7 @@ export class Player {
   private _shieldFlickerTimer: number;
   private _fireTimer: number;
   private _prevFireDown: boolean;
+  private _fireDownDuration: number;
   private _invTimer: number;
   private _flickerTimer: number;
   private _newBullets: IBullet[];
@@ -124,6 +125,7 @@ export class Player {
     this.chargeLevel     = 0;       // 0–1, exposed for HUD
     this._fireTimer      = 0;
     this._prevFireDown   = false;
+    this._fireDownDuration = 0;
     this._invTimer       = 0;
     this._flickerTimer   = 0;
     this._newBullets     = [];
@@ -436,7 +438,7 @@ export class Player {
       const isYellow = Math.random() > 0.6;
       this._particles.push({
         isYellow,
-        x: -34,
+        x: -42,
         y: 0,
         z: 0,
         vx: 0,
@@ -449,13 +451,13 @@ export class Player {
 
     // Engine lighting
     this._engineLight = new THREE.PointLight(0xffaa00, 2.0, 150);
-    this._engineLight.position.set(-48, 0, 5);
+    this._engineLight.position.set(-44, 0, 2);
     group.add(this._engineLight);
 
     // Charge Energy condensation orb
     const chargeGeo = new THREE.SphereGeometry(8, 24, 24);
     this._chargeOrb = new THREE.Mesh(chargeGeo, chargeMat);
-    this._chargeOrb.position.set(38, 0, 0);
+    this._chargeOrb.position.set(33.2, -10.5, 0);
     this._chargeOrb.visible = false;
     group.add(this._chargeOrb);
 
@@ -514,6 +516,7 @@ export class Player {
     this._exitSpeed = 300;
     this.chargeLevel = 0;
     this._prevFireDown = false;
+    this._fireDownDuration = 0;
     this._fireTimer = 0;
     this._invTimer = 0;
     this._flickerTimer = 0;
@@ -613,7 +616,7 @@ export class Player {
           // Recycle dead particle at the nozzle with minor randomized offset
           p.life = 1.0;
           p.decay = 1.8 + Math.random() * 1.8;
-          p.x = -34 + (Math.random() - 0.5) * 4;
+          p.x = -42 + (Math.random() - 0.5) * 4;
           p.y = (Math.random() - 0.5) * 3;
           p.z = (Math.random() - 0.5) * 3;
           // Shoot backwards (negative X)
@@ -665,12 +668,17 @@ export class Player {
 
     if (this._fireTimer > 0) this._fireTimer -= dt;
 
-    // While held: charge accumulates
+    // While held: charge accumulates after a 300ms safety window for rapid tapping
     if (fireDown) {
-      this.chargeLevel = Math.min(1, this.chargeLevel + dt / CHARGE_TIME);
-      if (this.chargeLevel > 0.08) {
-        this._audio.startChargeHum();
+      this._fireDownDuration += dt;
+      if (this._fireDownDuration >= 0.30) {
+        this.chargeLevel = Math.min(1, this.chargeLevel + dt / CHARGE_TIME);
+        if (this.chargeLevel > 0.08) {
+          this._audio.startChargeHum();
+        }
       }
+    } else {
+      this._fireDownDuration = 0;
     }
 
     // First-press tap shot (all tiers)
@@ -694,7 +702,7 @@ export class Player {
 
     // ── CHARGE-UP PLASMA ORB ANIMATION ───────────────────────────────────────
     if (this._chargeOrb) {
-      if (this.chargeLevel > 0) {
+      if (this.chargeLevel > 0 && this._fireDownDuration >= 0.30) {
         this._chargeOrb.visible = true;
         // Scale dynamically as charge progresses, with an intense plasma pulse
         const pulse = 1.0 + Math.sin(Date.now() * 0.035) * 0.15;
@@ -710,49 +718,74 @@ export class Player {
     }
   }
 
-  private _muzzleX(): number { return this._mesh.position.x + DISPLAY_W / 2 + 2; }
-  private _muzzleY(): number { return this._mesh.position.y; }
+  // ── CANNON HARDPOINTS ──────────────────────────────────────────────────────
+  // Nose Cannon (physical nose tip of Player Model)
+  private _noseCannonX(): number { return this._mesh.position.x + 33.2; }
+  private _noseCannonY(): number { return this._mesh.position.y - 10.5; }
+
+  // Wing Cannons (physical wing mounts/weapon pods)
+  private _wingCannonLeftX(): number { return this._mesh.position.x + 6; }
+  private _wingCannonLeftY(): number { return this._mesh.position.y + 12; }
+
+  private _wingCannonRightX(): number { return this._mesh.position.x + 6; }
+  private _wingCannonRightY(): number { return this._mesh.position.y - 12; }
 
   private _fireTap(): void {
-    const x = this._muzzleX(), y = this._muzzleY();
+    const nx = this._noseCannonX(), ny = this._noseCannonY();
+    const lx = this._wingCannonLeftX(), ly = this._wingCannonLeftY();
+    const rx = this._wingCannonRightX(), ry = this._wingCannonRightY();
+
     if (this.weaponTier === WeaponTier.RAPID) {
-      this._spawn(BulletType.PLAYER, x, y, 600, 0, '#00ffff');
+      // Tier 1: Single shot from Nose Cannon
+      this._spawn(BulletType.PLAYER, nx, ny, 600, 0, '#00ffff');
     } else if (this.weaponTier === WeaponTier.TWIN) {
-      this._spawn(BulletType.PLAYER, x, y - 10, 600, 0, '#ffd700');
-      this._spawn(BulletType.PLAYER, x, y + 10, 600, 0, '#ffd700');
+      // Tier 2: Double shots from Wing Cannons
+      this._spawn(BulletType.PLAYER, lx, ly, 600, 0, '#ffd700');
+      this._spawn(BulletType.PLAYER, rx, ry, 600, 0, '#ffd700');
     } else if (this.weaponTier === WeaponTier.SPREAD) {
-      this._spawn(BulletType.PLAYER, x, y, 520,    0, '#ffffff');
-      this._spawn(BulletType.PLAYER, x, y, 470,  170, '#ffffff');
-      this._spawn(BulletType.PLAYER, x, y, 470, -170, '#ffffff');
+      // Tier 3: Triple shots: straight from Nose, angled from Wing tips
+      this._spawn(BulletType.PLAYER, nx, ny, 520,    0, '#ffffff');
+      this._spawn(BulletType.PLAYER, lx, ly, 470,  170, '#ffffff');
+      this._spawn(BulletType.PLAYER, rx, ry, 470, -170, '#ffffff');
     } else if (this.weaponTier === WeaponTier.WAVE) {
-      this._spawn(BulletType.PLAYER_WAVE, x, y, 500, 0, '#ff00ff', 2);
+      // Tier 4: Center wave from Nose Cannon
+      this._spawn(BulletType.PLAYER_WAVE, nx, ny, 500, 0, '#ff00ff', 2);
     } else if (this.weaponTier === WeaponTier.PLASMA) {
-      this._spawn(BulletType.PLAYER_WAVE, x, y, 500,    0, '#00ffd5', 2);
-      this._spawn(BulletType.PLAYER,      x, y, 500,  170, '#00ffd5');
-      this._spawn(BulletType.PLAYER,      x, y, 500, -170, '#00ffd5');
+      // Tier 5 (Focused Plasma): Heavy center wave from Nose, side support from Wing Cannons
+      this._spawn(BulletType.PLAYER_WAVE, nx, ny, 500,    0, '#00ffd5', 2);
+      this._spawn(BulletType.PLAYER,      lx, ly, 500,  170, '#00ffd5');
+      this._spawn(BulletType.PLAYER,      rx, ry, 500, -170, '#00ffd5');
     }
     this._audio.play('playerShoot', this.weaponTier);
   }
 
   private _fireCharged(): void {
-    const x = this._muzzleX(), y = this._muzzleY();
+    const nx = this._noseCannonX(), ny = this._noseCannonY();
+    const lx = this._wingCannonLeftX(), ly = this._wingCannonLeftY();
+    const rx = this._wingCannonRightX(), ry = this._wingCannonRightY();
+
     if (this.weaponTier === WeaponTier.RAPID) {
-      this._spawn(BulletType.PLAYER_CHARGE, x, y, 700, 0, '#ffd700');
+      // Tier 1 Charge: Nose Cannon
+      this._spawn(BulletType.PLAYER_CHARGE, nx, ny, 700, 0, '#ffd700');
     } else if (this.weaponTier === WeaponTier.TWIN) {
-      this._spawn(BulletType.PLAYER_CHARGE, x, y - 12, 700, 0, '#ffd700');
-      this._spawn(BulletType.PLAYER_CHARGE, x, y + 12, 700, 0, '#ffd700');
+      // Tier 2 Charge: Twin charged shots from Wing Cannons
+      this._spawn(BulletType.PLAYER_CHARGE, lx, ly, 700, 0, '#ffd700');
+      this._spawn(BulletType.PLAYER_CHARGE, rx, ry, 700, 0, '#ffd700');
     } else if (this.weaponTier === WeaponTier.SPREAD) {
-      this._spawn(BulletType.PLAYER_CHARGE, x, y, 620,    0, '#ffd700');
-      this._spawn(BulletType.PLAYER_CHARGE, x, y, 560,  210, '#ffd700');
-      this._spawn(BulletType.PLAYER_CHARGE, x, y, 560, -210, '#ffd700');
+      // Tier 3 Charge: Straight from Nose, angled from Wing tips
+      this._spawn(BulletType.PLAYER_CHARGE, nx, ny, 620,    0, '#ffd700');
+      this._spawn(BulletType.PLAYER_CHARGE, lx, ly, 560,  210, '#ffd700');
+      this._spawn(BulletType.PLAYER_CHARGE, rx, ry, 560, -210, '#ffd700');
     } else if (this.weaponTier === WeaponTier.WAVE) {
-      this._spawn(BulletType.PLAYER_WAVE, x, y, 480,    0, '#ff00ff');
-      this._spawn(BulletType.PLAYER_WAVE, x, y, 440,  180, '#ff00ff');
-      this._spawn(BulletType.PLAYER_WAVE, x, y, 440, -180, '#ff00ff');
+      // Tier 4 Charge: Triple waves (center from Nose, sides from Wing Cannons)
+      this._spawn(BulletType.PLAYER_WAVE, nx, ny, 480,    0, '#ff00ff');
+      this._spawn(BulletType.PLAYER_WAVE, lx, ly, 440,  180, '#ff00ff');
+      this._spawn(BulletType.PLAYER_WAVE, rx, ry, 440, -180, '#ff00ff');
     } else if (this.weaponTier === WeaponTier.PLASMA) {
-      this._spawn(BulletType.PLAYER_PLASMA, x, y, 550,    0, null, 2);
-      this._spawn('playerChargeSide',       x, y, 540,  190, '#00ffd5');
-      this._spawn('playerChargeSide',       x, y, 540, -190, '#00ffd5');
+      // Tier 5 Charge: Heavy center plasma from Nose, side support from Wing Cannons
+      this._spawn(BulletType.PLAYER_PLASMA, nx, ny, 550,    0, null, 2);
+      this._spawn('playerChargeSide',       lx, ly, 540,  190, '#00ffd5');
+      this._spawn('playerChargeSide',       rx, ry, 540, -190, '#00ffd5');
     }
     this._audio.play('playerChargeShoot', this.weaponTier);
   }
