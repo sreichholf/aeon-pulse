@@ -466,7 +466,13 @@ export class Player {
       opacity: 0.08,
       depthWrite: false,
     });
-    this._shieldAura = new THREE.Mesh(new THREE.SphereGeometry(36, 16, 12), shieldMat);
+    
+    // Create an elegant "egg-shaped" protective ellipsoid shield with a beautiful padding around the ship
+    // Elongated along the flight path (X) and contoured tightly in height (Y) and depth (Z)
+    const shieldGeo = new THREE.SphereGeometry(1, 24, 24);
+    this._shieldAura = new THREE.Mesh(shieldGeo, shieldMat);
+    this._shieldAura.scale.set(43, 23, 23); // Elongated egg shape: X radius 43, Y/Z radius 23
+    this._shieldAura.position.set(-2, 0, 0); // Shifted slightly backward to align perfectly with the fuselage weight
     this._shieldAura.visible = false;
     group.add(this._shieldAura);
 
@@ -777,8 +783,7 @@ export class Player {
       this._shieldPips = this._shieldMax;   // all-at-once restore
       this._shieldRegenTimer = 0;
       if (this._shieldAura) {
-        this._shieldAura.visible = true;
-        this._shieldAura.material.opacity = 0.25;
+        this._shieldAura.visible = false;   // Keep invisible until hit
       }
     }
   }
@@ -792,16 +797,17 @@ export class Player {
       this._shieldFlickerTimer -= dt;
       if (this._shieldAura) {
         this._shieldAura.visible = true;
-        this._shieldAura.material.opacity = 0.6;
+        // Smoothly fade the shield glow out from 0.70 opacity down to 0 over its 0.3s duration
+        const pct = Math.max(0, Math.min(1, this._shieldFlickerTimer / 0.3));
+        this._shieldAura.material.opacity = 0.70 * pct;
       }
       if (this._shieldFlickerTimer <= 0) {
         this._shieldFlickerTimer = 0;
-        if (this._shieldAura) this._shieldAura.material.opacity = 0.25;
+        if (this._shieldAura) this._shieldAura.visible = false; // Hide completely when done
       }
     } else {
       if (this._shieldAura) {
-        this._shieldAura.visible = this._shieldPips > 0;
-        this._shieldAura.material.opacity = 0.25;
+        this._shieldAura.visible = false;   // Invisible during normal flight
       }
     }
   }
@@ -815,8 +821,8 @@ export class Player {
     this._shieldRegenTimer = 0;
     this._shieldFlickerTimer = 0;
     if (this._shieldAura) {
-      this._shieldAura.visible = this._shieldMax > 0;
-      this._shieldAura.material.opacity = 0.25;
+      this._shieldAura.visible = false;     // Invisible during normal flight
+      this._shieldAura.material.opacity = 0;
     }
   }
 
