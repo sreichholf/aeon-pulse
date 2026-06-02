@@ -106,6 +106,14 @@ Do not push score/audio/scene side effects back down into `Collisions.ts`.
 
 **Procedural visuals:** The old sprite-generator architecture is gone. The current codebase is primarily procedural Three.js geometry/material construction per entity/background/terrain. Do not document or extend `SpriteGenerator`-style flows unless you are reintroducing them deliberately.
 
+**Embedded GLB texture adjustment:** Use `scripts/brighten-glb-texture.mjs` when an embedded PNG texture in a GLB needs the same brightness lift previously applied to `src/models/player.glb`. Example:
+
+```bash
+node scripts/brighten-glb-texture.mjs brighten src/models/player.glb src/models/player.glb --image 0 --factor 1.74
+```
+
+The script can also `list` embedded texture dimensions/statistics and `extract` a PNG. It supports embedded, non-interlaced, 8-bit PNG textures and rebuilds the GLB BIN chunk when the rewritten PNG grows.
+
 ## Campaign And Level Structure
 
 **Campaign module (`src/campaign/Campaign.ts`):** The game now uses a chapter/level campaign model instead of a flat four-level loop.

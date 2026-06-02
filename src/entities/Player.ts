@@ -253,48 +253,44 @@ export class Player {
           child.receiveShadow = true;
 
           if (child.material) {
+            const tuneTexture = (texture?: THREE.Texture | null): void => {
+              if (!texture) return;
+              texture.minFilter = THREE.LinearMipmapLinearFilter;
+              texture.magFilter = THREE.LinearFilter;
+              texture.generateMipmaps = true;
+              texture.wrapS = THREE.RepeatWrapping;
+              texture.wrapT = THREE.RepeatWrapping;
+              texture.needsUpdate = true;
+            };
+
             const processMaterial = (oldMat: THREE.Material): THREE.Material => {
               if (oldMat instanceof THREE.MeshStandardMaterial || oldMat.type === 'MeshStandardMaterial') {
                 const stdMat = oldMat as THREE.MeshStandardMaterial;
-                
-                // Convert to MeshPhongMaterial to gain absolute, pixel-perfect control over specular highlights
-                const newMat = new THREE.MeshPhongMaterial({
-                  map: stdMat.map,
-                  normalMap: stdMat.normalMap,
-                  aoMap: stdMat.aoMap,
-                  side: THREE.DoubleSide,
-                  transparent: stdMat.transparent,
-                  opacity: stdMat.opacity,
-                  flatShading: stdMat.flatShading,
-                  vertexColors: stdMat.vertexColors,
-                });
 
-                // Deep, soft cobalt blue specular highlight to fully eliminate glaring white silhouette outlines
-                newMat.specular = new THREE.Color(0x002266);
-                newMat.shininess = 50; // Premium satin-smooth edge reflection
+                stdMat.side = THREE.DoubleSide;
+                stdMat.envMapIntensity = 0.85;
+                stdMat.roughness = stdMat.roughnessMap
+                  ? THREE.MathUtils.clamp(stdMat.roughness, 0.35, 1.0)
+                  : THREE.MathUtils.clamp(stdMat.roughness, 0.32, 0.72);
+                stdMat.metalness = stdMat.metalnessMap
+                  ? THREE.MathUtils.clamp(stdMat.metalness, 0.18, 0.65)
+                  : THREE.MathUtils.clamp(stdMat.metalness, 0.12, 0.45);
 
-                if (stdMat.map) {
-                  // Enable emissive mapping using the base texture so the ship glows in its exact authored colors
-                  newMat.emissiveMap = stdMat.map;
-                  newMat.emissive = new THREE.Color(0xffffff);
-                  // Calibrated 0.85 emissive multiplier for stunning vibrance
-                  newMat.emissive.multiplyScalar(0.85);
-
-                  // Restore smooth trilinear filtering and mipmapping for perfectly anti-aliased silhouette edges
-                  stdMat.map.minFilter = THREE.LinearMipmapLinearFilter;
-                  stdMat.map.generateMipmaps = true;
-                  stdMat.map.wrapS = THREE.RepeatWrapping;
-                  stdMat.map.wrapT = THREE.RepeatWrapping;
-                  stdMat.map.needsUpdate = true;
-                } else if (stdMat.color) {
-                  newMat.color = stdMat.color.clone().multiplyScalar(1.65);
-                  newMat.emissive = newMat.color.clone().multiplyScalar(0.15);
-                } else {
-                  newMat.color = new THREE.Color(0xffffff);
+                if (stdMat.emissiveMap) {
+                  stdMat.emissiveIntensity = 0.92;
+                } else if (stdMat.map) {
+                  stdMat.emissive = stdMat.color.clone().multiplyScalar(0.08);
+                  stdMat.emissiveIntensity = 0.55;
                 }
 
-                oldMat.dispose();
-                return newMat;
+                tuneTexture(stdMat.map);
+                tuneTexture(stdMat.normalMap);
+                tuneTexture(stdMat.aoMap);
+                tuneTexture(stdMat.roughnessMap);
+                tuneTexture(stdMat.metalnessMap);
+                tuneTexture(stdMat.emissiveMap);
+                stdMat.needsUpdate = true;
+                return stdMat;
               }
               return oldMat;
             };

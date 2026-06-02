@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GAME_WIDTH, GAME_HEIGHT } from './constants.ts';
 import { RenderCategory, UserDataKey } from './types.ts';
 
@@ -59,6 +60,10 @@ export class Scene {
     this.camera.position.z = 100;
 
     this.scene = new THREE.Scene();
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.32;
+    pmrem.dispose();
 
     // Create a camera group for axonometric tilt and local shake support
     this.cameraGroup = new THREE.Group();
@@ -68,11 +73,11 @@ export class Scene {
     this._tilted = false;
 
     // Saturated ambient light to keep secondary surfaces and shadows beautifully colored
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.60);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.44);
     this.scene.add(ambientLight);
 
     // Front-top-right directional light to uniformly light the broad side-profiles of all ships across the screen
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.93);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.68);
     dirLight.position.set(80, 120, 600);
     this.scene.add(dirLight);
 
@@ -96,7 +101,7 @@ export class Scene {
     this._composer = new EffectComposer(this.renderer);
     this._composer.addPass(new RenderPass(this.scene, this.camera));
 
-    const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.5, 0.4, 0.4);
+    const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.34, 0.32, 0.56);
     this._composer.addPass(bloom);
 
     const chroma = new ShaderPass(ChromaShader);
