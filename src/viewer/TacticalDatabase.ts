@@ -5,6 +5,7 @@ import type { UI } from '../ui/UI.ts';
 import { type IAudio, type IBullet, type GetPositionFn, type EntityMetadata, type IScene } from '../types.ts';
 
 type SceneRef = IScene;
+type PlayerModelProvider = () => THREE.Group | null;
 
 interface ViewerBullet {
   update(dt: number): void;
@@ -28,6 +29,10 @@ interface ViewerEntity {
   metadata?: EntityMetadata;
   destroy?: () => void;
   viewerXOffset?: number;
+  _viewerIdle?: boolean;
+  _viewerTime?: number;
+  _viewerBaseY?: number;
+  _viewerBaseRotation?: THREE.Euler;
   _viewerBullet?: ViewerBullet | null;
   [key: string]: unknown;
 }
@@ -43,15 +48,17 @@ export class TacticalDatabase {
   private _sprites: Record<string, THREE.Texture>;
   private _ui: UI;
   private _audio: IAudio;
+  private _getPlayerModel: PlayerModelProvider;
   private _page: number;
   private _entities: ViewerEntity[];
   private _clonedMaterials: THREE.Material[];
 
-  constructor(scene: SceneRef, sprites: Record<string, THREE.Texture>, ui: UI, audio: IAudio) {
+  constructor(scene: SceneRef, sprites: Record<string, THREE.Texture>, ui: UI, audio: IAudio, getPlayerModel: PlayerModelProvider) {
     this._scene   = scene;
     this._sprites = sprites;
     this._ui      = ui;
     this._audio   = audio;
+    this._getPlayerModel = getPlayerModel;
 
     this._page              = 1;
     this._entities          = [];
@@ -82,6 +89,21 @@ export class TacticalDatabase {
 
       const hasUpdate = typeof ent.update === 'function';
       const hasTick = typeof ent._tick === 'function';
+      if (ent._viewerIdle) {
+        ent._viewerTime = (ent._viewerTime ?? 0) + dt;
+        const t = ent._viewerTime;
+        const baseY = ent._viewerBaseY ?? ent._mesh.position.y;
+        const baseRotation = ent._viewerBaseRotation;
+
+        ent._mesh.position.y = baseY + Math.sin(t * 1.4) * 2.2;
+        if (baseRotation) {
+          ent._mesh.rotation.set(
+            baseRotation.x + Math.sin(t * 1.1) * 0.018,
+            baseRotation.y + Math.sin(t * 0.8) * 0.035,
+            baseRotation.z + Math.sin(t * 1.5) * 0.012,
+          );
+        }
+      }
       if (!hasUpdate && !hasTick) continue;
 
       // Keep track of the original viewer position to lock it in its card slot
@@ -171,7 +193,8 @@ export class TacticalDatabase {
 
   changePage(dir: number): void {
     this._audio.play('menuSelect');
-    this._page = this._page === 1 ? 2 : 1;
+    const pageCount = 3;
+    this._page = ((this._page - 1 + dir + pageCount) % pageCount) + 1;
     this._renderPage();
   }
 
@@ -182,10 +205,51 @@ export class TacticalDatabase {
     const getPos = () => ({ x: 0, y: 0 });
 
     if (this._page === 1) {
+      this._renderPlayerPage();
+    } else if (this._page === 2) {
       this._renderEnemyPage(getPos);
     } else {
       this._renderBossPage(getPos);
     }
+  }
+
+  private _renderPlayerPage(): void {
+    const sourceModel = this._getPlayerModel();
+    if (!sourceModel) {
+      this._ui.showViewer(this._page, []);
+      return;
+    }
+
+    const shipModel = sourceModel.clone();
+    const display = new THREE.Group();
+    display.add(shipModel);
+
+    const box = new THREE.Box3().setFromObject(shipModel);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+
+    shipModel.position.set(-center.x, -center.y, -center.z);
+    display.rotation.set(THREE.MathUtils.degToRad(30), -Math.PI / 2 + 0.23, -0.03);
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = maxDim > 0 ? 385 / maxDim : 1;
+    display.scale.set(scale, scale, scale);
+    display.position.set(0, 54, 8);
+
+    this._scene.add(display);
+    this._entities.push({
+      _mesh: display,
+      destroy: () => this._scene.remove(display),
+      _isViewer: true,
+      _viewerIdle: true,
+      _viewerTime: 0,
+      _viewerBaseY: display.position.y,
+      _viewerBaseRotation: display.rotation.clone(),
+    });
+
+    this._ui.showViewer(this._page, []);
   }
 
   private _renderEnemyPage(getPos: GetPositionFn): void {

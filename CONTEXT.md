@@ -4,6 +4,46 @@ AEON PULSE is a side-scrolling arcade shooter organised around a campaign of vis
 
 ## Language
 
+**AEON PULSE**:
+The game title.
+_Avoid_: Using the title alone when referring specifically to the player craft
+
+**Aeon Pulse Craft**:
+The player craft's in-world designation, shown as "AEON PULSE" in the Tactical Database.
+_Avoid_: Generic player ship, unnamed player craft
+
+**Tactical Database**:
+The front-end intel viewer for cataloguing the Aeon Pulse Craft, standard enemies, and finale bosses.
+_Avoid_: Model gallery, debug viewer
+
+**Tactical Dossier Card**:
+A restrained Tactical Database presentation that frames one subject as intel: animated subject view, nameplate, and concise readouts without turning into a marketing hero or dense spec sheet.
+_Avoid_: Hangar showcase, hero section, exhaustive stat panel
+
+**Aeon Pulse Craft Readout**:
+The Tactical Dossier Card readout for the Aeon Pulse Craft. It describes identity and operational role, not enemy-style numeric stats.
+_Avoid_: Player HP panel, score value, tunable stat sheet
+
+**Primary Craft Dossier**:
+The single-subject Tactical Dossier Card layout for the Aeon Pulse Craft. It shares the Tactical Database shell but does not use the enemy or boss catalog grid.
+_Avoid_: Enemy grid card, boss grid card, hangar showcase
+
+**Craft-Only Dossier Treatment**:
+The current Tactical Dossier Card treatment applies only to the Aeon Pulse Craft page. Standard enemy and finale boss pages remain catalog grids unless a separate redesign decision is made.
+_Avoid_: Implicit Tactical Database-wide restyle, bundled catalog redesign
+
+**Primary Craft Dossier Elements**:
+The Primary Craft Dossier uses exactly three presentation elements: a large central scan frame, a compact craft nameplate, and a compact operational readout stack.
+_Avoid_: Fake gauges, dense explanatory copy, extra controls
+
+**Dossier Overlay**:
+The screen-space HTML/CSS interface layer for Tactical Dossier Card framing and readouts. The dossier subject itself remains a Three.js model.
+_Avoid_: 3D UI frame geometry, world-space labels
+
+**Passive Inspection Motion**:
+The non-interactive subject animation used in a Tactical Dossier Card, limited to subtle hover and attitude drift.
+_Avoid_: Manual model rotation, new viewer input mode, static stillframe
+
 **Chapter**:
 A major campaign family with a shared visual identity and gameplay grammar. A chapter contains multiple levels.
 _Avoid_: Stage, world
@@ -196,4 +236,3 @@ _Avoid_: Procedural mesh, player sprite, static mesh
 
 Dev: "Should `3-2` use the organic corridor?"
 Designer: "Yes. It belongs to Chapter 3, so it follows the Chapter 3 archetype, but its wave layout and terrain rhythm can differ from `3-1`."
-

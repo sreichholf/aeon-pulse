@@ -31,18 +31,27 @@ export class ViewerScreen {
   show(page: number, entities: ViewerEntityData[]): void {
     this.el.classList.add('active');
     this.bgEl.classList.add('active');
+    this.el.classList.toggle('viewer-player-page', page === 1);
+    this.bgEl.classList.toggle('viewer-player-page', page === 1);
 
     if (page === 1) {
-      this._viewerPageTitle.textContent = 'STAGE ENEMIES [PAGE 1/2]';
+      this._viewerPageTitle.textContent = 'AEON PULSE [PAGE 1/3]';
+    } else if (page === 2) {
+      this._viewerPageTitle.textContent = 'STAGE ENEMIES [PAGE 2/3]';
     } else {
-      this._viewerPageTitle.textContent = 'LEVEL BOSSES [PAGE 2/2]';
+      this._viewerPageTitle.textContent = 'LEVEL BOSSES [PAGE 3/3]';
     }
 
     this._viewerCardsContainer.innerHTML = '';
     this._viewerBgCardsContainer.innerHTML = '';
 
+    if (page === 1) {
+      this._showPrimaryCraftDossier();
+      return;
+    }
+
     for (const ent of entities) {
-      const isBoss = page === 2;
+      const isBoss = page === 3;
       const card = this._el('div', 'viewer-card' + (isBoss ? ' boss-card' : ''));
 
       const left = ent.x + 480;
@@ -74,6 +83,8 @@ export class ViewerScreen {
   hide(): void {
     this.el.classList.remove('active');
     this.bgEl.classList.remove('active');
+    this.el.classList.remove('viewer-player-page');
+    this.bgEl.classList.remove('viewer-player-page');
     if (this._viewerCardsContainer)   this._viewerCardsContainer.innerHTML = '';
     if (this._viewerBgCardsContainer) this._viewerBgCardsContainer.innerHTML = '';
   }
@@ -98,6 +109,36 @@ export class ViewerScreen {
 
     this._viewerBgCardsContainer = this._el('div', 'viewer-bg-cards-container');
     s.appendChild(this._viewerBgCardsContainer);
+  }
+
+  private _showPrimaryCraftDossier(): void {
+    const scanFrame = this._el('div', 'primary-craft-scan-frame');
+    scanFrame.appendChild(this._el('div', 'primary-craft-scan-grid'));
+    scanFrame.appendChild(this._el('div', 'primary-craft-scan-line'));
+    scanFrame.appendChild(this._el('div', 'primary-craft-corner top-left'));
+    scanFrame.appendChild(this._el('div', 'primary-craft-corner top-right'));
+    scanFrame.appendChild(this._el('div', 'primary-craft-corner bottom-left'));
+    scanFrame.appendChild(this._el('div', 'primary-craft-corner bottom-right'));
+    this._viewerCardsContainer.appendChild(scanFrame);
+
+    const nameplate = this._el('div', 'primary-craft-nameplate');
+    nameplate.appendChild(this._el('div', 'primary-craft-label', 'CRAFT DESIGNATION'));
+    nameplate.appendChild(this._el('div', 'primary-craft-name', 'AEON PULSE'));
+    nameplate.appendChild(this._el('div', 'primary-craft-status', 'INTERCEPTOR  /  STATUS: ACTIVE'));
+    this._viewerCardsContainer.appendChild(nameplate);
+
+    const readouts = this._el('div', 'primary-craft-readouts');
+    for (const [label, value] of [
+      ['ROLE', 'PRECISION ASSAULT'],
+      ['LOADOUT', 'ADAPTIVE WEAPON TIERS'],
+      ['MODE', 'CAMPAIGN READY'],
+    ] as const) {
+      const row = this._el('div', 'primary-craft-readout-row');
+      row.appendChild(this._el('span', 'primary-craft-readout-label', label));
+      row.appendChild(this._el('span', 'primary-craft-readout-value', value));
+      readouts.appendChild(row);
+    }
+    this._viewerCardsContainer.appendChild(readouts);
   }
 
   private _el(tag: string, cls?: string, text?: string): HTMLElement {

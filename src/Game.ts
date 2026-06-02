@@ -97,7 +97,7 @@ export class Game {
     this._titlePreviewCue = null;
 
     this._run = null;
-    this._viewer = new TacticalDatabase(this.scene, this.sprites, this.ui, this.audio);
+    this._viewer = new TacticalDatabase(this.scene, this.sprites, this.ui, this.audio, () => this.playerModel);
   }
 
   // ── BOOT ───────────────────────────────────────────────────────────────────
