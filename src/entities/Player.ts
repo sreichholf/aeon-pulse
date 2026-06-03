@@ -574,9 +574,8 @@ export class Player {
     }
 
     // ── 3D FLIGHT ANIMATIONS & TILTS ─────────────────────────────────────────
-    // Target Banking (Roll): dy banks top/bottom towards camera
-    const targetRoll = -dy * 0.45; // ~25 degrees max roll
-    // Target Nose Pitch: dy points nose up/down in direction of travel
+    // The ship points along +X, so screen-space nose up/down is a Z-axis turn.
+    const targetRoll = 0;
     const targetPitch = dy * 0.2;   // ~12 degrees max pitch
     // Target Yaw: dx pivots nose slightly in direction of acceleration
     const targetYaw = -dx * 0.14;  // ~8 degrees max yaw
