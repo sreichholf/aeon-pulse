@@ -4,6 +4,7 @@ import { BossBase } from './BossBase.ts';
 import { Bullet } from './Bullet.ts';
 import { Explosion } from './Explosion.ts';
 import { BulletType, EnemyType, type GetPositionFn, type IAudio, type SpawnEnemyFn, type IScene, type BossConstructorParams } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const TOTAL_HP       = 100;
 const STOP_X         = 300;
@@ -24,6 +25,38 @@ interface TentacleJointData {
 interface PustuleItem {
   mesh: THREE.Mesh;
   baseScale: number;
+}
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const cloned = geo.index ? geo.toNonIndexed() : geo.clone();
+  if (cloned.hasAttribute('uv')) {
+    cloned.deleteAttribute('uv');
+  }
+  return cloned;
+}
+
+function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
+  const posAttr = geo.getAttribute('position');
+  if (!posAttr) return;
+  const colors = new Float32Array(posAttr.count * 3);
+  const color = new THREE.Color(colorHex);
+  for (let i = 0; i < posAttr.count; i++) {
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+function coloredGeometry(
+  source: THREE.BufferGeometry,
+  colorHex: number,
+  transform?: (geo: THREE.BufferGeometry) => void,
+): THREE.BufferGeometry {
+  const geo = ensureNonIndexed(source);
+  if (transform) transform(geo);
+  addVertexColor(geo, colorHex);
+  return geo;
 }
 
 export class Boss3 extends BossBase {
@@ -379,6 +412,7 @@ export class Boss3 extends BossBase {
       shininess: 85,
       specular: 0xffffff,
       flatShading: true,
+      vertexColors: true,
     });
 
     const pustuleYellowMat = new THREE.MeshPhongMaterial({
@@ -551,24 +585,29 @@ export class Boss3 extends BossBase {
       pivot.rotation.z = ang;
 
       const clawGeo = new THREE.CylinderGeometry(5.0, 1.8, 38, 8);
-      clawGeo.rotateZ(Math.PI / 2);
-      clawGeo.translate(-19, 0, 0);
-      const clawMesh = new THREE.Mesh(clawGeo, plateMat);
-      pivot.add(clawMesh);
-
       const jointGeo = new THREE.SphereGeometry(5.5, 8, 8);
-      const baseJoint = new THREE.Mesh(jointGeo, plateMat);
-      baseJoint.position.set(0, 0, 0);
-      pivot.add(baseJoint);
-
-      const midJoint = new THREE.Mesh(jointGeo, plateMat);
-      midJoint.position.set(-18, 0, 0);
-      pivot.add(midJoint);
-
       const stingerGeo = new THREE.SphereGeometry(3.6, 6, 6);
-      const stinger = new THREE.Mesh(stingerGeo, pustuleYellowMat);
-      stinger.position.set(-37, 0, 1.5);
-      pivot.add(stinger);
+      const toothGeos = [
+        coloredGeometry(clawGeo, 0xf2ebd9, geo => {
+          geo.rotateZ(Math.PI / 2);
+          geo.translate(-19, 0, 0);
+        }),
+        coloredGeometry(jointGeo, 0xf2ebd9),
+        coloredGeometry(jointGeo, 0xf2ebd9, geo => {
+          geo.translate(-18, 0, 0);
+        }),
+        coloredGeometry(stingerGeo, 0xd4ff2a, geo => {
+          geo.translate(-37, 0, 1.5);
+        }),
+      ];
+      const toothGeo = mergeGeometries(toothGeos);
+      const tooth = new THREE.Mesh(toothGeo, plateMat);
+      pivot.add(tooth);
+
+      toothGeos.forEach(geo => geo.dispose());
+      clawGeo.dispose();
+      jointGeo.dispose();
+      stingerGeo.dispose();
 
       this._teethGroup.add(pivot);
       this._teethPivots.push(pivot);
