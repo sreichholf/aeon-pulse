@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { BossBase } from './BossBase.ts';
 import { Bullet } from './Bullet.ts';
 import { BulletType, EnemyType, type GetPositionFn, type IAudio, type SpawnEnemyFn, type IScene, type BossConstructorParams } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const HALF_W = GAME_WIDTH  / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -33,6 +34,78 @@ interface SegmentConfig {
   d?: number;
   r?: number;
   l?: number;
+}
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const cloned = geo.index ? geo.toNonIndexed() : geo.clone();
+  if (cloned.hasAttribute('uv')) {
+    cloned.deleteAttribute('uv');
+  }
+  return cloned;
+}
+
+function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
+  const posAttr = geo.getAttribute('position');
+  if (!posAttr) return;
+  const colors = new Float32Array(posAttr.count * 3);
+  const color = new THREE.Color(colorHex);
+  for (let i = 0; i < posAttr.count; i++) {
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+function coloredGeometry(
+  source: THREE.BufferGeometry,
+  colorHex: number,
+  transform?: (geo: THREE.BufferGeometry) => void,
+): THREE.BufferGeometry {
+  const geo = ensureNonIndexed(source);
+  if (transform) transform(geo);
+  addVertexColor(geo, colorHex);
+  return geo;
+}
+
+function mergedColoredMesh(geos: THREE.BufferGeometry[], material: THREE.MeshPhongMaterial): THREE.Mesh {
+  const merged = mergeGeometries(geos);
+  geos.forEach(geo => geo.dispose());
+  return new THREE.Mesh(merged, material);
+}
+
+function collapseStaticMeshChildren(
+  group: THREE.Group,
+  material: THREE.MeshPhongMaterial,
+  skippedMaterials: Set<THREE.Material>,
+): void {
+  const geos: THREE.BufferGeometry[] = [];
+  const meshesToRemove: THREE.Mesh[] = [];
+  const geometriesToDispose = new Set<THREE.BufferGeometry>();
+  group.updateWorldMatrix(true, true);
+  const groupInverse = group.matrixWorld.clone().invert();
+  group.traverse(child => {
+    if (!(child instanceof THREE.Mesh)) return;
+    const childMaterial = Array.isArray(child.material) ? child.material[0] : child.material;
+    if (!childMaterial || skippedMaterials.has(childMaterial)) return;
+
+    child.updateWorldMatrix(true, false);
+    const geo = ensureNonIndexed(child.geometry);
+    geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(groupInverse, child.matrixWorld));
+
+    const color = childMaterial instanceof THREE.MeshBasicMaterial || childMaterial instanceof THREE.MeshPhongMaterial
+      ? childMaterial.color.getHex()
+      : 0xffffff;
+    addVertexColor(geo, color);
+    geos.push(geo);
+    meshesToRemove.push(child);
+    geometriesToDispose.add(child.geometry);
+  });
+
+  if (geos.length === 0) return;
+  meshesToRemove.forEach(mesh => mesh.parent?.remove(mesh));
+  geometriesToDispose.forEach(geo => geo.dispose());
+  group.add(mergedColoredMesh(geos, material));
 }
 
 export class Boss4 extends BossBase {
@@ -487,6 +560,7 @@ export class Boss4 extends BossBase {
       specular: 0x544031,
       shininess: 15,
       flatShading: true,
+      vertexColors: true,
     });
 
     const clawMat = new THREE.MeshPhongMaterial({
@@ -497,26 +571,36 @@ export class Boss4 extends BossBase {
       flatShading: true,
     });
 
+    const geos: THREE.BufferGeometry[] = [];
+
     const thighGeo = new THREE.CylinderGeometry(5.5, 7.5, 30, 6);
-    thighGeo.rotateZ(isFront ? -Math.PI / 4.5 : Math.PI / 4.5);
-    const thigh = new THREE.Mesh(thighGeo, legMat);
-    thigh.position.set(isLeftLeg ? -10 : 10, isFront ? 10 : -10, 0);
-    legGroup.add(thigh);
+    geos.push(coloredGeometry(thighGeo, 0x7a5f4c, geo => {
+      geo.rotateZ(isFront ? -Math.PI / 4.5 : Math.PI / 4.5);
+      geo.translate(isLeftLeg ? -10 : 10, isFront ? 10 : -10, 0);
+    }));
 
     const shinGeo = new THREE.CylinderGeometry(4.2, 4.2, 26, 6);
-    shinGeo.rotateZ(isFront ? Math.PI / 6.5 : -Math.PI / 6.5);
-    const shin = new THREE.Mesh(shinGeo, legMat);
-    shin.position.set(isLeftLeg ? -22 : 22, isFront ? 24 : -24, 0);
-    legGroup.add(shin);
+    geos.push(coloredGeometry(shinGeo, 0x7a5f4c, geo => {
+      geo.rotateZ(isFront ? Math.PI / 6.5 : -Math.PI / 6.5);
+      geo.translate(isLeftLeg ? -22 : 22, isFront ? 24 : -24, 0);
+    }));
 
     const clawGeo = new THREE.ConeGeometry(3.8, 14, 4);
-    clawGeo.rotateZ(Math.PI);
-    const claw1 = new THREE.Mesh(clawGeo, clawMat);
-    claw1.position.set(isLeftLeg ? -28 : 28, isFront ? 35 : -35, -5);
-    const claw2 = new THREE.Mesh(clawGeo, clawMat);
-    claw2.position.set(isLeftLeg ? -28 : 28, isFront ? 35 : -35, 5);
-    legGroup.add(claw1);
-    legGroup.add(claw2);
+    geos.push(coloredGeometry(clawGeo, 0xb59a85, geo => {
+      geo.rotateZ(Math.PI);
+      geo.translate(isLeftLeg ? -28 : 28, isFront ? 35 : -35, -5);
+    }));
+    geos.push(coloredGeometry(clawGeo, 0xb59a85, geo => {
+      geo.rotateZ(Math.PI);
+      geo.translate(isLeftLeg ? -28 : 28, isFront ? 35 : -35, 5);
+    }));
+
+    legGroup.add(mergedColoredMesh(geos, legMat));
+
+    thighGeo.dispose();
+    shinGeo.dispose();
+    clawGeo.dispose();
+    clawMat.dispose();
 
     return legGroup;
   }
@@ -534,6 +618,7 @@ export class Boss4 extends BossBase {
       specular: 0x54473e,
       shininess: 35,
       flatShading: true,
+      vertexColors: true,
     });
 
     const facetMat = new THREE.MeshPhongMaterial({
@@ -542,6 +627,7 @@ export class Boss4 extends BossBase {
       specular: 0x6a5d52,
       shininess: 25,
       flatShading: true,
+      vertexColors: true,
     });
 
     const plateMat = new THREE.MeshPhongMaterial({
@@ -550,6 +636,7 @@ export class Boss4 extends BossBase {
       specular: 0x473b32,
       shininess: 15,
       flatShading: true,
+      vertexColors: true,
     });
 
     const lavaMat = new THREE.MeshBasicMaterial({
@@ -674,6 +761,14 @@ export class Boss4 extends BossBase {
         this._headSeg3.add(eyeR);
         this._headSeg3.add(eyeL);
 
+        const animatedHeadMaterials = new Set<THREE.Material>([
+          this._headJointMat,
+          this._headEyeMat,
+        ]);
+        collapseStaticMeshChildren(this._headSeg1, rockMat, animatedHeadMaterials);
+        collapseStaticMeshChildren(this._headSeg2, rockMat, animatedHeadMaterials);
+        collapseStaticMeshChildren(this._headSeg3, rockMat, animatedHeadMaterials);
+
         segGroup.add(this._headSeg1);
         segGroup.add(this._headSeg2);
         segGroup.add(this._headSeg3);
@@ -691,31 +786,40 @@ export class Boss4 extends BossBase {
       } else if (cfg.type === 'body') {
         const r = cfg.r ?? 20;
         const bodyGeo = new THREE.SphereGeometry(r, 6, 6);
-        const bodyPart = new THREE.Mesh(bodyGeo, rockMat);
-        segGroup.add(bodyPart);
 
         const scaleGeo = new THREE.ConeGeometry(r / 3, r / 1.5, 4);
-        scaleGeo.rotateZ(-Math.PI / 6);
-        const scale = new THREE.Mesh(scaleGeo, facetMat);
-        scale.position.set(0, r - 2, 0);
-        segGroup.add(scale);
+        const segmentGeos = [
+          coloredGeometry(bodyGeo, 0x7a6a5f),
+          coloredGeometry(scaleGeo, 0x948375, geo => {
+            geo.rotateZ(-Math.PI / 6);
+            geo.translate(0, r - 2, 0);
+          }),
+        ];
+        segGroup.add(mergedColoredMesh(segmentGeos, rockMat));
+        bodyGeo.dispose();
+        scaleGeo.dispose();
 
       } else if (cfg.type === 'tail') {
         const r = cfg.r ?? 8;
         const l = cfg.l ?? 45;
         const tailGeo = new THREE.ConeGeometry(r, l, 5);
-        tailGeo.rotateZ(Math.PI / 2);
-        const tail = new THREE.Mesh(tailGeo, rockMat);
-        segGroup.add(tail);
 
         const spikeGeo = new THREE.ConeGeometry(2.2, 10, 4);
-        const spikeTop = new THREE.Mesh(spikeGeo, facetMat);
-        spikeTop.position.set(10, 4, 0);
-        const spikeBot = new THREE.Mesh(spikeGeo, facetMat);
-        spikeBot.position.set(10, -4, 0);
-        spikeBot.rotateZ(Math.PI);
-        segGroup.add(spikeTop);
-        segGroup.add(spikeBot);
+        const tailGeos = [
+          coloredGeometry(tailGeo, 0x7a6a5f, geo => {
+            geo.rotateZ(Math.PI / 2);
+          }),
+          coloredGeometry(spikeGeo, 0x948375, geo => {
+            geo.translate(10, 4, 0);
+          }),
+          coloredGeometry(spikeGeo, 0x948375, geo => {
+            geo.rotateZ(Math.PI);
+            geo.translate(10, -4, 0);
+          }),
+        ];
+        segGroup.add(mergedColoredMesh(tailGeos, rockMat));
+        tailGeo.dispose();
+        spikeGeo.dispose();
       }
 
       group.add(segGroup);
@@ -751,42 +855,48 @@ export class Boss4 extends BossBase {
     this._plateLMesh.position.set(-10, 34, 0);
 
     const plateGeo = new THREE.BoxGeometry(80, 16, 28);
-    const plateLBody = new THREE.Mesh(plateGeo, plateMat);
-    this._plateLMesh.add(plateLBody);
-
     const seamGeo = new THREE.BoxGeometry(50, 4, 30);
-    const seamL = new THREE.Mesh(seamGeo, lavaMat);
-    seamL.position.set(0, -6, 0);
-    this._plateLMesh.add(seamL);
-
     const spireGeo = new THREE.ConeGeometry(5, 14, 4);
     spireGeo.rotateX(Math.PI / 12);
+    const plateLGeos = [
+      coloredGeometry(plateGeo, 0x685a50),
+      coloredGeometry(seamGeo, 0xff3300, geo => {
+        geo.translate(0, -6, 0);
+      }),
+    ];
     for (const xOff of [-20, 0, 20]) {
-      const spire = new THREE.Mesh(spireGeo, facetMat);
-      spire.position.set(xOff, 12, 0);
-      this._plateLMesh.add(spire);
+      plateLGeos.push(coloredGeometry(spireGeo, 0x948375, geo => {
+        geo.translate(xOff, 12, 0);
+      }));
     }
+    this._plateLMesh.add(mergedColoredMesh(plateLGeos, plateMat));
     group.add(this._plateLMesh);
 
     this._plateRMesh = new THREE.Group();
     this._plateRMesh.position.set(-10, -34, 0);
 
-    const plateRBody = new THREE.Mesh(plateGeo, plateMat);
-    this._plateRMesh.add(plateRBody);
-
-    const seamR = new THREE.Mesh(seamGeo, lavaMat);
-    seamR.position.set(0, 6, 0);
-    this._plateRMesh.add(seamR);
-
     const spireGeoR = new THREE.ConeGeometry(5, 14, 4);
     spireGeoR.rotateZ(Math.PI);
     spireGeoR.rotateX(-Math.PI / 12);
+    const plateRGeos = [
+      coloredGeometry(plateGeo, 0x685a50),
+      coloredGeometry(seamGeo, 0xff3300, geo => {
+        geo.translate(0, 6, 0);
+      }),
+    ];
     for (const xOff of [-20, 0, 20]) {
-      const spire = new THREE.Mesh(spireGeoR, facetMat);
-      spire.position.set(xOff, -12, 0);
-      this._plateRMesh.add(spire);
+      plateRGeos.push(coloredGeometry(spireGeoR, 0x948375, geo => {
+        geo.translate(xOff, -12, 0);
+      }));
     }
+    this._plateRMesh.add(mergedColoredMesh(plateRGeos, plateMat));
     group.add(this._plateRMesh);
+
+    plateGeo.dispose();
+    seamGeo.dispose();
+    spireGeo.dispose();
+    spireGeoR.dispose();
+    lavaMat.dispose();
 
     const legPlacements = [
       { x: -35, z: 25,  front: true,  left: true },
