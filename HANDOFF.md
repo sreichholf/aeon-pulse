@@ -1,6 +1,6 @@
 # AEON PULSE — Enemy & Boss Render Optimization Handoff
 
-This document details the architecture, design choices, verified benchmarks, and precise step-by-step blueprints for continuing the geometry-merging draw-call collapse optimizations across the remaining standard enemy types and all four chapter bosses. 
+This document details the architecture, design choices, verified benchmarks, and precise step-by-step blueprints for continuing the geometry-merging draw-call collapse optimizations across the remaining standard enemy types.
 
 ---
 
@@ -10,6 +10,11 @@ We have successfully implemented and committed the following render optimization
 - **Phase 2 (Rock Drake Merge)**: Removed splayed leg duplicates and merged geometry inside [RockDrake.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/RockDrake.ts), collapsing draw calls from **21 to 5 per instance** with zero z-fighting.
 - **Phase 3 (Terrain4 Debris Instancing)**: Converted 30 falling rock meshes in [Terrain4.ts](file:///e:/Develop/GitHub/aeon-pulse/src/level/Terrain4.ts) to a single `THREE.InstancedMesh`.
 - **Phase 4 (EnemyStraight Collapse & Subtle Recoil)**: Collapsed [EnemyStraight.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/EnemyStraight.ts) from 8 draw calls to **exactly 3** (Hull Mesh, Visor Canopy Mesh, and merged Exhaust Flames). Fixed a visual double-rotation bug on the cockpit canopy, and implemented a 75%-scaled underdamped spring visual recoil (`2.0` displacement, `-21.25` velocity) matched with a physical lunge speed recovery (`SPEED * 0.79` pause compensated by `SPEED * 1.21` lunge).
+- **Phase 5 (Boss Geometry Collapse)**: Implemented and committed all four chapter boss merge passes:
+  - `4b63ae4 Collapse volcanic titan geometry` — [Boss4.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss4.ts) collapsed legs, armor plates, slithering segments, tail, and head segment internals.
+  - `7de2ead Collapse industrial titan geometry` — [Boss2.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss2.ts) collapsed static plated body, spinning drill, and exhaust flames.
+  - `89e2134 Collapse titan one geometry` — [Boss.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss.ts) collapsed static hull, energy lights, transparent conduits, and exhaust flames.
+  - `46e6f13 Collapse hive heart teeth geometry` — [Boss3.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss3.ts) collapsed each armored tooth pivot into one vertex-colored mesh.
 
 ### Final Benchmark Results (Working Tree Clean & Committed)
 *Headless browser profiling CDP stats capture (1eeda27):*
@@ -57,10 +62,10 @@ When refactoring models in this repository, always preserve **100% visual replic
 
 ---
 
-## 👹 4. Optimization Blueprints for All 4 Chapter Bosses
+## 👹 4. Completed Boss Optimization Passes
 
 ### 1. `Boss.ts` (Titan I - Chapter 1 Boss)
-*A high-specular mechanical fortress. Current draw calls: 24 per active instance.*
+*Completed in `89e2134 Collapse titan one geometry`.*
 - **Static Opaque Hull (12 -> 1 draw calls)**: Merge the main fuselage lathe, side ridges, wings, canards, front prongs, engine nacelles, and central engine port into a **single, static vertex-colored Mesh** at `(0, 0, 0)`.
 - **Static Energy Lights (4 -> 1 draw calls)**: Merge the static wing tips and front prong rings (which share the pulsing `_energyMat`) into a **single static energy-light Mesh**. When the emissive warn-flash triggers, all parts will flash together cleanly!
 - **Transparent Conduits (4 -> 1 draw calls)**: Merge the conduit stripes and exhaust nacelle rings (which both share `conduitMat` with `opacity: 0.9`) into a **single transparent Mesh**.
@@ -69,20 +74,20 @@ When refactoring models in this repository, always preserve **100% visual replic
 - **Outcome**: Collapses the L1 Boss from **24 down to exactly 6 draw calls** (a **75% reduction**).
 
 ### 2. `Boss2.ts` (Industrial Titan - Chapter 2 Boss)
-*A steel-plated industrial ship with a massive spinning drill. Current draw calls: 27 per active instance.*
+*Completed in `7de2ead Collapse industrial titan geometry`.*
 - **Static Plated Body (18 -> 1 draw calls)**: Fuselage cylinder, backing plates, panels, horizontal pods, hazard orange bands, weapon ports, arms, lenses, and engine vents are static relative to the ship frame. **Merge them into a single, vertex-colored Mesh**. The color flashes dynamically inside `_setMeshColor` via child traversal, which remains 100% compatible.
 - **Spinning Nose Drill (5 -> 1 draw calls)**: The nose drill cone and its 4 spiral blades spin as a single unit in `_tickBoss`. **Merge them into a single vertex-colored Drill Mesh** inside the spinning group.
 - **Exhaust Flames (3 -> 1 draw calls)**: Merge the 3 exhaust flame spheres into a **single flame Mesh**.
 - **Outcome**: Collapses the L2 Boss from **27 down to exactly 3 draw calls** (an **88% reduction**).
 
 ### 3. `Boss3.ts` (Hive Heart - Chapter 3 Boss)
-*An organic biological eye with wiggling tentacles and teeth. Current draw calls: ~92 per active instance.*
+*Completed in `46e6f13 Collapse hive heart teeth geometry`.*
 - **Armored Claw Teeth (32 -> 8 draw calls)**: 8 armored claws pivot individually to open/close. Each claw group contains a claw shaft, base joint, mid joint, and yellow stinger. These 4 elements are static relative to the claw pivot. **Merge the 4 parts of each claw into a single vertex-colored tooth Mesh** (8 meshes total). Saves **24 draw calls**.
 - **Organic Animate Parts (Keep Separate)**: Keep the 4 wiggling tentacles (7 joints each, total 28 meshes), 20 base lobes, and 12 pustules separate. They wiggle and pulsate individually with distinct phase offsets to represent a realistic beating bio-organism.
 - **Pulsing Central Eye**: Keep the sclera and pupil separate as they dilate and scale during charging warnings.
 
 ### 4. `Boss4.ts` (Volcanic Titan - Chapter 4 Boss)
-*A volcanic slithering beast with destructible armor. Current draw calls: ~55 per active instance.*
+*Completed in `4b63ae4 Collapse volcanic titan geometry`.*
 - **Crawling Legs (16 -> 4 draw calls)**: 4 crawling legs. Each leg has a thigh, shin, and 2 claws. **Merge the 4 parts of each leg into a single vertex-colored leg Mesh** (1 per leg). Saves **12 draw calls**.
 - **Destructible Armor Plates (10 -> 2 draw calls)**: 2 back carapace plates can be shot and destroyed independently. Each plate has a box plate, lava seam, and 3 volcanic spires. **Merge the 5 parts of each armor plate into a single vertex-colored plate Mesh** (1 for Left, 1 for Right). Saves **8 draw calls**.
 - **Slithering Segments (10 body/tail meshes -> 6 draw calls)**: 5 body segments and 1 tail segment wiggle on Y with distinct phases. For each body segment, merge its core sphere and scale cone into a **single vertex-colored segment Mesh**. For the tail, merge the tail cone and 2 spikes. Saves **6 draw calls**.
@@ -106,16 +111,16 @@ When refactoring models in this repository, always preserve **100% visual replic
 
 | Target | Current Draw Calls | After Merge | Savings |
 |---|---|---|---|
-| `Boss.ts` (Chapter 1) | 24 | **6** | **-75%** |
-| `Boss2.ts` (Chapter 2) | 27 | **3** | **-88%** |
-| `Boss3.ts` (Chapter 3) | ~92 | ~68 | -26% |
-| `Boss4.ts` (Chapter 4) | ~55 | **15** | **-73%** |
+| `Boss.ts` (Chapter 1) | 24 | **6** | **-75%** — complete in `89e2134` |
+| `Boss2.ts` (Chapter 2) | 27 | **3** | **-88%** — complete in `7de2ead` |
+| `Boss3.ts` (Chapter 3) | ~92 | ~68 | -26% — complete in `46e6f13` |
+| `Boss4.ts` (Chapter 4) | ~55 | **15** | **-73%** — complete in `4b63ae4` |
 
 ---
 
 ## 🚀 6. Workflow for Next Agent / Developer
 1. **Develop/Run Server**: Start the local development server at `http://localhost:5173` via `npm run dev`.
-2. **Execute Refactoring**: Modify target files according to the blueprints above. Ensure to dispose of all temporary/cloned geometries to prevent GPU memory leaks!
+2. **Execute Remaining Refactoring**: Continue with the remaining standard enemy blueprints in Section 3. The boss blueprints in Section 4 are already implemented and should be used as reference patterns only. Ensure all temporary/cloned geometries are disposed to prevent GPU memory leaks.
 3. **Verify Build**: Always run `npm run build` to verify there are no TypeScript or bundler errors.
 4. **Gather Performance Stats**: Trigger the pre-authorized Windows headless Chrome profiler orchestrator:
    ```powershell
