@@ -3,6 +3,29 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { BossBase } from './BossBase.ts';
 import { Bullet } from './Bullet.ts';
 import { BulletType, type GetPositionFn, type IAudio, type IScene, type ICollidable, type BossConstructorParams } from '../types.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const cloned = geo.index ? geo.toNonIndexed() : geo.clone();
+  if (cloned.hasAttribute('uv')) {
+    cloned.deleteAttribute('uv');
+  }
+  return cloned;
+}
+
+function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
+  const posAttr = geo.getAttribute('position');
+  if (!posAttr) return;
+
+  const colors = new Float32Array(posAttr.count * 3);
+  const color = new THREE.Color(colorHex);
+  for (let i = 0; i < posAttr.count; i++) {
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
 
 const HALF_H = GAME_HEIGHT / 2;
 
@@ -233,6 +256,7 @@ export class Boss2 extends BossBase {
     const flash  = Math.floor(this._alertTimer * 14) % 2 === 0;
     this._setMeshColor(flash ? colors[this._phaseIdx]! : 0xffffff);
     if (this._alertTimer <= 0) {
+      this._setMeshColor(0xffffff);
       this._mesh?.traverse(child => {
         if (child instanceof THREE.Mesh && child.material) {
           const mat = child.material as THREE.MeshPhongMaterial;
@@ -248,166 +272,192 @@ export class Boss2 extends BossBase {
     const group = new THREE.Group();
 
     const plateMat = new THREE.MeshPhongMaterial({
-      color: 0x48505c,       // Volumetric mid-gray steel
+      color: 0xffffff,       // Vertex-colored plated body, tintable for boss flashes
       emissive: 0x101215,    // Soft passive steel glow
       shininess: 50,         // Clean metallic sheen
       specular: 0x556070,    // Soft steel specular reflection
+      vertexColors: true,
     });
 
     const hullMat = new THREE.MeshPhongMaterial({
-      color: 0x333b47,       // Bright inner engine core
-      emissive: 0x0f1217,
-      shininess: 100,
-      specular: 0x8899aa,
-    });
-
-    const drillMat = new THREE.MeshPhongMaterial({
-      color: 0xd4953b,       // Bright copper-bronze
+      color: 0xffffff,       // Vertex-colored spinning drill, tintable for boss flashes
       emissive: 0x3d270d,
       shininess: 100,
       specular: 0xffeebb,
-    });
-
-    const drillBladeMat = new THREE.MeshPhongMaterial({
-      color: 0x1f232b,       // Dark titanium spiral blades
-      emissive: 0x07090d,
-      shininess: 80,
-    });
-
-    const steelMat = new THREE.MeshPhongMaterial({
-      color: 0x828c9a,       // Bright mid-steel gray for pistons
-      emissive: 0x22262c,
-      shininess: 100,
-      specular: 0xcccccc,    // High metallic shine just under pure white blowout
-    });
-
-    const hazardMat = new THREE.MeshPhongMaterial({
-      color: 0xff8800,       // Original warm hazard orange
-      emissive: 0x331b00,
-      shininess: 70,
-    });
-
-    const laserMat = new THREE.MeshBasicMaterial({
-      color: 0x00ffee,
+      vertexColors: true,
     });
 
     const exhaustMat = new THREE.MeshBasicMaterial({
-      color: 0xff4400,
+      color: 0xffffff,
+      vertexColors: true,
     });
 
     const coreCylGeo = new THREE.CylinderGeometry(50, 52, 140, 16);
     coreCylGeo.rotateZ(Math.PI / 2);
-    const coreCyl = new THREE.Mesh(coreCylGeo, hullMat);
-    coreCyl.position.set(0, 0, -5);
-    group.add(coreCyl);
+    const bodyGeos: THREE.BufferGeometry[] = [];
+
+    const coreCylCloned = ensureNonIndexed(coreCylGeo);
+    coreCylCloned.translate(0, 0, -5);
+    addVertexColor(coreCylCloned, 0x333b47);
+    bodyGeos.push(coreCylCloned);
 
     const outerPlateGeo = new THREE.BoxGeometry(160, 120, 24);
-    const outerPlate = new THREE.Mesh(outerPlateGeo, plateMat);
-    outerPlate.position.set(0, 0, -10);
-    group.add(outerPlate);
+    const outerPlateCloned = ensureNonIndexed(outerPlateGeo);
+    outerPlateCloned.translate(0, 0, -10);
+    addVertexColor(outerPlateCloned, 0x48505c);
+    bodyGeos.push(outerPlateCloned);
 
     const panelGeo = new THREE.BoxGeometry(100, 40, 6);
 
-    const panelTop = new THREE.Mesh(panelGeo, steelMat);
-    panelTop.position.set(10, 35, 8);
-    group.add(panelTop);
+    const panelTopCloned = ensureNonIndexed(panelGeo);
+    panelTopCloned.translate(10, 35, 8);
+    addVertexColor(panelTopCloned, 0x828c9a);
+    bodyGeos.push(panelTopCloned);
 
-    const panelBottom = new THREE.Mesh(panelGeo, steelMat);
-    panelBottom.position.set(10, -35, 8);
-    group.add(panelBottom);
+    const panelBottomCloned = ensureNonIndexed(panelGeo);
+    panelBottomCloned.translate(10, -35, 8);
+    addVertexColor(panelBottomCloned, 0x828c9a);
+    bodyGeos.push(panelBottomCloned);
 
     const podGeo = new THREE.CylinderGeometry(15, 15, 90, 12);
     podGeo.rotateZ(Math.PI / 2);
 
-    const podTop = new THREE.Mesh(podGeo, plateMat);
-    podTop.position.set(0, 65, -8);
-    group.add(podTop);
+    const podTopCloned = ensureNonIndexed(podGeo);
+    podTopCloned.translate(0, 65, -8);
+    addVertexColor(podTopCloned, 0x48505c);
+    bodyGeos.push(podTopCloned);
 
-    const podBottom = new THREE.Mesh(podGeo, plateMat);
-    podBottom.position.set(0, -65, -8);
-    group.add(podBottom);
+    const podBottomCloned = ensureNonIndexed(podGeo);
+    podBottomCloned.translate(0, -65, -8);
+    addVertexColor(podBottomCloned, 0x48505c);
+    bodyGeos.push(podBottomCloned);
 
     const bandGeo = new THREE.TorusGeometry(16, 2.5, 8, 16);
     bandGeo.rotateY(Math.PI / 2);
 
     for (let offset = -30; offset <= 30; offset += 60) {
-      const bandTop = new THREE.Mesh(bandGeo, hazardMat);
-      bandTop.position.set(offset, 65, -8);
-      group.add(bandTop);
+      const bandTopCloned = ensureNonIndexed(bandGeo);
+      bandTopCloned.translate(offset, 65, -8);
+      addVertexColor(bandTopCloned, 0xff8800);
+      bodyGeos.push(bandTopCloned);
 
-      const bandBottom = new THREE.Mesh(bandGeo, hazardMat);
-      bandBottom.position.set(offset, -65, -8);
-      group.add(bandBottom);
+      const bandBottomCloned = ensureNonIndexed(bandGeo);
+      bandBottomCloned.translate(offset, -65, -8);
+      addVertexColor(bandBottomCloned, 0xff8800);
+      bodyGeos.push(bandBottomCloned);
     }
 
     const armGeo = new THREE.CylinderGeometry(7, 7, 45, 12);
     armGeo.rotateZ(Math.PI / 2);
 
-    const topArm = new THREE.Mesh(armGeo, steelMat);
-    topArm.position.set(-60, 58, 10);
-    group.add(topArm);
+    const topArmCloned = ensureNonIndexed(armGeo);
+    topArmCloned.translate(-60, 58, 10);
+    addVertexColor(topArmCloned, 0x828c9a);
+    bodyGeos.push(topArmCloned);
 
-    const bottomArm = new THREE.Mesh(armGeo, steelMat);
-    bottomArm.position.set(-60, -58, -10);
-    group.add(bottomArm);
+    const bottomArmCloned = ensureNonIndexed(armGeo);
+    bottomArmCloned.translate(-60, -58, -10);
+    addVertexColor(bottomArmCloned, 0x828c9a);
+    bodyGeos.push(bottomArmCloned);
 
     const portGeo = new THREE.CylinderGeometry(10, 10, 24, 16);
     portGeo.rotateZ(Math.PI / 2);
 
-    const topPort = new THREE.Mesh(portGeo, steelMat);
-    topPort.position.set(-85, 45, 5);
-    group.add(topPort);
+    const topPortCloned = ensureNonIndexed(portGeo);
+    topPortCloned.translate(-85, 45, 5);
+    addVertexColor(topPortCloned, 0x828c9a);
+    bodyGeos.push(topPortCloned);
 
-    const bottomPort = new THREE.Mesh(portGeo, steelMat);
-    bottomPort.position.set(-85, -45, -5);
-    group.add(bottomPort);
+    const bottomPortCloned = ensureNonIndexed(portGeo);
+    bottomPortCloned.translate(-85, -45, -5);
+    addVertexColor(bottomPortCloned, 0x828c9a);
+    bodyGeos.push(bottomPortCloned);
 
     const lensGeo = new THREE.CylinderGeometry(7, 7, 4, 16);
     lensGeo.rotateZ(Math.PI / 2);
 
-    const topLens = new THREE.Mesh(lensGeo, laserMat);
-    topLens.position.set(-97, 45, 5);
-    group.add(topLens);
+    const topLensCloned = ensureNonIndexed(lensGeo);
+    topLensCloned.translate(-97, 45, 5);
+    addVertexColor(topLensCloned, 0x00ffee);
+    bodyGeos.push(topLensCloned);
 
-    const bottomLens = new THREE.Mesh(lensGeo, laserMat);
-    bottomLens.position.set(-97, -45, -5);
-    group.add(bottomLens);
+    const bottomLensCloned = ensureNonIndexed(lensGeo);
+    bottomLensCloned.translate(-97, -45, -5);
+    addVertexColor(bottomLensCloned, 0x00ffee);
+    bodyGeos.push(bottomLensCloned);
+
+    const ventGeo = new THREE.CylinderGeometry(8, 6, 12, 12);
+    ventGeo.rotateZ(Math.PI / 2);
+
+    for (let i = -1; i <= 1; i++) {
+      const ventCloned = ensureNonIndexed(ventGeo);
+      ventCloned.translate(85, i * 28, 0);
+      addVertexColor(ventCloned, 0x828c9a);
+      bodyGeos.push(ventCloned);
+    }
+
+    const mergedBodyGeo = mergeGeometries(bodyGeos);
+    const bodyMesh = new THREE.Mesh(mergedBodyGeo, plateMat);
+    group.add(bodyMesh);
+
+    bodyGeos.forEach(g => g.dispose());
+    coreCylGeo.dispose();
+    outerPlateGeo.dispose();
+    panelGeo.dispose();
+    podGeo.dispose();
+    bandGeo.dispose();
+    armGeo.dispose();
+    portGeo.dispose();
+    lensGeo.dispose();
+    ventGeo.dispose();
 
     this._drillMesh = new THREE.Group();
     this._drillMesh.position.set(-95, 0, 0);
 
     const drillGeo = new THREE.ConeGeometry(25, 62, 16);
     drillGeo.rotateZ(Math.PI / 2);
-    const drillCore = new THREE.Mesh(drillGeo, drillMat);
-    this._drillMesh.add(drillCore);
+    const drillCoreCloned = ensureNonIndexed(drillGeo);
+    addVertexColor(drillCoreCloned, 0xd4953b);
+    const drillGeos = [drillCoreCloned];
 
     const bladeGeo = new THREE.BoxGeometry(45, 3, 6);
     bladeGeo.rotateZ(-Math.PI / 10);
 
     for (let r = 0; r < 4; r++) {
       const angle = (r / 4) * Math.PI * 2;
-      const blade = new THREE.Mesh(bladeGeo, drillBladeMat);
-      blade.position.set(0, Math.cos(angle) * 12, Math.sin(angle) * 12);
-      blade.rotation.x = angle;
-      this._drillMesh.add(blade);
+      const bladeCloned = ensureNonIndexed(bladeGeo);
+      bladeCloned.rotateX(angle);
+      bladeCloned.translate(0, Math.cos(angle) * 12, Math.sin(angle) * 12);
+      addVertexColor(bladeCloned, 0x1f232b);
+      drillGeos.push(bladeCloned);
     }
+
+    const mergedDrillGeo = mergeGeometries(drillGeos);
+    const drillMesh = new THREE.Mesh(mergedDrillGeo, hullMat);
+    this._drillMesh.add(drillMesh);
     group.add(this._drillMesh);
 
-    const ventGeo = new THREE.CylinderGeometry(8, 6, 12, 12);
-    ventGeo.rotateZ(Math.PI / 2);
+    drillGeos.forEach(g => g.dispose());
+    drillGeo.dispose();
+    bladeGeo.dispose();
 
     const flameGeo = new THREE.SphereGeometry(5, 12, 12);
+    const flameGeos: THREE.BufferGeometry[] = [];
 
     for (let i = -1; i <= 1; i++) {
       const vy = i * 28;
-      const vent = new THREE.Mesh(ventGeo, steelMat);
-      vent.position.set(85, vy, 0);
-      group.add(vent);
-
-      const flame = new THREE.Mesh(flameGeo, exhaustMat);
-      flame.position.set(92, vy, 0);
-      group.add(flame);
+      const flameCloned = ensureNonIndexed(flameGeo);
+      flameCloned.translate(92, vy, 0);
+      addVertexColor(flameCloned, 0xff4400);
+      flameGeos.push(flameCloned);
     }
+
+    const mergedFlameGeo = mergeGeometries(flameGeos);
+    const flameMesh = new THREE.Mesh(mergedFlameGeo, exhaustMat);
+    group.add(flameMesh);
+
+    flameGeos.forEach(g => g.dispose());
+    flameGeo.dispose();
 
     return group;
   }
