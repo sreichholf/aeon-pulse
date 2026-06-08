@@ -1,10 +1,38 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { BossBase } from './BossBase.ts';
 import { Bullet } from './Bullet.ts';
 import { BulletType, type GetPositionFn, type IAudio, type IBullet, type IScene, type BossConstructorParams } from '../types.ts';
 
 const HALF_H = GAME_HEIGHT / 2;
+
+function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const cloned = geo.index ? geo.toNonIndexed() : geo.clone();
+  if (cloned.hasAttribute('uv')) {
+    cloned.deleteAttribute('uv');
+  }
+  return cloned;
+}
+
+function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
+  const posAttr = geo.getAttribute('position');
+  if (!posAttr) return;
+  const colors = new Float32Array(posAttr.count * 3);
+  const color = new THREE.Color(colorHex);
+  for (let i = 0; i < posAttr.count; i++) {
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+function cloneColoredGeometry(geo: THREE.BufferGeometry, colorHex: number): THREE.BufferGeometry {
+  const cloned = ensureNonIndexed(geo);
+  addVertexColor(cloned, colorHex);
+  return cloned;
+}
 
 const TOTAL_HP       = 45;
 const PHASE2_HP      = Math.round(TOTAL_HP * 0.67);
@@ -238,15 +266,6 @@ export class Boss extends BossBase {
   protected _build3DModel(): THREE.Object3D {
     const group = new THREE.Group();
 
-    const hullMat = new THREE.MeshPhongMaterial({
-      color: 0x2a5c9e, emissive: 0x0e2040, shininess: 140, specular: 0x44bbdd,
-    });
-    const crystalMat = new THREE.MeshPhongMaterial({
-      color: 0x4a8cd4, emissive: 0x142850, shininess: 180, specular: 0x66aadd,
-    });
-    const brightCrystalMat = new THREE.MeshPhongMaterial({
-      color: 0x6aacee, emissive: 0x1a3358, shininess: 200, specular: 0x88ccff,
-    });
     this._energyMat = new THREE.MeshPhongMaterial({
       color: 0x00eeff, emissive: 0x00aacc, shininess: 250, specular: 0xaaffff,
     });
@@ -259,7 +278,11 @@ export class Boss extends BossBase {
       transparent: true, opacity: 0.9,
     });
     const darkMat = new THREE.MeshPhongMaterial({
-      color: 0x1a3050, emissive: 0x081420, shininess: 120, specular: 0x2288bb,
+      color: 0xffffff,
+      vertexColors: true,
+      emissive: 0x081420,
+      shininess: 140,
+      specular: 0x44bbdd,
     });
 
     const lathePoints = [
@@ -273,36 +296,54 @@ export class Boss extends BossBase {
       new THREE.Vector2(10,  -55),
     ];
     const latheGeo = new THREE.LatheGeometry(lathePoints, 24);
-    latheGeo.rotateZ(Math.PI / 2);
-    group.add(new THREE.Mesh(latheGeo, hullMat));
+    const ridgeGeo = new THREE.BoxGeometry(100, 5, 8);
+    const wingGeo = new THREE.BoxGeometry(50, 5, 12);
+    const tipGeo = new THREE.ConeGeometry(6, 30, 4);
+    const canardGeo = new THREE.BoxGeometry(26, 3.5, 8);
+    const stripeGeo = new THREE.BoxGeometry(44, 1.5, 3);
+    const prongGeo = new THREE.CylinderGeometry(3, 1.5, 45, 8);
+    const ringGeo = new THREE.TorusGeometry(4, 1.0, 8, 16);
+    const nacelleGeo = new THREE.CylinderGeometry(8, 10, 35, 12);
+    const exhaustRingGeo = new THREE.TorusGeometry(9, 1.5, 8, 16);
+    const flameGeo = new THREE.ConeGeometry(7, 20, 10);
+    const centralPortGeo = new THREE.CylinderGeometry(10, 12, 12, 12);
+    const centralFlameGeo = new THREE.ConeGeometry(9, 24, 10);
+
+    const hullGeos: THREE.BufferGeometry[] = [];
+    const energyGeos: THREE.BufferGeometry[] = [];
+    const conduitGeos: THREE.BufferGeometry[] = [];
+    const flameGeos: THREE.BufferGeometry[] = [];
+
+    const fuselageGeo = cloneColoredGeometry(latheGeo, 0x2a5c9e);
+    fuselageGeo.rotateZ(Math.PI / 2);
+    hullGeos.push(fuselageGeo);
 
     for (const zSide of [1, -1]) {
-      const ridge = new THREE.Mesh(new THREE.BoxGeometry(100, 5, 8), crystalMat);
-      ridge.position.set(-5, 0, zSide * 22);
-      group.add(ridge);
+      const ridge = cloneColoredGeometry(ridgeGeo, 0x4a8cd4);
+      ridge.translate(-5, 0, zSide * 22);
+      hullGeos.push(ridge);
     }
 
     for (const side of [1, -1]) {
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(50, 5, 12), brightCrystalMat);
-      wing.position.set(10, side * 52, 0);
-      wing.rotation.z = side * -0.2;
-      group.add(wing);
+      const wing = cloneColoredGeometry(wingGeo, 0x6aacee);
+      wing.rotateZ(side * -0.2);
+      wing.translate(10, side * 52, 0);
+      hullGeos.push(wing);
 
-      const tipGeo = new THREE.ConeGeometry(6, 30, 4);
-      tipGeo.rotateZ(side * Math.PI / 2);
-      const tip = new THREE.Mesh(tipGeo, this._energyMat);
-      tip.position.set(10, side * 78, 0);
-      group.add(tip);
+      const tip = ensureNonIndexed(tipGeo);
+      tip.rotateZ(side * Math.PI / 2);
+      tip.translate(10, side * 78, 0);
+      energyGeos.push(tip);
 
-      const canard = new THREE.Mesh(new THREE.BoxGeometry(26, 3.5, 8), crystalMat);
-      canard.position.set(-42, side * 34, 0);
-      canard.rotation.z = side * -0.3;
-      group.add(canard);
+      const canard = cloneColoredGeometry(canardGeo, 0x4a8cd4);
+      canard.rotateZ(side * -0.3);
+      canard.translate(-42, side * 34, 0);
+      hullGeos.push(canard);
 
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(44, 1.5, 3), conduitMat);
-      stripe.position.set(10, side * 52, 7);
-      stripe.rotation.z = side * -0.2;
-      group.add(stripe);
+      const stripe = ensureNonIndexed(stripeGeo);
+      stripe.rotateZ(side * -0.2);
+      stripe.translate(10, side * 52, 7);
+      conduitGeos.push(stripe);
     }
 
     this._coreGroup = new THREE.Group();
@@ -312,50 +353,76 @@ export class Boss extends BossBase {
     this._coreGroup.add(new THREE.Mesh(new THREE.SphereGeometry(24, 14, 12), coreGlowMat));
 
     for (const yOff of [12, -12]) {
-      const pGeo = new THREE.CylinderGeometry(3, 1.5, 45, 8);
-      pGeo.rotateZ(Math.PI / 2);
-      const prong = new THREE.Mesh(pGeo, darkMat);
-      prong.position.set(-90, yOff, 0);
-      group.add(prong);
+      const prong = cloneColoredGeometry(prongGeo, 0x1a3050);
+      prong.rotateZ(Math.PI / 2);
+      prong.translate(-90, yOff, 0);
+      hullGeos.push(prong);
 
-      const rGeo = new THREE.TorusGeometry(4, 1.0, 8, 16);
-      rGeo.rotateY(Math.PI / 2);
-      const ring = new THREE.Mesh(rGeo, this._energyMat);
-      ring.position.set(-113, yOff, 0);
-      group.add(ring);
+      const ring = ensureNonIndexed(ringGeo);
+      ring.rotateY(Math.PI / 2);
+      ring.translate(-113, yOff, 0);
+      energyGeos.push(ring);
     }
 
     for (const side of [1, -1]) {
-      const nGeo = new THREE.CylinderGeometry(8, 10, 35, 12);
-      nGeo.rotateZ(Math.PI / 2);
-      const nac = new THREE.Mesh(nGeo, darkMat);
-      nac.position.set(50, side * 30, 0);
-      group.add(nac);
+      const nacelle = cloneColoredGeometry(nacelleGeo, 0x1a3050);
+      nacelle.rotateZ(Math.PI / 2);
+      nacelle.translate(50, side * 30, 0);
+      hullGeos.push(nacelle);
 
-      const erGeo = new THREE.TorusGeometry(9, 1.5, 8, 16);
-      erGeo.rotateY(Math.PI / 2);
-      const exRing = new THREE.Mesh(erGeo, conduitMat);
-      exRing.position.set(68, side * 30, 0);
-      group.add(exRing);
+      const exhaustRing = ensureNonIndexed(exhaustRingGeo);
+      exhaustRing.rotateY(Math.PI / 2);
+      exhaustRing.translate(68, side * 30, 0);
+      conduitGeos.push(exhaustRing);
 
-      const fGeo = new THREE.ConeGeometry(7, 20, 10);
-      fGeo.rotateZ(-Math.PI / 2);
-      const flame = new THREE.Mesh(fGeo, coreGlowMat);
-      flame.position.set(80, side * 30, 0);
-      group.add(flame);
+      const flame = ensureNonIndexed(flameGeo);
+      flame.rotateZ(-Math.PI / 2);
+      flame.translate(80, side * 30, 0);
+      flameGeos.push(flame);
     }
 
-    const cpGeo = new THREE.CylinderGeometry(10, 12, 12, 12);
-    cpGeo.rotateZ(Math.PI / 2);
-    const cp = new THREE.Mesh(cpGeo, darkMat);
-    cp.position.set(55, 0, 0);
-    group.add(cp);
+    const centralPort = cloneColoredGeometry(centralPortGeo, 0x1a3050);
+    centralPort.rotateZ(Math.PI / 2);
+    centralPort.translate(55, 0, 0);
+    hullGeos.push(centralPort);
 
-    const cfGeo = new THREE.ConeGeometry(9, 24, 10);
-    cfGeo.rotateZ(-Math.PI / 2);
-    const cf = new THREE.Mesh(cfGeo, coreGlowMat);
-    cf.position.set(72, 0, 0);
-    group.add(cf);
+    const centralFlame = ensureNonIndexed(centralFlameGeo);
+    centralFlame.rotateZ(-Math.PI / 2);
+    centralFlame.translate(72, 0, 0);
+    flameGeos.push(centralFlame);
+
+    const mergedHullGeo = mergeGeometries(hullGeos);
+    const mergedEnergyGeo = mergeGeometries(energyGeos);
+    const mergedConduitGeo = mergeGeometries(conduitGeos);
+    const mergedFlameGeo = mergeGeometries(flameGeos);
+
+    const hullMesh = new THREE.Mesh(mergedHullGeo, darkMat);
+    const energyMesh = new THREE.Mesh(mergedEnergyGeo, this._energyMat);
+    const conduitMesh = new THREE.Mesh(mergedConduitGeo, conduitMat);
+    const flameMesh = new THREE.Mesh(mergedFlameGeo, coreGlowMat);
+
+    group.add(hullMesh);
+    group.add(energyMesh);
+    group.add(conduitMesh);
+    group.add(flameMesh);
+
+    hullGeos.forEach(g => g.dispose());
+    energyGeos.forEach(g => g.dispose());
+    conduitGeos.forEach(g => g.dispose());
+    flameGeos.forEach(g => g.dispose());
+    latheGeo.dispose();
+    ridgeGeo.dispose();
+    wingGeo.dispose();
+    tipGeo.dispose();
+    canardGeo.dispose();
+    stripeGeo.dispose();
+    prongGeo.dispose();
+    ringGeo.dispose();
+    nacelleGeo.dispose();
+    exhaustRingGeo.dispose();
+    flameGeo.dispose();
+    centralPortGeo.dispose();
+    centralFlameGeo.dispose();
 
     return group;
   }
