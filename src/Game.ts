@@ -16,19 +16,15 @@ import { GameState, DifficultyMode, MusicCue } from './types.ts';
 import {
   getFirstImplementedLevel,
   getMusicCueForChapterKey,
-  getNextImplementedLevel,
   getNextTitleLevel,
   getPreviousImplementedLevel,
   toLevelLabel,
   type CampaignLevelRecord,
 } from './campaign/Campaign.ts';
+import { CampaignAttempt } from './campaign/CampaignAttempt.ts';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import playerGlbUrl from './models/player.glb';
 
-
-const CLEAR_BONUS = 10000;
-const LIVES_BONUS = 2000;
-const CHAPTER_BONUS = 25000;
 
 
 
@@ -58,6 +54,7 @@ export class Game {
   private _startWeaponTier: number;
   private _nextLevelState: GameState | null;
   private _nextLevel: CampaignLevelRecord | null;
+  private _attempt: CampaignAttempt | null;
   private _levelStartTimer: number;
   private _waitingForRestart: boolean;
   private _waitingForReturn: boolean;
@@ -91,6 +88,7 @@ export class Game {
     this._startWeaponTier = 1; // weapon tier chosen on title screen
     this._nextLevelState = null;
     this._nextLevel = null;
+    this._attempt = null;
     this._levelStartTimer = 0;
     this._waitingForRestart = false;
     this._waitingForReturn = false;
@@ -227,6 +225,7 @@ export class Game {
     this.currentLevel = getFirstImplementedLevel();
     this._savedWeaponTier = 1;
     this._startWeaponTier = 1;
+    this._attempt = null;
     this._mode = DifficultyMode.ROOKIE;
     this._titlePreviewCue = null;
     this.score = new ScoreManager(this._mode);
@@ -278,6 +277,7 @@ export class Game {
       this.input.wasJustPressed(Action.CONFIRM)) {
       this.audio.play('menuSelect');
       this._savedWeaponTier = this._startWeaponTier; // commit chosen tier before gameplay starts
+      this._attempt = new CampaignAttempt(this.currentLevel, this._startWeaponTier);
       this._setState(GameState.LEVEL_START);
     }
   }
@@ -311,7 +311,11 @@ export class Game {
       return;
     }
 
-    if (this.currentLevel.id === getFirstImplementedLevel().id) {
+    if (!this._attempt) {
+      this._attempt = new CampaignAttempt(this.currentLevel, this._savedWeaponTier);
+    }
+
+    if (this._attempt.level.id === getFirstImplementedLevel().id) {
       this.score.reset();
     }
     this.audio.setMusicVolumeMultiplier(0.3);
@@ -327,7 +331,7 @@ export class Game {
       playerModel: this.playerModel,
     });
 
-    this._run.start(this.currentLevel, this._savedWeaponTier, this._mode);
+    this._run.start(this._attempt, this._mode);
     this.ui.updateHUD(this._run.getHUDSnapshot());
   }
 
@@ -370,8 +374,11 @@ export class Game {
 
   // Called by LevelManager when the boss is defeated
   onLevelComplete() {
-    this._nextLevel = getNextImplementedLevel(this.currentLevel);
-    this._nextLevelState = this._nextLevel ? GameState.LEVEL_START : GameState.GAME_COMPLETE;
+    if (!this._attempt) {
+      this._attempt = new CampaignAttempt(this.currentLevel, this._savedWeaponTier);
+    }
+    this._nextLevel = this._attempt.getNextLevel();
+    this._nextLevelState = this._attempt.getNextGameState();
     this._setState(GameState.LEVEL_COMPLETE);
   }
 
@@ -409,29 +416,34 @@ export class Game {
 
   _enterLevelComplete() {
     this.audio.play('levelComplete');
-    this._savedWeaponTier = this._run?.getSavedWeaponTier() ?? 1;
+    if (!this._attempt) {
+      this._attempt = new CampaignAttempt(this.currentLevel, this._savedWeaponTier);
+    }
+    this._attempt.weaponTier = this._run?.getSavedWeaponTier() ?? 1;
+    this._savedWeaponTier = this._attempt.weaponTier;
     this._clearGameplay();
 
-    const livesBonus = this.score.lives * LIVES_BONUS;
-    const chapterBonus = this.currentLevel.isFinale ? CHAPTER_BONUS : 0;
     const preBonusScore = this.score.score;
-    this.score.addScore(CLEAR_BONUS + livesBonus + chapterBonus);
+    const clearScores = this._attempt.calculateClearScores(this.score.lives, preBonusScore);
+    this.score.addScore(clearScores.clearBonus + clearScores.livesBonus + clearScores.chapterBonus);
 
     const nextState = this._nextLevelState ?? GameState.TITLE;
 
     this.ui.showLevelComplete({
-      title: this.currentLevel.isFinale ? 'CHAPTER COMPLETE' : 'LEVEL COMPLETE',
-      clearTypeLabel: this.currentLevel.clearType === 'chapter' ? 'CHAPTER FINALE CLEAR' : 'LEVEL CLEAR',
-      chapterName: this.currentLevel.chapterName,
-      levelId: this.currentLevel.id,
-      baseScore: preBonusScore,
-      clearBonus: CLEAR_BONUS,
-      livesBonus,
-      chapterBonus,
+      title: this._attempt.level.isFinale ? 'CHAPTER COMPLETE' : 'LEVEL COMPLETE',
+      clearTypeLabel: this._attempt.level.clearType === 'chapter' ? 'CHAPTER FINALE CLEAR' : 'LEVEL CLEAR',
+      chapterName: this._attempt.level.chapterName,
+      levelId: this._attempt.level.id,
+      baseScore: clearScores.baseScore,
+      clearBonus: clearScores.clearBonus,
+      livesBonus: clearScores.livesBonus,
+      chapterBonus: clearScores.chapterBonus,
       onContinue: () => {
         this.audio.play('menuSelect');
-        if (nextState === GameState.LEVEL_START && this._nextLevel) {
-          this.currentLevel = this._nextLevel;
+        if (nextState === GameState.LEVEL_START && this._attempt) {
+          this._attempt.advance(this._attempt.weaponTier);
+          this.currentLevel = this._attempt.level;
+          this._savedWeaponTier = this._attempt.weaponTier;
         }
         setTimeout(() => this._setState(nextState), 400);
       },
@@ -463,6 +475,7 @@ export class Game {
       this.audio.play('menuSelect');
       this.currentLevel = getFirstImplementedLevel();
       this._savedWeaponTier = 1;
+      this._attempt = null;
       this._setState(GameState.TITLE);
     }
   }

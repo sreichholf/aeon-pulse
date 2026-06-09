@@ -15,6 +15,8 @@ import { LevelManager, type LevelGameHost } from '../level/LevelManager.ts';
 import { LEVELS } from '../level/Levels.ts';
 import { StageEventType, type StageEvent } from '../level/StageEvents.ts';
 import type { CampaignLevelRecord } from '../campaign/Campaign.ts';
+import { CampaignAttempt } from '../campaign/CampaignAttempt.ts';
+
 import {
   DifficultyMode,
   type EnemyType,
@@ -82,6 +84,8 @@ export class GameplayRun implements LevelGameHost {
   private _levelExitTimer: number;
   private _levelExitFlyoutStarted: boolean;
 
+  private _attempt: CampaignAttempt | null;
+
   constructor(deps: GameplayRunDeps) {
     this._deps = deps;
     this.background = null;
@@ -97,12 +101,15 @@ export class GameplayRun implements LevelGameHost {
     this._projectilePool = new ProjectilePool(deps.scene, deps.sprites);
     this._level = null;
     this._isExitingLevel = false;
+    this._attempt = null;
     this._levelExitHoldTimer = 0;
     this._levelExitTimer = 0;
     this._levelExitFlyoutStarted = false;
   }
 
-  start(level: CampaignLevelRecord, savedWeaponTier: number, mode: DifficultyMode): void {
+  start(attempt: CampaignAttempt, mode: DifficultyMode): void {
+    this._attempt = attempt;
+    const level = attempt.level;
     const levelDef = LEVELS[level.archetype]!;
     this._level = level;
 
@@ -127,8 +134,8 @@ export class GameplayRun implements LevelGameHost {
       this._deps.playerModel,
     );
 
-    if (savedWeaponTier > 1) {
-      this._player.weaponTier = savedWeaponTier as WeaponTierValue;
+    if (attempt.weaponTier > 1) {
+      this._player.weaponTier = attempt.weaponTier as WeaponTierValue;
     }
     this._player.resetShield();
 
