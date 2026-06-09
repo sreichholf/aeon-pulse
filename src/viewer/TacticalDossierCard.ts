@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { type IBullet, type EntityMetadata, type GetPositionFn } from '../types.ts';
+import { type BulletType, type EntityMetadata, type GetPositionFn } from '../types.ts';
 
 export interface ViewerBullet {
   update(dt: number): void;
@@ -9,8 +9,8 @@ export interface ViewerBullet {
 
 export interface WrappedEntity {
   _mesh: THREE.Object3D | null;
-  update?: (dt: number) => IBullet[];
-  _tick?: (dt: number) => IBullet[];
+  update?: (dt: number) => unknown;
+  _tick?: (dt: number) => unknown;
   _getPlayerPos?: GetPositionFn | null;
   isBoss?: boolean;
   isMesh?: boolean;
@@ -19,8 +19,14 @@ export interface WrappedEntity {
   viewerXOffset?: number;
   _isViewer?: boolean;
   _entered?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
+
+/** Factory the card uses to construct one preview bullet by type. */
+export type ViewerBulletFactory = (type: BulletType) => ViewerBullet;
+
+/** Duration each bullet type is displayed before cycling to the next. */
+const BULLET_PREVIEW_LIFETIME = 5.0;
 
 export class TacticalDossierCard {
   private _entity: WrappedEntity | THREE.Object3D;
@@ -34,9 +40,13 @@ export class TacticalDossierCard {
   private _viewerTime: number = 0;
   private _viewerBaseY: number = 0;
   private _viewerBaseRotation: THREE.Euler | null = null;
+
+  // Catalog-driven bullet preview cycling (ADR 0017)
+  private _bulletTypes: BulletType[];
+  private _bulletFactory: ViewerBulletFactory | null;
+  private _bulletIndex: number = 0;
+  private _bulletTimer: number;          // starts at lifetime so first bullet fires immediately
   private _viewerBullet: ViewerBullet | null = null;
-  private _viewerBulletLife: number = 0;   // seconds the current preview bullet has been displayed
-  private _viewerBulletStale: boolean = false; // true once lifetime elapsed — replace on next new bullet
 
   constructor(
     entity: WrappedEntity | THREE.Object3D,
@@ -45,6 +55,8 @@ export class TacticalDossierCard {
       viewerX?: number;
       viewerY?: number;
       viewerIdle?: boolean;
+      bulletTypes?: BulletType[];
+      bulletFactory?: ViewerBulletFactory;
     }
   ) {
     this._entity = entity;
@@ -52,6 +64,11 @@ export class TacticalDossierCard {
     this._viewerX = options?.viewerX ?? 0;
     this._viewerY = options?.viewerY ?? 0;
     this._viewerIdle = options?.viewerIdle ?? false;
+    this._bulletTypes = options?.bulletTypes ?? [];
+    this._bulletFactory = options?.bulletFactory ?? null;
+
+    // Initialise timer to lifetime so the first bullet spawns on the very first update() tick.
+    this._bulletTimer = BULLET_PREVIEW_LIFETIME;
 
     const mesh = this.mesh;
     if (mesh) {
@@ -71,18 +88,6 @@ export class TacticalDossierCard {
       this._entity._entered = true;
       if (typeof this._entity._getPlayerPos !== 'function' || this._entity._getPlayerPos === null) {
         this._entity._getPlayerPos = () => ({ x: 0, y: 0 });
-      }
-
-      // Accelerate first shot by zeroing all known fire-cooldown timers so enemies shoot
-      // almost immediately when displayed in the viewer instead of after their random delay.
-      const ent = this._entity as Record<string, unknown>;
-      if (typeof ent['_fireTimer'] === 'number')    ent['_fireTimer'] = 0;
-      if (typeof ent['_circTimer'] === 'number')    ent['_circTimer'] = 0;
-      if (typeof ent['_homingTimer'] === 'number')  ent['_homingTimer'] = 0;
-      if (typeof ent['_lavaTimer'] === 'number')    ent['_lavaTimer'] = 0;
-      if (typeof ent['_patternTimers'] === 'object' && ent['_patternTimers'] !== null) {
-        const pt = ent['_patternTimers'] as Record<string, number>;
-        for (const k of Object.keys(pt)) pt[k] = 0;
       }
     }
   }
@@ -137,9 +142,8 @@ export class TacticalDossierCard {
     if (!mesh) return;
 
     const isWrapped = this.isWrappedEntity(this._entity);
-    const hasUpdate = isWrapped && typeof (this._entity as WrappedEntity).update === 'function';
-    const hasTick = isWrapped && typeof (this._entity as WrappedEntity)._tick === 'function';
 
+    // ── Idle float animation (player page) ──────────────────────────────────
     if (this._viewerIdle) {
       this._viewerTime += dt;
       mesh.position.y = this._viewerBaseY + Math.sin(this._viewerTime * 1.4) * 2.2;
@@ -150,67 +154,41 @@ export class TacticalDossierCard {
           this._viewerBaseRotation.z + Math.sin(this._viewerTime * 1.5) * 0.012,
         );
       }
+      return;
     }
 
-    if (!hasUpdate && !hasTick) return;
+    if (!isWrapped) return;
 
     const wrapped = this._entity as WrappedEntity;
 
-    // Run the animation tick and capture bullets
-    let newBullets: IBullet[] = [];
-    if (hasUpdate) {
-      newBullets = wrapped.update!(dt) || [];
-    } else if (hasTick) {
-      newBullets = wrapped._tick!(dt) || [];
+    // ── Tick entity for visual animation only; ignore any bullets it emits ──
+    if (typeof wrapped.update === 'function') {
+      wrapped.update(dt);
+    } else if (typeof wrapped._tick === 'function') {
+      wrapped._tick(dt);
     }
 
-    // Advance the preview lifetime first so staleness is known before we decide
-    // whether to accept an incoming bullet this tick.
-    const BULLET_PREVIEW_LIFETIME = 5.0;
-    if (this._viewerBullet && !this._viewerBulletStale) {
-      this._viewerBulletLife += dt;
-      if (this._viewerBulletLife >= BULLET_PREVIEW_LIFETIME) {
-        this._viewerBulletStale = true;
+    // ── Catalog-driven bullet preview cycling (ADR 0017) ────────────────────
+    if (this._bulletTypes.length > 0 && this._bulletFactory) {
+      this._bulletTimer += dt;
+      if (this._bulletTimer >= BULLET_PREVIEW_LIFETIME) {
+        this._bulletTimer = 0;
+
+        // Destroy the current preview and spawn the next type in the list
+        if (this._viewerBullet) {
+          this._viewerBullet.destroy();
+        }
+        const type = this._bulletTypes[this._bulletIndex % this._bulletTypes.length]!;
+        this._viewerBullet = this._bulletFactory(type);
+        this._bulletIndex++;
       }
     }
 
-    // Accept an incoming bullet only when the slot is empty or already stale.
-    // If the current preview is still fresh, discard all new bullets so fast-firing
-    // enemies/bosses don't replace the display on every shot — the cycling rate is
-    // always exactly the 5 s lifetime, never driven by the entity's fire cadence.
-    if (Array.isArray(newBullets) && newBullets.length > 0) {
-      const slotReady = !this._viewerBullet || this._viewerBulletStale;
-      if (slotReady) {
-        const firstBullet = newBullets[0] as unknown as ViewerBullet | undefined;
-        if (firstBullet) {
-          if (this._viewerBullet) {
-            this._viewerBullet.destroy();
-          }
-          this._viewerBullet = firstBullet;
-          this._viewerBulletLife = 0;
-          this._viewerBulletStale = false;
-          for (let idx = 1; idx < newBullets.length; idx++) {
-            (newBullets[idx] as unknown as ViewerBullet | undefined)?.destroy();
-          }
-        }
-      } else {
-        // Slot is still fresh — discard every bullet from this tick
-        for (const b of newBullets) {
-          (b as unknown as ViewerBullet | undefined)?.destroy();
-        }
-      }
-    }
-
-    // Force position lock, shifting the enemy model UP a bit to place it at the top of the card if it shoots,
-    // or centering it perfectly in the empty card space above the name if it does not shoot.
+    // ── Position lock ────────────────────────────────────────────────────────
     const isBoss = wrapped.isBoss ?? false;
     const targetY = this._viewerY + (this._viewerBullet ? (isBoss ? 24 : 22) : (isBoss ? 8 : 6));
+    const targetX = this._viewerX + ((wrapped.viewerXOffset as number | undefined) ?? 0);
 
-    // Symmetrically center the Charger across all rotation angles by applying a dynamic,
-    // rotation-aware offset matching the projection of its asymmetrical features (nose and trails) on the screen X-axis!
-    const targetX = this._viewerX + (wrapped.viewerXOffset ?? 0);
-
-    // Use dedicated, physics-independent virtual coordinates to prevent active charging velocity from pulling the ship off-screen!
     if (this._viewerCurrentX === undefined) {
       this._viewerCurrentX = targetX;
       this._viewerCurrentY = targetY;
@@ -223,10 +201,10 @@ export class TacticalDossierCard {
     mesh.position.y = this._viewerCurrentY;
     mesh.position.z = 0;
 
-    // Slowly rotate the mesh around the Y-axis to show off its full 3D shape
+    // Slowly rotate to show off 3D shape
     mesh.rotation.y += dt * 0.45;
 
-    // Handle the card's shot/bullet preview if it exists
+    // ── Bullet preview display ───────────────────────────────────────────────
     if (this._viewerBullet) {
       this._viewerBullet.update(dt);
 

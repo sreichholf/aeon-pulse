@@ -4,7 +4,7 @@ import { Bullet } from '../entities/Bullet.ts';
 import { getBossCatalogEntries, getStageEnemyCatalogEntries, type EnemyViewerPresentation } from '../entities/EntityCatalog.ts';
 import type { UI } from '../ui/UI.ts';
 import { type IAudio, type IBullet, type GetPositionFn, type EntityMetadata, type IScene } from '../types.ts';
-import { TacticalDossierCard } from './TacticalDossierCard.ts';
+import { TacticalDossierCard, type ViewerBulletFactory } from './TacticalDossierCard.ts';
 
 type SceneRef = IScene;
 type PlayerModelProvider = () => THREE.Group | null;
@@ -71,6 +71,28 @@ export class TacticalDatabase {
     const pageCount = 3;
     this._page = ((this._page - 1 + dir + pageCount) % pageCount) + 1;
     this._renderPage();
+  }
+
+  // ── Bullet factory helper (ADR 0017) ─────────────────────────────────────
+
+  /**
+   * Returns a ViewerBulletFactory that constructs a static Bullet preview
+   * at the card's position, closed over the current scene and sprites.
+   * Velocity is zero — the card pins the bullet's position every frame.
+   */
+  private _makeBulletFactory(x: number, y: number): ViewerBulletFactory {
+    return (type) => new Bullet(
+      this._scene,
+      this._sprites,
+      type,
+      x,
+      y,
+      0,
+      0,
+      null,
+      null,
+      null,
+    );
   }
 
   // ── Rendering ────────────────────────────────────────────────────────────
@@ -144,23 +166,16 @@ export class TacticalDatabase {
         audio: { play: () => { } },
         getScrollX: () => 0,
         terrain: null,
-        projectileFactory: (spawn) => new Bullet(
-          this._scene,
-          this._sprites,
-          spawn.type,
-          spawn.x,
-          spawn.y,
-          spawn.vx,
-          spawn.vy,
-          spawn.getTargetPos ?? null,
-          spawn.tint ?? null,
-          spawn.damageOverride ?? null
-        ),
+        // No-op: entity fires into the void; bullet previews are catalog-driven (ADR 0017)
+        projectileFactory: () => null as never,
       });
       if (spawnedEnemy && spawnedEnemy._mesh) {
         this._applyEnemyViewerPresentation(spawnedEnemy._mesh, entry.viewer, x, y);
 
-        const card = new TacticalDossierCard(spawnedEnemy, this._scene);
+        const card = new TacticalDossierCard(spawnedEnemy, this._scene, {
+          bulletTypes: entry.viewerBulletTypes,
+          bulletFactory: this._makeBulletFactory(x, y),
+        });
         this._entities.push(card);
 
         // Setup holographic clipping planes to restrict enemy meshes to their card boundaries (with premium inside padding)
@@ -206,18 +221,8 @@ export class TacticalDatabase {
         onDeath: () => { },
         audio: { play: () => { } },
         spawnEnemyCallback: () => { },
-        projectileFactory: (spawn) => new Bullet(
-          this._scene,
-          this._sprites,
-          spawn.type,
-          spawn.x,
-          spawn.y,
-          spawn.vx,
-          spawn.vy,
-          spawn.getTargetPos ?? null,
-          spawn.tint ?? null,
-          spawn.damageOverride ?? null
-        ),
+        // No-op: entity fires into the void; bullet previews are catalog-driven (ADR 0017)
+        projectileFactory: () => null as never,
       });
       if (spawnedBoss && spawnedBoss._mesh) {
         spawnedBoss._mesh.position.set(x, y, 0);
@@ -230,7 +235,10 @@ export class TacticalDatabase {
         spawnedBoss._mesh.position.x -= (center.x - x);
         spawnedBoss._mesh.position.y -= (center.y - y);
 
-        const card = new TacticalDossierCard(spawnedBoss, this._scene);
+        const card = new TacticalDossierCard(spawnedBoss, this._scene, {
+          bulletTypes: entry.viewerBulletTypes,
+          bulletFactory: this._makeBulletFactory(x, y),
+        });
         this._entities.push(card);
 
         // Setup holographic clipping planes to restrict boss meshes to their card boundaries (with premium inside padding)

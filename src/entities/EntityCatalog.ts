@@ -10,7 +10,7 @@ import { Obstacle } from './Obstacle.ts';
 import { RockDrake } from './RockDrake.ts';
 import { Stalactite } from './Stalactite.ts';
 import { LEVELS } from '../level/Levels.ts';
-import { EnemyType, type BossConstructorParams, type GetPositionFn, type IAudio, type IBoss, type IEnemy, type IScene, type ITerrain, type SpawnEnemyFn, type ProjectileFactoryFn } from '../types.ts';
+import { EnemyType, BulletType, type BossConstructorParams, type GetPositionFn, type IAudio, type IBoss, type IEnemy, type IScene, type ITerrain, type SpawnEnemyFn, type ProjectileFactoryFn } from '../types.ts';
 
 export interface SpawnEnemyParams {
   scene: IScene;
@@ -36,6 +36,8 @@ export interface EnemyViewerPresentation {
 export interface EnemyCatalogEntry {
   type: EnemyType;
   viewer: EnemyViewerPresentation;
+  /** Ordered list of bullet types to cycle through in the Tactical Database preview. Empty = no preview. */
+  viewerBulletTypes: BulletType[];
   spawn(params: SpawnEnemyParams): IEnemy;
 }
 
@@ -57,67 +59,79 @@ export interface SpawnBossParams {
 export interface BossCatalogEntry {
   level: number;
   viewer: BossViewerPresentation;
+  /** Ordered list of bullet types to cycle through in the Tactical Database preview. */
+  viewerBulletTypes: BulletType[];
 }
 
 export const ENEMY_CATALOG: readonly EnemyCatalogEntry[] = [
   {
     type: EnemyType.STRAIGHT,
     viewer: { page: 'stage-enemies', order: 10, scale: 0.85, centering: 'bounds' },
+    viewerBulletTypes: [BulletType.ENEMY],
     spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemyStraight(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.SINE,
     viewer: { page: 'stage-enemies', order: 20, scale: 0.85, centering: 'bounds' },
+    viewerBulletTypes: [BulletType.ENEMY],
     spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemySine(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.DIVER,
     viewer: { page: 'stage-enemies', order: 30, scale: 0.85, centering: 'bounds' },
+    viewerBulletTypes: [BulletType.ENEMY],
     spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemyDiver(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.SWARM,
     viewer: { page: 'stage-enemies', order: 40, scale: 0.85, centering: 'bounds' },
+    viewerBulletTypes: [BulletType.ENEMY],
     spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemySwarm(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.TURRET,
     viewer: { page: 'stage-enemies', order: 50, scale: 0.85, centering: 'bounds' },
+    viewerBulletTypes: [BulletType.ENEMY, BulletType.BOSS_LASER],
     spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemyTurret(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.CHARGER,
     viewer: { page: 'stage-enemies', order: 60, scale: 0.85, centering: 'origin' },
+    viewerBulletTypes: [],
     spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemyCharger(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.SPORE,
     viewer: { page: 'stage-enemies', order: 70, scale: 0.85, centering: 'bounds' },
+    viewerBulletTypes: [BulletType.HOMING],
     spawn: ({ scene, sprites, x, y, getPos, projectileFactory }) => new EnemySpore(scene, sprites, x, y, getPos, projectileFactory),
   },
   {
     type: EnemyType.OBSTACLE,
     viewer: { page: 'stage-enemies', order: 80, scale: 0.60, centering: 'bounds' },
+    viewerBulletTypes: [],
     spawn: ({ scene, sprites, x, y, projectileFactory }) => new Obstacle(scene, sprites, x, y, projectileFactory),
   },
   {
     type: EnemyType.ROCK_DRAKE,
     viewer: { page: 'stage-enemies', order: 90, scale: 0.75, centering: 'bounds' },
+    viewerBulletTypes: [BulletType.LAVA],
     spawn: ({ scene, sprites, x, y, getPos, projectileFactory }) => new RockDrake(scene, sprites, x, y, getPos, projectileFactory),
   },
   {
     type: EnemyType.STALACTITE,
     viewer: { page: 'stage-enemies', order: 100, scale: 0.70, centering: 'bounds' },
+    viewerBulletTypes: [BulletType.LAVA],
     spawn: ({ scene, sprites, x, y, getPos, getScrollX, terrain, audio, projectileFactory }) =>
       new Stalactite(scene, sprites, x, y, getPos, getScrollX, terrain, audio, projectileFactory),
   },
 ] as const;
 
 export const BOSS_CATALOG: readonly BossCatalogEntry[] = [
-  { level: 1, viewer: { level: 1, scale: 0.52 } },
-  { level: 2, viewer: { level: 2, scale: 0.45 } },
-  { level: 3, viewer: { level: 3, scale: 0.36 } },
-  { level: 4, viewer: { level: 4, scale: 0.33 } },
+  { level: 1, viewer: { level: 1, scale: 0.52 }, viewerBulletTypes: [BulletType.BOSS, BulletType.HOMING] },
+  { level: 2, viewer: { level: 2, scale: 0.45 }, viewerBulletTypes: [BulletType.BOSS, BulletType.HOMING, BulletType.BOSS_LASER] },
+  { level: 3, viewer: { level: 3, scale: 0.36 }, viewerBulletTypes: [BulletType.BOSS_LASER, BulletType.HOMING, BulletType.WAVE] },
+  { level: 4, viewer: { level: 4, scale: 0.33 }, viewerBulletTypes: [BulletType.LAVA] },
 ] as const;
 
 const ENEMY_BY_TYPE = new Map<EnemyType, EnemyCatalogEntry>(
