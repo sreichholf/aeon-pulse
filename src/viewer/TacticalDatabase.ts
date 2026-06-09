@@ -3,39 +3,11 @@ import { spawnEnemy, spawnBoss } from '../entities/EntityRegistry.ts';
 import { getBossCatalogEntries, getStageEnemyCatalogEntries, type EnemyViewerPresentation } from '../entities/EntityCatalog.ts';
 import type { UI } from '../ui/UI.ts';
 import { type IAudio, type IBullet, type GetPositionFn, type EntityMetadata, type IScene } from '../types.ts';
+import { TacticalDossierCard } from './TacticalDossierCard.ts';
 
 type SceneRef = IScene;
 type PlayerModelProvider = () => THREE.Group | null;
 
-interface ViewerBullet {
-  update(dt: number): void;
-  destroy(): void;
-  _mesh: THREE.Object3D;
-}
-
-interface ViewerEntity {
-  _mesh: THREE.Object3D | null;
-  update?: (dt: number) => IBullet[];
-  _tick?: (dt: number) => IBullet[];
-  _getPlayerPos?: GetPositionFn | null;
-  _viewerX?: number;
-  _viewerY?: number;
-  _viewerCurrentX?: number;
-  _viewerCurrentY?: number;
-  _isViewer?: boolean;
-  _entered?: boolean;
-  isBoss?: boolean;
-  isMesh?: boolean;
-  metadata?: EntityMetadata;
-  destroy?: () => void;
-  viewerXOffset?: number;
-  _viewerIdle?: boolean;
-  _viewerTime?: number;
-  _viewerBaseY?: number;
-  _viewerBaseRotation?: THREE.Euler;
-  _viewerBullet?: ViewerBullet | null;
-  [key: string]: unknown;
-}
 
 /**
  * TacticalDatabase — manages the interactive 3D entity viewer.
@@ -50,7 +22,7 @@ export class TacticalDatabase {
   private _audio: IAudio;
   private _getPlayerModel: PlayerModelProvider;
   private _page: number;
-  private _entities: ViewerEntity[];
+  private _entities: TacticalDossierCard[];
   private _clonedMaterials: THREE.Material[];
 
   constructor(scene: SceneRef, sprites: Record<string, THREE.Texture>, ui: UI, audio: IAudio, getPlayerModel: PlayerModelProvider) {
@@ -84,107 +56,9 @@ export class TacticalDatabase {
   update(dt: number): void {
     if (!this._entities) return;
 
-    for (const ent of this._entities) {
-      if (!ent || !ent._mesh) continue;
-
-      const hasUpdate = typeof ent.update === 'function';
-      const hasTick = typeof ent._tick === 'function';
-      if (ent._viewerIdle) {
-        ent._viewerTime = (ent._viewerTime ?? 0) + dt;
-        const t = ent._viewerTime;
-        const baseY = ent._viewerBaseY ?? ent._mesh.position.y;
-        const baseRotation = ent._viewerBaseRotation;
-
-        ent._mesh.position.y = baseY + Math.sin(t * 1.4) * 2.2;
-        if (baseRotation) {
-          ent._mesh.rotation.set(
-            baseRotation.x + Math.sin(t * 1.1) * 0.018,
-            baseRotation.y + Math.sin(t * 0.8) * 0.035,
-            baseRotation.z + Math.sin(t * 1.5) * 0.012,
-          );
-        }
-      }
-      if (!hasUpdate && !hasTick) continue;
-
-      // Keep track of the original viewer position to lock it in its card slot
-      if (ent._viewerX === undefined) {
-        ent._viewerX = ent._mesh.position.x;
-        ent._viewerY = ent._mesh.position.y;
-        ent._isViewer = true;
-      }
-
-      // Mock player position at (0, 0) for target-locking logic in the viewer
-      if (typeof ent._getPlayerPos !== 'function' || ent._getPlayerPos === null) {
-        ent._getPlayerPos = () => ({ x: 0, y: 0 });
-      }
-
-      // Run the animation tick and capture bullets
-      let newBullets: IBullet[] = [];
-      if (hasUpdate) {
-        newBullets = (ent.update as (dt: number) => IBullet[])(dt) || [];
-      } else if (hasTick) {
-        newBullets = (ent._tick as (dt: number) => IBullet[])(dt) || [];
-      }
-
-      // If bullets are spawned, display the first one at the bottom and destroy any others
-      if (Array.isArray(newBullets) && newBullets.length > 0) {
-        const firstBullet = newBullets[0] as unknown as ViewerBullet | undefined; // viewer-internal duck-type
-        if (firstBullet) {
-          // Clean up previous bullet for this card to prevent stacking
-          ent._viewerBullet?.destroy();
-          ent._viewerBullet = firstBullet;
-          // DO NOT push firstBullet into this._entities!
-          // It will be cleaned up properly in _clear via ent._viewerBullet.destroy()
-        }
-        // Dispose of excess bullets immediately
-        for (let idx = 1; idx < newBullets.length; idx++) {
-          (newBullets[idx] as unknown as ViewerBullet | undefined)?.destroy(); // viewer-internal duck-type
-        }
-      }
-
-      // Force position lock, shifting the enemy model UP a bit to place it at the top of the card if it shoots,
-      // or centering it perfectly in the empty card space above the name if it does not shoot.
-      const isBoss = ent.isBoss ?? false;
-      const viewerY = ent._viewerY ?? 0;
-      const viewerX = ent._viewerX ?? 0;
-      const targetY = viewerY + (ent._viewerBullet ? (isBoss ? 24 : 22) : (isBoss ? 8 : 6));
-
-      // Symmetrically center the Charger across all rotation angles by applying a dynamic,
-      // rotation-aware offset matching the projection of its asymmetrical features (nose and trails) on the screen X-axis!
-      const targetX = viewerX + (ent.viewerXOffset ?? 0);
-
-      // Use dedicated, physics-independent virtual coordinates to prevent active charging velocity from pulling the ship off-screen!
-      if (ent._viewerCurrentX === undefined) {
-        ent._viewerCurrentX = targetX;
-        ent._viewerCurrentY = targetY;
-      } else {
-        ent._viewerCurrentX += (targetX - ent._viewerCurrentX) * 10 * dt;
-        ent._viewerCurrentY = (ent._viewerCurrentY ?? targetY) + (targetY - (ent._viewerCurrentY ?? targetY)) * 10 * dt;
-      }
-
-      const mesh = ent._mesh;
-      if (!mesh) continue;
-      mesh.position.x = ent._viewerCurrentX;
-      mesh.position.y = ent._viewerCurrentY ?? 0;
-      mesh.position.z = 0;
-
-      // Slowly rotate the mesh around the Y-axis to show off its full 3D shape
-      mesh.rotation.y += dt * 0.45;
-
-      // Handle the card's shot/bullet preview if it exists
-      if (ent._viewerBullet) {
-        // Run the bullet's internal animation tick
-        ent._viewerBullet.update(dt);
-
-        // Move bullet exactly between the enemy model and the bottom text (shifted up a tiny bit)
-        const bulletY = viewerY - (isBoss ? 42 : 37);
-        ent._viewerBullet._mesh.position.set(viewerX, bulletY, 0);
-
-        // Scale the bullet 40% larger for high-visibility preview
-        ent._viewerBullet._mesh.scale.set(1.4, 1.4, 1.4);
-
-        // Slowly rotate the bullet mesh Y-axis as well for dynamic depth
-        ent._viewerBullet._mesh.rotation.y += dt * 0.45;
+    for (const card of this._entities) {
+      if (card) {
+        card.update(dt);
       }
     }
   }
@@ -239,15 +113,11 @@ export class TacticalDatabase {
     display.position.set(0, 54, 8);
 
     this._scene.add(display);
-    this._entities.push({
-      _mesh: display,
-      destroy: () => this._scene.remove(display),
-      _isViewer: true,
-      _viewerIdle: true,
-      _viewerTime: 0,
-      _viewerBaseY: display.position.y,
-      _viewerBaseRotation: display.rotation.clone(),
-    });
+    this._entities.push(
+      new TacticalDossierCard(display, this._scene, {
+        viewerIdle: true,
+      })
+    );
 
     this._ui.showViewer(this._page, []);
   }
@@ -274,14 +144,11 @@ export class TacticalDatabase {
         getScrollX: () => 0,
         terrain: null,
       });
-      const enemy = spawnedEnemy as unknown as ViewerEntity | null; // viewer-internal duck-type
+      if (spawnedEnemy && spawnedEnemy._mesh) {
+        this._applyEnemyViewerPresentation(spawnedEnemy._mesh, entry.viewer, x, y);
 
-      if (enemy && enemy._mesh) {
-        this._applyEnemyViewerPresentation(enemy._mesh, entry.viewer, x, y);
-
-        enemy._isViewer = true;
-        enemy._entered = true;
-        this._entities.push(enemy);
+        const card = new TacticalDossierCard(spawnedEnemy, this._scene);
+        this._entities.push(card);
 
         // Setup holographic clipping planes to restrict enemy meshes to their card boundaries (with premium inside padding)
         const halfW = 67; // 73 - 6 units padding
@@ -289,9 +156,9 @@ export class TacticalDatabase {
         const cardCenterX = x;
         const cardCenterY = y - 20;
 
-        this._applyClippingPlanes(enemy._mesh, cardCenterX, cardCenterY, halfW, halfH);
+        this._applyClippingPlanes(spawnedEnemy._mesh, cardCenterX, cardCenterY, halfW, halfH);
 
-        const meta = enemy.metadata;
+        const meta = spawnedEnemy.metadata;
         entitiesData.push({
           name: meta?.displayName,
           hp: meta?.hp ?? 0,
@@ -327,22 +194,19 @@ export class TacticalDatabase {
         audio: { play: () => { } },
         spawnEnemyCallback: () => { },
       });
-      const boss = spawnedBoss as unknown as ViewerEntity | null; // viewer-internal duck-type
+      if (spawnedBoss && spawnedBoss._mesh) {
+        spawnedBoss._mesh.position.set(x, y, 0);
+        spawnedBoss._mesh.scale.set(scale, scale, scale);
 
-      if (boss && boss._mesh) {
-        boss._mesh.position.set(x, y, 0);
-        boss._mesh.scale.set(scale, scale, scale);
-
-        boss._mesh.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(boss._mesh);
+        spawnedBoss._mesh.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(spawnedBoss._mesh);
         const center = new THREE.Vector3();
         box.getCenter(center);
-        boss._mesh.position.x -= (center.x - x);
-        boss._mesh.position.y -= (center.y - y);
+        spawnedBoss._mesh.position.x -= (center.x - x);
+        spawnedBoss._mesh.position.y -= (center.y - y);
 
-        boss._isViewer = true;
-        boss._entered = true;
-        this._entities.push(boss);
+        const card = new TacticalDossierCard(spawnedBoss, this._scene);
+        this._entities.push(card);
 
         // Setup holographic clipping planes to restrict boss meshes to their card boundaries (with premium inside padding)
         const halfW = 125; // 135 - 10 units padding
@@ -350,9 +214,9 @@ export class TacticalDatabase {
         const cardCenterX = x;
         const cardCenterY = y - 25;
 
-        this._applyClippingPlanes(boss._mesh, cardCenterX, cardCenterY, halfW, halfH);
+        this._applyClippingPlanes(spawnedBoss._mesh, cardCenterX, cardCenterY, halfW, halfH);
 
-        const meta = boss.metadata;
+        const meta = spawnedBoss.metadata;
         bossesData.push({
           name: meta?.displayName,
           hp: meta?.hp ?? 0,
@@ -434,23 +298,8 @@ export class TacticalDatabase {
     this._clonedMaterials = [];
 
     if (this._entities) {
-      for (const ent of this._entities) {
-        if (ent && ent._viewerBullet) {
-          ent._viewerBullet.destroy();
-          ent._viewerBullet = null;
-        }
-
-        if (typeof ent.destroy === 'function') {
-          ent.destroy();
-        } else if (ent.isMesh && ent._mesh instanceof THREE.Mesh) {
-          this._scene.remove(ent._mesh);
-          ent._mesh.geometry?.dispose();
-          if (Array.isArray(ent._mesh.material)) {
-            for (const mat of ent._mesh.material) mat.dispose();
-          } else {
-            (ent._mesh.material as THREE.Material | undefined)?.dispose();
-          }
-        }
+      for (const card of this._entities) {
+        card.destroy();
       }
     }
     this._entities = [];
