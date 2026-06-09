@@ -2,28 +2,7 @@ import * as THREE from 'three';
 import { Enemy, HALF_H } from './Enemy.ts';
 import type { GetPositionFn, IAudio, IScene } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-
-function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  const cloned = geo.index ? geo.toNonIndexed() : geo.clone();
-  if (cloned.hasAttribute('uv')) {
-    cloned.deleteAttribute('uv');
-  }
-  return cloned;
-}
-
-function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
-  const posAttr = geo.getAttribute('position');
-  if (!posAttr) return;
-
-  const colors = new Float32Array(posAttr.count * 3);
-  const color = new THREE.Color(colorHex);
-  for (let i = 0; i < posAttr.count; i++) {
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-}
+import { ensureNonIndexed, addVertexColor } from '../utils/ProceduralToolkit.ts';
 
 function coloredGeometry(
   source: THREE.BufferGeometry,
@@ -35,6 +14,7 @@ function coloredGeometry(
   addVertexColor(geo, colorHex);
   return geo;
 }
+
 
 const SPEED        = 150;
 const STOP_X       = 100;

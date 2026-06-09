@@ -2,10 +2,8 @@ import * as THREE from 'three';
 import { Enemy } from './Enemy.ts';
 import type { IScene } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 
-function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  return geo.index ? geo.toNonIndexed() : geo.clone();
-}
 
 export class Obstacle extends Enemy {
   constructor(scene: IScene, sprites: Record<string, THREE.Texture>, x: number, y: number) {

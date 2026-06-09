@@ -3,10 +3,8 @@ import { BulletType, type GetPositionFn, type IBullet, type IScene } from '../ty
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import { Bullet } from './Bullet.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 
-function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  return geo.index ? geo.toNonIndexed() : geo.clone();
-}
 
 const SLIDE_SPEED  = 80;
 const CHARGE_SPEED = 320;

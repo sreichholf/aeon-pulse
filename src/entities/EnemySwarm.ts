@@ -2,10 +2,8 @@ import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import type { GetPositionFn, IAudio, IScene } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 
-function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  return geo.index ? geo.toNonIndexed() : geo.clone();
-}
 
 const SPEED         = 230;
 const FIRE_INTERVAL = 2.7;

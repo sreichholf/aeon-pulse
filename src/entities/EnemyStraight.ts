@@ -3,33 +3,8 @@ import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import { Bullet } from './Bullet.ts';
 import { BulletType, type GetPositionFn, type IAudio, type IScene } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ensureNonIndexed, addVertexColor } from '../utils/ProceduralToolkit.ts';
 
-function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  const cloned = geo.index ? geo.toNonIndexed() : geo.clone();
-  // Strip UV attributes to avoid BufferGeometryUtils attribute mismatch on custom shapes
-  if (cloned.hasAttribute && cloned.hasAttribute('uv')) {
-    cloned.deleteAttribute('uv');
-  } else if ((cloned as any).removeAttribute) {
-    (cloned as any).removeAttribute('uv');
-  } else if (cloned.attributes.uv) {
-    delete cloned.attributes.uv;
-  }
-  return cloned;
-}
-
-function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
-  const posAttr = geo.getAttribute('position');
-  if (!posAttr) return;
-  const count = posAttr.count;
-  const colors = new Float32Array(count * 3);
-  const color = new THREE.Color(colorHex);
-  for (let i = 0; i < count; i++) {
-    colors[i * 3]     = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-}
 
 function createAirfoilWingGeometry(): THREE.BufferGeometry {
   const geo = new THREE.BufferGeometry();

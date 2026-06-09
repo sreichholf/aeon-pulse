@@ -3,10 +3,8 @@ import { Enemy } from './Enemy.ts';
 import { Bullet } from './Bullet.ts';
 import { BulletType, type GetPositionFn, type IScene } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 
-function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  return geo.index ? geo.toNonIndexed() : geo.clone();
-}
 
 export class EnemySpore extends Enemy {
   private _vx: number;

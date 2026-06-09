@@ -5,10 +5,8 @@ import { Action } from '../systems/InputManager.ts';
 import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 import { Bullet } from './Bullet.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 
-function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  return geo.index ? geo.toNonIndexed() : geo.clone();
-}
 
 const HALF_W = GAME_WIDTH / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -79,7 +77,7 @@ export class Player {
   private _sprites: unknown;
   private _input: InputManager;
   private _audio: PlayerAudio;
-  private _projectileFactory: ProjectileFactoryFn | null;
+  private _projectileFactory: ProjectileFactoryFn;
   private _debugInvincible: boolean;
   private _mode: DifficultyMode;
   private _shieldMax: number;
@@ -109,8 +107,8 @@ export class Player {
     sprites: unknown,
     input: InputManager,
     audio: PlayerAudio,
+    projectileFactory: ProjectileFactoryFn,
     mode?: DifficultyMode,
-    projectileFactory: ProjectileFactoryFn | null = null,
     debugInvincible = false,
     loadedModel?: THREE.Group | null,
   ) {
@@ -788,7 +786,7 @@ export class Player {
   private _spawn(type: string, x: number, y: number, vx: number, vy: number, tint: string | null = null, dmgOverride: number | null = null): void {
     const tintNum = tint ? parseInt(tint.replace('#', ''), 16) : null;
     const spawn = { type, x, y, vx, vy, getTargetPos: null, tint: tintNum, damageOverride: dmgOverride };
-    this._newBullets.push(this._projectileFactory?.(spawn) ?? new Bullet(this._scene, this._sprites, type, x, y, vx, vy, null, tintNum, dmgOverride));
+    this._newBullets.push(this._projectileFactory(spawn));
   }
 
   // ── INVINCIBILITY / FLICKER ────────────────────────────────────────────────

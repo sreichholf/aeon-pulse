@@ -4,6 +4,7 @@ import { BossBase } from './BossBase.ts';
 import { Bullet } from './Bullet.ts';
 import { BulletType, EnemyType, type GetPositionFn, type IAudio, type SpawnEnemyFn, type IScene, type BossConstructorParams } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ensureNonIndexed, addVertexColor } from '../utils/ProceduralToolkit.ts';
 
 const HALF_W = GAME_WIDTH  / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -36,27 +37,6 @@ interface SegmentConfig {
   l?: number;
 }
 
-function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  const cloned = geo.index ? geo.toNonIndexed() : geo.clone();
-  if (cloned.hasAttribute('uv')) {
-    cloned.deleteAttribute('uv');
-  }
-  return cloned;
-}
-
-function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
-  const posAttr = geo.getAttribute('position');
-  if (!posAttr) return;
-  const colors = new Float32Array(posAttr.count * 3);
-  const color = new THREE.Color(colorHex);
-  for (let i = 0; i < posAttr.count; i++) {
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-}
-
 function coloredGeometry(
   source: THREE.BufferGeometry,
   colorHex: number,
@@ -67,6 +47,7 @@ function coloredGeometry(
   addVertexColor(geo, colorHex);
   return geo;
 }
+
 
 function mergedColoredMesh(geos: THREE.BufferGeometry[], material: THREE.MeshPhongMaterial): THREE.Mesh {
   const merged = mergeGeometries(geos);

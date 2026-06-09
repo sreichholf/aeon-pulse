@@ -3,24 +3,8 @@ import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import { Bullet } from './Bullet.ts';
 import { BulletType, type GetPositionFn, type IAudio, type IScene } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ensureNonIndexed, addVertexColor } from '../utils/ProceduralToolkit.ts';
 
-function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  return geo.index ? geo.toNonIndexed() : geo.clone();
-}
-
-function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
-  const posAttr = geo.getAttribute('position');
-  if (!posAttr) return;
-
-  const colors = new Float32Array(posAttr.count * 3);
-  const color = new THREE.Color(colorHex);
-  for (let i = 0; i < posAttr.count; i++) {
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-}
 
 const SPEED         = 120;
 const FIRE_INTERVAL = 2.5;

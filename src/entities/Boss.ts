@@ -4,35 +4,16 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { BossBase } from './BossBase.ts';
 import { Bullet } from './Bullet.ts';
 import { BulletType, type GetPositionFn, type IAudio, type IBullet, type IScene, type BossConstructorParams } from '../types.ts';
+import { ensureNonIndexed, addVertexColor } from '../utils/ProceduralToolkit.ts';
 
 const HALF_H = GAME_HEIGHT / 2;
-
-function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  const cloned = geo.index ? geo.toNonIndexed() : geo.clone();
-  if (cloned.hasAttribute('uv')) {
-    cloned.deleteAttribute('uv');
-  }
-  return cloned;
-}
-
-function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
-  const posAttr = geo.getAttribute('position');
-  if (!posAttr) return;
-  const colors = new Float32Array(posAttr.count * 3);
-  const color = new THREE.Color(colorHex);
-  for (let i = 0; i < posAttr.count; i++) {
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-}
 
 function cloneColoredGeometry(geo: THREE.BufferGeometry, colorHex: number): THREE.BufferGeometry {
   const cloned = ensureNonIndexed(geo);
   addVertexColor(cloned, colorHex);
   return cloned;
 }
+
 
 const TOTAL_HP       = 45;
 const PHASE2_HP      = Math.round(TOTAL_HP * 0.67);
