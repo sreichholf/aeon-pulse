@@ -118,6 +118,9 @@ export class Background4 implements IBackground {
   private _instanceHelper: THREE.Object3D;
   private _blackColor: THREE.Color;
 
+  // Scratch Euler reused every frame to avoid per-frame heap allocations
+  private _euler: THREE.Euler;
+
   constructor(scene: IScene) {
     this._scene = scene;
     this._time = 0;
@@ -332,6 +335,7 @@ export class Background4 implements IBackground {
     this._scene.add(this._emberMesh);
     this._instanceHelper = new THREE.Object3D();
     this._blackColor = new THREE.Color(0x000000);
+    this._euler = new THREE.Euler();
 
     for (let i = 0; i < 75; i++) {
       const x = (Math.random() - 0.5) * GAME_WIDTH;
@@ -395,7 +399,7 @@ export class Background4 implements IBackground {
         mesh,
         index,
         [sp.x, sp.y, sp.z],
-        new THREE.Euler(0, 0, rotationZ),
+        this._euler.set(0, 0, rotationZ),
         [sp.baseWidth, sp.baseHeight, sp.baseWidth],
       );
     }
@@ -452,7 +456,7 @@ export class Background4 implements IBackground {
         this._particleMesh,
         particleCount++,
         [p.x, p.y, p.z],
-        new THREE.Euler(0, 0, 0),
+        this._euler.set(0, 0, 0),
         [lifeRatio, lifeRatio, lifeRatio],
       );
     }
@@ -479,7 +483,7 @@ export class Background4 implements IBackground {
         this._plateMainMesh,
         i,
         [pl.x, pl.y, pl.z],
-        new THREE.Euler(pl.mainRotation.x, pl.mainRotation.y, pl.mainRotation.z),
+        this._euler.set(pl.mainRotation.x, pl.mainRotation.y, pl.mainRotation.z),
         [pl.mainScale.x, pl.mainScale.y, pl.mainScale.z],
       );
 
@@ -492,7 +496,7 @@ export class Background4 implements IBackground {
           this._plateSubMesh,
           plateSubIndex++,
           [pl.x + sub.offsetX, pl.y + sub.offsetY, pl.z + sub.offsetZ],
-          new THREE.Euler(sub.rotationX, sub.rotationY, sub.rotationZ),
+          this._euler.set(sub.rotationX, sub.rotationY, sub.rotationZ),
           [sub.scaleX, sub.scaleY, sub.scaleZ],
         );
       }
@@ -527,7 +531,7 @@ export class Background4 implements IBackground {
         this._emberMesh,
         i,
         [em.x, em.y, em.z],
-        new THREE.Euler(rot, rot, 0),
+        this._euler.set(rot, rot, 0),
         [scale, scale, scale],
       );
       this._emberMesh.setColorAt(i, this._blackColor.setRGB(brightness, brightness * 0.55, 0));

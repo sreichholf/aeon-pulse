@@ -112,6 +112,12 @@ export class Terrain4 implements ITerrain {
   private _instanceHelper: THREE.Object3D;
   private _tipCache: Map<number, { topTips: number[], botTips: number[] }>;
 
+  // Scratch objects reused every frame to avoid per-frame heap allocations
+  private _euler: THREE.Euler;
+  private _baseLava: THREE.Color;
+  private _activeLava: THREE.Color;
+  private _curLava: THREE.Color;
+
   constructor(scene: IScene, points: ControlPoint[]) {
     this._scene  = scene;
     this._points = points;
@@ -237,6 +243,10 @@ export class Terrain4 implements ITerrain {
     this._time = 0;
     this._instanceHelper = new THREE.Object3D();
     this._tipCache = new Map();
+    this._euler = new THREE.Euler();
+    this._baseLava = new THREE.Color(0x882200);
+    this._activeLava = new THREE.Color(0xff4400);
+    this._curLava = new THREE.Color();
     this.update(0);
   }
 
@@ -442,12 +452,9 @@ export class Terrain4 implements ITerrain {
 
     // 3. Gentle breathing pulse on backing lava material
     // Breathing cycles every ~4.2 seconds (freq = 1.5 rad/s) between warm dim and rich active orange
-    const baseLava = new THREE.Color(0x882200);
-    const activeLava = new THREE.Color(0xff4400);
-    const curLava = new THREE.Color();
     const breatheIntensity = 0.5 + 0.5 * Math.sin(this._time * 1.5);
-    curLava.lerpColors(baseLava, activeLava, breatheIntensity);
-    this._lavaPlaneMat.color.copy(curLava);
+    this._curLava.lerpColors(this._baseLava, this._activeLava, breatheIntensity);
+    this._lavaPlaneMat.color.copy(this._curLava);
 
     // 4. Update the boundary Columns & Backing Planes dynamically
     let topBackingCount = 0;
@@ -476,7 +483,7 @@ export class Terrain4 implements ITerrain {
         this._topBackingMesh,
         topBackingCount++,
         [slotWorldX - scrollX, GAME_HEIGHT / 2 - slotTopHeight / 2, -35],
-        new THREE.Euler(0, 0, 0),
+        this._euler.set(0, 0, 0),
         [1, slotTopHeight, 1],
       );
 
@@ -484,7 +491,7 @@ export class Terrain4 implements ITerrain {
         this._botBackingMesh,
         botBackingCount++,
         [slotWorldX - scrollX, -GAME_HEIGHT / 2 + slotBotHeight / 2, -35],
-        new THREE.Euler(0, 0, 0),
+        this._euler.set(0, 0, 0),
         [1, slotBotHeight, 1],
       );
 
@@ -509,7 +516,7 @@ export class Terrain4 implements ITerrain {
           this._topColumnMesh,
           topColumnCount++,
           [tWorldX - scrollX, GAME_HEIGHT / 2 - topHeight / 2, tCol.dz],
-          new THREE.Euler(tCol.slantX, tCol.rotY, tCol.slantZ),
+          this._euler.set(tCol.slantX, tCol.rotY, tCol.slantZ),
           [tCol.radius, topHeight, 0.2],
         );
 
@@ -520,7 +527,7 @@ export class Terrain4 implements ITerrain {
           this._botColumnMesh,
           botColumnCount++,
           [bWorldX - scrollX, -GAME_HEIGHT / 2 + botHeight / 2, bCol.dz],
-          new THREE.Euler(bCol.slantX, bCol.rotY, bCol.slantZ),
+          this._euler.set(bCol.slantX, bCol.rotY, bCol.slantZ),
           [bCol.radius, botHeight, 0.2],
         );
       }
@@ -560,7 +567,6 @@ export class Terrain4 implements ITerrain {
 
     // Update active debris
     let activeDebrisCount = 0;
-    const tempEuler = new THREE.Euler();
     for (const d of this._debrisPool) {
       if (!d.active) continue;
 
@@ -577,12 +583,12 @@ export class Terrain4 implements ITerrain {
         continue;
       }
 
-      tempEuler.set(d.rotX, d.rotY, d.rotZ);
+      this._euler.set(d.rotX, d.rotY, d.rotZ);
       this._setInstanceTransform(
         this._debrisMesh,
         activeDebrisCount++,
         [d.x - scrollX, d.y, d.z],
-        tempEuler,
+        this._euler,
         [d.scale, d.scale, d.scale]
       );
     }
