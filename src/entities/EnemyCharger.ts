@@ -82,6 +82,10 @@ export class EnemyCharger extends Enemy {
     return baseOffset * Math.cos(this._mesh!.rotation.y);
   }
 
+  private get _isInViewer(): boolean {
+    return (this as { _isViewer?: boolean })._isViewer === true;
+  }
+
   private _trackResource<T extends THREE.Material | THREE.BufferGeometry>(res: T): T {
     if (!res) return res;
     if ((res as THREE.Material).isMaterial) this._materialsList.push(res as THREE.Material);
@@ -339,6 +343,29 @@ export class EnemyCharger extends Enemy {
   _tick(dt: number): void {
     this._time = (this._time || 0) + dt;
     const pos = this._mesh!.position;
+
+    if (this._isInViewer) {
+      this._topWingGroup!.rotation.z = THREE.MathUtils.lerp(this._topWingGroup!.rotation.z, -0.05, 5 * dt);
+      this._bottomWingGroup!.rotation.z = THREE.MathUtils.lerp(this._bottomWingGroup!.rotation.z, 0.05, 5 * dt);
+      this._shipGroup!.position.set(0, 0, 0);
+
+      this._topPlumeT!.scale.set(0, 0, 0);
+      this._topPlumeA!.scale.set(0, 0, 0);
+      this._bottomPlumeT!.scale.set(0, 0, 0);
+      this._bottomPlumeA!.scale.set(0, 0, 0);
+      this._topSteerPlume!.scale.set(0, 0, 0);
+      this._bottomSteerPlume!.scale.set(0, 0, 0);
+      this._trailMat!.opacity = 0;
+      this._laserMesh!.visible = false;
+
+      if (this._neonMat && this._neonMat.emissive) {
+        this._neonMat.emissive.setHex(0x00a8b3);
+      }
+      if (this._amberMat && this._amberMat.emissive) {
+        this._amberMat.emissive.setHex(0x772200);
+      }
+      return;
+    }
 
     if (this._state === 'entering') {
       // ── Cruise animation ──
