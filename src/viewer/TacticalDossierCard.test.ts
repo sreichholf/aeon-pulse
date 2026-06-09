@@ -120,29 +120,17 @@ describe('TacticalDossierCard', () => {
     expect(mesh.position.y).toBe(32);
   });
 
-  it('cleans up excess spawned bullets and destroys previous bullet on new bullet spawn', () => {
+  it('discards excess bullets in the same tick, and discards new bullets while the slot is fresh', () => {
     const mesh = new THREE.Mesh();
     mesh.position.set(0, 0, 0);
 
-    const mockBullet1 = {
-      _mesh: new THREE.Mesh(),
-      update: vi.fn(),
-      destroy: vi.fn(),
-    };
-    const mockBullet2 = {
-      _mesh: new THREE.Mesh(),
-      update: vi.fn(),
-      destroy: vi.fn(),
-    };
-    const mockBullet3 = {
-      _mesh: new THREE.Mesh(),
-      update: vi.fn(),
-      destroy: vi.fn(),
-    };
+    const mockBullet1 = { _mesh: new THREE.Mesh(), update: vi.fn(), destroy: vi.fn() };
+    const mockBullet2 = { _mesh: new THREE.Mesh(), update: vi.fn(), destroy: vi.fn() };
+    const mockBullet3 = { _mesh: new THREE.Mesh(), update: vi.fn(), destroy: vi.fn() };
 
     const mockEntity: WrappedEntity = {
       _mesh: mesh,
-      // First update returns 2 bullets, second returns 1 new bullet
+      // First update returns 2 bullets (bullet2 is excess), second returns bullet3 while slot is still fresh
       update: vi.fn()
         .mockReturnValueOnce([mockBullet1, mockBullet2])
         .mockReturnValueOnce([mockBullet3]),
@@ -150,16 +138,17 @@ describe('TacticalDossierCard', () => {
 
     const card = new TacticalDossierCard(mockEntity, mockScene);
 
-    // First update: should store mockBullet1, and immediately destroy mockBullet2 (excess)
+    // First update: bullet1 is stored, bullet2 (excess in same tick) is destroyed immediately
     card.update(0.1);
     expect(card.viewerBullet).toBe(mockBullet1);
     expect(mockBullet2.destroy).toHaveBeenCalled();
     expect(mockBullet1.destroy).not.toHaveBeenCalled();
 
-    // Second update: should replace mockBullet1 with mockBullet3, destroying mockBullet1
+    // Second update: slot is still fresh — bullet3 must be discarded, bullet1 stays
     card.update(0.1);
-    expect(card.viewerBullet).toBe(mockBullet3);
-    expect(mockBullet1.destroy).toHaveBeenCalled();
+    expect(card.viewerBullet).toBe(mockBullet1);
+    expect(mockBullet3.destroy).toHaveBeenCalled();
+    expect(mockBullet1.destroy).not.toHaveBeenCalled();
   });
 
   it('cleans up resources on destroy()', () => {
@@ -233,16 +222,16 @@ describe('TacticalDossierCard', () => {
     expect((entity._patternTimers as Record<string, number>)['p2']).toBe(0);
   });
 
-  it('keeps bullet preview visible after 1.5 s (stale) and only replaces on a new bullet', () => {
+  it('keeps bullet preview visible after 5 s (stale) and only replaces on a new bullet', () => {
     const mesh = new THREE.Mesh();
     mesh.position.set(0, 0, 0);
 
     const mockBullet1 = { _mesh: new THREE.Mesh(), update: vi.fn(), destroy: vi.fn() };
     const mockBullet2 = { _mesh: new THREE.Mesh(), update: vi.fn(), destroy: vi.fn() };
+    const mockBulletFresh = { _mesh: new THREE.Mesh(), update: vi.fn(), destroy: vi.fn() };
 
     const mockEntity: WrappedEntity = {
       _mesh: mesh,
-      // First call spawns bullet1, subsequent calls return nothing until bullet2 arrives
       update: vi.fn()
         .mockReturnValueOnce([mockBullet1])
         .mockReturnValue([]),
@@ -254,12 +243,18 @@ describe('TacticalDossierCard', () => {
     card.update(0.1);
     expect(card.viewerBullet).toBe(mockBullet1);
 
+    // A bullet that arrives while the slot is still fresh must be discarded
+    (mockEntity.update as ReturnType<typeof vi.fn>).mockReturnValueOnce([mockBulletFresh]);
+    card.update(0.1);
+    expect(card.viewerBullet).toBe(mockBullet1);       // unchanged
+    expect(mockBulletFresh.destroy).toHaveBeenCalledTimes(1); // discarded
+
     // Advance past the 5 s lifetime — bullet1 should still be visible (not destroyed)
     card.update(5.0);
     expect(card.viewerBullet).toBe(mockBullet1);
     expect(mockBullet1.destroy).not.toHaveBeenCalled();
 
-    // When a new bullet arrives, the stale bullet1 is destroyed and bullet2 takes over
+    // When a new bullet arrives after the slot is stale, it replaces bullet1
     (mockEntity.update as ReturnType<typeof vi.fn>).mockReturnValueOnce([mockBullet2]);
     card.update(0.1);
     expect(mockBullet1.destroy).toHaveBeenCalledTimes(1);

@@ -164,32 +164,40 @@ export class TacticalDossierCard {
       newBullets = wrapped._tick!(dt) || [];
     }
 
-    // If bullets are spawned, display the first one; discard extras.
-    // If the current preview is stale, replace it eagerly — otherwise keep showing it
-    // so single-bullet enemies never flash blank between fire cycles.
-    if (Array.isArray(newBullets) && newBullets.length > 0) {
-      const firstBullet = newBullets[0] as unknown as ViewerBullet | undefined;
-      if (firstBullet) {
-        if (this._viewerBullet) {
-          this._viewerBullet.destroy();
-        }
-        this._viewerBullet = firstBullet;
-        this._viewerBulletLife = 0;
-        this._viewerBulletStale = false;
-      }
-      for (let idx = 1; idx < newBullets.length; idx++) {
-        (newBullets[idx] as unknown as ViewerBullet | undefined)?.destroy();
-      }
-    }
-
-    // Advance the preview lifetime. Once it crosses 5 s, mark it stale so the next
-    // incoming bullet replaces it immediately — but keep showing the current one until
-    // then so single-bullet enemies never show an empty slot.
+    // Advance the preview lifetime first so staleness is known before we decide
+    // whether to accept an incoming bullet this tick.
     const BULLET_PREVIEW_LIFETIME = 5.0;
     if (this._viewerBullet && !this._viewerBulletStale) {
       this._viewerBulletLife += dt;
       if (this._viewerBulletLife >= BULLET_PREVIEW_LIFETIME) {
         this._viewerBulletStale = true;
+      }
+    }
+
+    // Accept an incoming bullet only when the slot is empty or already stale.
+    // If the current preview is still fresh, discard all new bullets so fast-firing
+    // enemies/bosses don't replace the display on every shot — the cycling rate is
+    // always exactly the 5 s lifetime, never driven by the entity's fire cadence.
+    if (Array.isArray(newBullets) && newBullets.length > 0) {
+      const slotReady = !this._viewerBullet || this._viewerBulletStale;
+      if (slotReady) {
+        const firstBullet = newBullets[0] as unknown as ViewerBullet | undefined;
+        if (firstBullet) {
+          if (this._viewerBullet) {
+            this._viewerBullet.destroy();
+          }
+          this._viewerBullet = firstBullet;
+          this._viewerBulletLife = 0;
+          this._viewerBulletStale = false;
+          for (let idx = 1; idx < newBullets.length; idx++) {
+            (newBullets[idx] as unknown as ViewerBullet | undefined)?.destroy();
+          }
+        }
+      } else {
+        // Slot is still fresh — discard every bullet from this tick
+        for (const b of newBullets) {
+          (b as unknown as ViewerBullet | undefined)?.destroy();
+        }
       }
     }
 
