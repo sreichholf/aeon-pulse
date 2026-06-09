@@ -182,10 +182,10 @@ export class TacticalDossierCard {
       }
     }
 
-    // Advance the preview lifetime. Once it crosses 1.5 s, mark it stale so the next
+    // Advance the preview lifetime. Once it crosses 5 s, mark it stale so the next
     // incoming bullet replaces it immediately — but keep showing the current one until
     // then so single-bullet enemies never show an empty slot.
-    const BULLET_PREVIEW_LIFETIME = 1.5;
+    const BULLET_PREVIEW_LIFETIME = 5.0;
     if (this._viewerBullet && !this._viewerBulletStale) {
       this._viewerBulletLife += dt;
       if (this._viewerBulletLife >= BULLET_PREVIEW_LIFETIME) {

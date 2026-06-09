@@ -254,8 +254,8 @@ describe('TacticalDossierCard', () => {
     card.update(0.1);
     expect(card.viewerBullet).toBe(mockBullet1);
 
-    // Advance past the 1.5 s lifetime — bullet1 should still be visible (not destroyed)
-    card.update(1.5);
+    // Advance past the 5 s lifetime — bullet1 should still be visible (not destroyed)
+    card.update(5.0);
     expect(card.viewerBullet).toBe(mockBullet1);
     expect(mockBullet1.destroy).not.toHaveBeenCalled();
 
