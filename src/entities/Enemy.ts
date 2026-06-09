@@ -82,6 +82,7 @@ export class Enemy extends Entity implements IEnemy {
 
   get x(): number           { return this._mesh ? this._mesh.position.x : 0; }
   get y(): number           { return this._mesh ? this._mesh.position.y : 0; }
+  set y(val: number)        { if (this._mesh) this._mesh.position.y = val; }
   get hw(): number          { return this._hw; }
   get hh(): number          { return this._hh; }
   get isAlive(): boolean    { return this._alive; }

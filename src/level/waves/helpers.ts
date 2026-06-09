@@ -13,15 +13,17 @@ interface Offset {
 
 export function row(type: EnemyType, count: number, yCenter: number, ySpread: number): SpawnEnemyStageEvent[] {
   const step = count > 1 ? ySpread / (count - 1) : 0;
+  const xSpacing = type === EnemyType.STRAIGHT ? 75 : 44;
   return Array.from({ length: count }, (_, i) =>
-    spawnEnemyEvent(type, SPAWN_X + i * 44, yCenter - ySpread / 2 + step * i)
+    spawnEnemyEvent(type, SPAWN_X + i * xSpacing, yCenter - ySpread / 2 + step * i)
   );
 }
 
 export function vForm(type: EnemyType, count: number, yStep: number = 72): SpawnEnemyStageEvent[] {
+  const xSpacing = type === EnemyType.STRAIGHT ? 80 : 52;
   return Array.from({ length: count }, (_, i) => {
     const mid = Math.floor(count / 2), dist = Math.abs(i - mid);
-    return spawnEnemyEvent(type, SPAWN_X + dist * 52, (i - mid) * yStep);
+    return spawnEnemyEvent(type, SPAWN_X + dist * xSpacing, (i - mid) * yStep);
   });
 }
 

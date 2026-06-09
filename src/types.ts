@@ -193,6 +193,7 @@ export interface IBullet extends ICollidable {
 
 // ── Enemy (non-boss) ─────────────────────────────────────────────────────────
 export interface IEnemy extends ICollidable {
+  y: number;
   readonly isBoss: false;
   readonly isAlive: boolean;
   readonly isOffscreen: boolean;

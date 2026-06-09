@@ -295,6 +295,13 @@ export class GameplayRun implements LevelGameHost {
       if (this._playfieldBounds) {
         enemy.terrainBounds = this._playfieldBounds;
       }
+
+      if (this._terrain) {
+        const scrollX = this._levelManager?.scrollX ?? 0;
+        const walls = this._terrain.getActualWallsAt(scrollX + enemy.x);
+        enemy.y = Math.max(walls.bottom + enemy.hh, Math.min(walls.top - enemy.hh, enemy.y));
+      }
+
       this._enemies.push(enemy);
     }
   }

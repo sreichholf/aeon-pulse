@@ -23,3 +23,11 @@ The game felt too easy on higher weapon levels, particularly because Tier 4 (Wav
 *   Low-tier gameplay is highly responsive.
 *   High-tier gameplay requires active charging to clear columns, preventing passive center-lane camping.
 *   Level pacing is shorter, snappier, and has a continuous flow of target engagement.
+
+## Amendment — Terrain-Aware Spawn Clamping and Wave Spacing Refinement
+
+**Date:** 2026-06-09
+
+To ensure polished visual presentation and prevent overlapping model placements:
+1. **Terrain-Aware Spawn Clamping:** The `spawnEnemy` routine in `GameplayRun.ts` now clamps an enemy's initial Y coordinate using `terrain.getActualWallsAt(scrollX + enemy.x)` and the enemy's own half-height `enemy.hh` when terrain is active. This keeps both scheduled and popcorn enemies from spawning inside terrain walls or popping visually.
+2. **Straight Enemy Row Spacing:** Spacing in waves (specifically `row` and `vForm` builders in `helpers.ts`) has been adjusted for `EnemyType.STRAIGHT` (width expanded to 75 in rows and 80 in V-forms) to accommodate its larger size and prevent visual overlaps.
