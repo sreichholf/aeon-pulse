@@ -35,7 +35,8 @@ export class TacticalDossierCard {
   private _viewerBaseY: number = 0;
   private _viewerBaseRotation: THREE.Euler | null = null;
   private _viewerBullet: ViewerBullet | null = null;
-  private _viewerBulletLife: number = 0;  // seconds the current preview bullet has been displayed
+  private _viewerBulletLife: number = 0;   // seconds the current preview bullet has been displayed
+  private _viewerBulletStale: boolean = false; // true once lifetime elapsed — replace on next new bullet
 
   constructor(
     entity: WrappedEntity | THREE.Object3D,
@@ -163,7 +164,9 @@ export class TacticalDossierCard {
       newBullets = wrapped._tick!(dt) || [];
     }
 
-    // If bullets are spawned, display the first one at the bottom and destroy any others
+    // If bullets are spawned, display the first one; discard extras.
+    // If the current preview is stale, replace it eagerly — otherwise keep showing it
+    // so single-bullet enemies never flash blank between fire cycles.
     if (Array.isArray(newBullets) && newBullets.length > 0) {
       const firstBullet = newBullets[0] as unknown as ViewerBullet | undefined;
       if (firstBullet) {
@@ -172,20 +175,21 @@ export class TacticalDossierCard {
         }
         this._viewerBullet = firstBullet;
         this._viewerBulletLife = 0;
+        this._viewerBulletStale = false;
       }
       for (let idx = 1; idx < newBullets.length; idx++) {
         (newBullets[idx] as unknown as ViewerBullet | undefined)?.destroy();
       }
     }
 
-    // Expire the bullet preview after 1.5 s so the display feels dynamic rather than frozen.
+    // Advance the preview lifetime. Once it crosses 1.5 s, mark it stale so the next
+    // incoming bullet replaces it immediately — but keep showing the current one until
+    // then so single-bullet enemies never show an empty slot.
     const BULLET_PREVIEW_LIFETIME = 1.5;
-    if (this._viewerBullet) {
+    if (this._viewerBullet && !this._viewerBulletStale) {
       this._viewerBulletLife += dt;
       if (this._viewerBulletLife >= BULLET_PREVIEW_LIFETIME) {
-        this._viewerBullet.destroy();
-        this._viewerBullet = null;
-        this._viewerBulletLife = 0;
+        this._viewerBulletStale = true;
       }
     }
 

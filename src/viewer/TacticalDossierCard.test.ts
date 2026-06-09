@@ -233,34 +233,36 @@ describe('TacticalDossierCard', () => {
     expect((entity._patternTimers as Record<string, number>)['p2']).toBe(0);
   });
 
-  it('expires bullet preview after 1.5 s and clears it', () => {
+  it('keeps bullet preview visible after 1.5 s (stale) and only replaces on a new bullet', () => {
     const mesh = new THREE.Mesh();
     mesh.position.set(0, 0, 0);
 
-    const mockBullet = {
-      _mesh: new THREE.Mesh(),
-      update: vi.fn(),
-      destroy: vi.fn(),
-    };
+    const mockBullet1 = { _mesh: new THREE.Mesh(), update: vi.fn(), destroy: vi.fn() };
+    const mockBullet2 = { _mesh: new THREE.Mesh(), update: vi.fn(), destroy: vi.fn() };
 
     const mockEntity: WrappedEntity = {
       _mesh: mesh,
-      update: vi.fn().mockReturnValueOnce([mockBullet]).mockReturnValue([]),
+      // First call spawns bullet1, subsequent calls return nothing until bullet2 arrives
+      update: vi.fn()
+        .mockReturnValueOnce([mockBullet1])
+        .mockReturnValue([]),
     };
 
     const card = new TacticalDossierCard(mockEntity, mockScene);
 
-    // First tick spawns the bullet
+    // Spawn bullet1
     card.update(0.1);
-    expect(card.viewerBullet).toBe(mockBullet);
+    expect(card.viewerBullet).toBe(mockBullet1);
 
-    // Advance time to just before expiry — bullet should still be alive
-    card.update(1.3);
-    expect(card.viewerBullet).toBe(mockBullet);
+    // Advance past the 1.5 s lifetime — bullet1 should still be visible (not destroyed)
+    card.update(1.5);
+    expect(card.viewerBullet).toBe(mockBullet1);
+    expect(mockBullet1.destroy).not.toHaveBeenCalled();
 
-    // One more tick pushes life to ≥ 1.5 s — should destroy and clear
-    card.update(0.11);
-    expect(mockBullet.destroy).toHaveBeenCalledTimes(1);
-    expect(card.viewerBullet).toBeNull();
+    // When a new bullet arrives, the stale bullet1 is destroyed and bullet2 takes over
+    (mockEntity.update as ReturnType<typeof vi.fn>).mockReturnValueOnce([mockBullet2]);
+    card.update(0.1);
+    expect(mockBullet1.destroy).toHaveBeenCalledTimes(1);
+    expect(card.viewerBullet).toBe(mockBullet2);
   });
 });
