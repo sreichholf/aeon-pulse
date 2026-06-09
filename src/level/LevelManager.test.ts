@@ -11,6 +11,7 @@ function createMockHost(overrides: Partial<LevelGameHost> = {}): LevelGameHost {
     completeLevel: vi.fn(),
     isLevelClearGateOpen: vi.fn().mockReturnValue(false),
     spawnEnemy: vi.fn(),
+    hasEnemyNear: vi.fn().mockReturnValue(false),
     ...overrides,
   };
 }
@@ -108,5 +109,18 @@ describe('LevelManager', () => {
     // Subsequent updates should not trigger completeLevel again.
     manager.update(1.0);
     expect(host.completeLevel).toHaveBeenCalledTimes(1);
+  });
+
+  it('checks for nearby enemies when spawning ambient popcorn', () => {
+    const host = createMockHost();
+    const levelRecord = getCampaignLevel('1-1');
+    const manager = new LevelManager(host, levelRecord);
+
+    // Popcorn timer is initialized to 1.5 seconds.
+    // Update by 1.6 seconds to trigger popcorn spawn.
+    manager.update(1.6);
+
+    expect(host.hasEnemyNear).toHaveBeenCalled();
+    expect(host.spawnEnemy).toHaveBeenCalled();
   });
 });

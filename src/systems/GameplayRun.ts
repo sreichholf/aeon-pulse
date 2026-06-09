@@ -299,6 +299,17 @@ export class GameplayRun implements LevelGameHost {
     }
   }
 
+  hasEnemyNear(x: number, y: number, radius: number): boolean {
+    for (const enemy of this._enemies) {
+      const dx = enemy.x - x;
+      const dy = enemy.y - y;
+      if (Math.sqrt(dx * dx + dy * dy) < radius) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   spawnBoss(): void {
     const level = this._level;
     if (!level?.finaleBossArchetype) return;

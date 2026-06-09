@@ -11,6 +11,7 @@ export interface LevelGameHost {
   completeLevel(): void;
   isLevelClearGateOpen(): boolean;
   spawnEnemy(type: EnemyType, x: number, y: number): void;
+  hasEnemyNear(x: number, y: number, radius: number): boolean;
 }
 
 export class LevelManager {
@@ -123,7 +124,15 @@ export class LevelManager {
     }
 
     const spawnX = 550;
-    const spawnY = (Math.random() - 0.5) * 400; // range -200 to 200
+    let spawnY = 0;
+    let attempts = 0;
+    const maxAttempts = 10;
+    const avoidRadius = 50;
+
+    do {
+      spawnY = (Math.random() - 0.5) * 400; // range -200 to 200
+      attempts++;
+    } while (attempts < maxAttempts && this._game.hasEnemyNear(spawnX, spawnY, avoidRadius));
 
     this._game.spawnEnemy(selectedType, spawnX, spawnY);
   }

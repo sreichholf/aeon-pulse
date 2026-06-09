@@ -16,7 +16,7 @@ The game felt too easy on higher weapon levels, particularly because Tier 4 (Wav
 ### 2. Action Density & Snappy Pacing
 *   **Timeline Compression:** Wave timelines are scaled down by 35% (Timeline scale factor `0.65`) to increase enemy spawn density.
 *   **Level Duration Snapping:** Levels are snapped from `11200` to `7300` scroll units to match the compressed waves, with terrain control points scaled inline by `0.65` to preserve alignment.
-*   **Ambient Popcorn Spawner:** A time-based spawner is added to `LevelManager.ts` to trickle in minor, chapter-specific enemies during wave gaps, eliminating dead screen time.
+*   **Ambient Popcorn Spawner:** A time-based spawner is added to `LevelManager.ts` to trickle in minor, chapter-specific enemies to keep the screen active. It uses a 2D Euclidean distance check (50-unit radius) and random sampling (up to 10 attempts) to ensure popcorn enemies do not spawn on top of existing active enemies at the spawn border.
 
 ## Consequences
 

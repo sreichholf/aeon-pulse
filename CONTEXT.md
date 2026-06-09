@@ -269,7 +269,7 @@ The 35% scale-down of wave timelines to increase wave density and action pacing.
 _Avoid_: Speed scaling, wave squeezing
 
 **Ambient Popcorn Spawner**:
-The background system that spawns random popcorn enemies during timeline gaps to keep the screen active.
+The background system that spawns random popcorn enemies to keep the screen active, using spatial avoidance to prevent overlapping with scheduled wave enemies at the spawn edge.
 _Avoid_: Random hazard spawner, filler generator
 
 **Level Duration Snapping**:
