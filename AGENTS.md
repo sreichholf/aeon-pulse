@@ -33,6 +33,12 @@ Use manual browser playtesting to verify gameplay feel, visuals, progression, an
 4. If another process owns port `5173`, use the alternate Vite URL printed by the command instead.
 5. Use a fresh page load after code changes if HMR state may hide startup or constructor problems.
 
+**In-app browser control**:
+- When the Codex Browser plugin is available, use the plugin skill instructions for `browser:control-in-app-browser`.
+- The in-app browser may not appear as a direct `browser.*` tool namespace. Control it through the Browser plugin bootstrap path, which uses the Node REPL `js` tool and the plugin's `scripts/browser-client.mjs`, then selects the `iab` browser.
+- If the user already has the in-app browser open at `http://localhost:5173/`, prefer attaching to that browser surface instead of launching a separate Chrome/CDP session.
+- Only fall back to the authorized CDP workflow below when the in-app browser cannot be started or controlled, and report that manual visual inspection was not completed.
+
 **Starting a focused test run**:
 - On the title screen, press `Tab` to cycle difficulty mode.
 - When advanced title options are enabled, press `UP` / `DOWN` to choose a campaign level and `LEFT` / `RIGHT` to choose the starting weapon tier.
