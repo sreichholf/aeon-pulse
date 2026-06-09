@@ -49,6 +49,18 @@ export class Game {
   private _frameCount: number;
   private _lastFpsTime: number;
 
+  // Performance overlay (renderStats=1 / allocStats=1)
+  private _showAllocStats: boolean;
+  private _panelMode: boolean;         // true when any perf flag is active
+  private _currentFps: number;         // updated once/sec for display
+  private _lastHeapBytes: number;
+  private _allocDeltaKb: number;
+  private _peakAllocKb: number;
+  // Cached once/sec to avoid per-frame scene traversal
+  private _cachedRenderCalls: number;
+  private _cachedObjectStats: { total: number; byCategory: Record<string, number> } | null;
+  private _cachedBulletStats: { total: number; renderUnits: number } | null;
+
   currentLevel: CampaignLevelRecord;
   private _savedWeaponTier: number;
   private _startWeaponTier: number;
@@ -80,8 +92,39 @@ export class Game {
     this._lastTime = 0;
 
     this._fpsElement = document.getElementById('fps-counter');
-    this._frameCount = 0;
+    this._frameCount  = 0;
     this._lastFpsTime = 0;
+
+    this._showAllocStats    = isRuntimeFlagEnabled('allocStats', false);
+    this._panelMode         = this._showRenderStats || this._showAllocStats;
+    this._currentFps        = 0;
+    this._lastHeapBytes     = 0;
+    this._allocDeltaKb      = 0;
+    this._peakAllocKb       = 0;
+    this._cachedRenderCalls = 0;
+    this._cachedObjectStats = null;
+    this._cachedBulletStats = null;
+
+    // Upgrade the fps-counter element to a styled panel when any perf flag is active
+    if (this._panelMode && this._fpsElement) {
+      Object.assign(this._fpsElement.style, {
+        top: '10px',
+        right: '10px',
+        left: 'auto',
+        color: '#e0fff8',
+        fontSize: '12px',
+        fontWeight: 'normal',
+        textShadow: 'none',
+        background: 'rgba(0,0,0,0.72)',
+        borderRadius: '8px',
+        padding: '10px 14px',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        minWidth: '210px',
+        lineHeight: '1',
+        border: '1px solid rgba(255,255,255,0.08)',
+      });
+    }
 
     this.currentLevel = getFirstImplementedLevel();
     this._savedWeaponTier = 1;
@@ -131,12 +174,42 @@ export class Game {
     this._lastTime = timestamp;
 
     this._frameCount++;
-    if (timestamp - this._lastFpsTime >= 1000) {
-      if (this._fpsElement) {
-        this._fpsElement.innerText = this._formatFpsText();
+
+    // Sample JS heap delta every frame (Chrome-only; no-op elsewhere)
+    if (this._showAllocStats) {
+      const mem = (performance as any).memory as { usedJSHeapSize: number } | undefined;
+      if (mem) {
+        const current = mem.usedJSHeapSize;
+        if (this._lastHeapBytes !== 0) {
+          const delta = current - this._lastHeapBytes;
+          this._allocDeltaKb = delta / 1024;
+          if (this._allocDeltaKb > this._peakAllocKb) {
+            this._peakAllocKb = this._allocDeltaKb;
+          }
+        }
+        this._lastHeapBytes = current;
       }
-      this._frameCount = 0;
+    }
+
+    // Once-per-second: snapshot expensive stats and update fps count
+    if (timestamp - this._lastFpsTime >= 1000) {
+      this._currentFps = this._frameCount;
+      if (this._showRenderStats) {
+        this._cachedRenderCalls = this.scene.getRenderInfo().calls;
+        this._cachedObjectStats = this.scene.getSceneObjectStats();
+        const bs = this._run?.getBulletStatsSnapshot();
+        this._cachedBulletStats = bs ? { total: bs.total, renderUnits: bs.renderUnits } : null;
+      }
+      if (!this._panelMode && this._fpsElement) {
+        this._fpsElement.innerText = `${this._currentFps} FPS`;
+      }
+      this._frameCount  = 0;
       this._lastFpsTime = timestamp;
+    }
+
+    // Panel mode: rebuild HTML every frame (alloc delta must be live)
+    if (this._panelMode && this._fpsElement) {
+      this._fpsElement.innerHTML = this._buildPanelHtml();
     }
 
     this._update(dt);
@@ -146,33 +219,59 @@ export class Game {
     requestAnimationFrame((t) => this._loop(t));
   }
 
-  private _formatFpsText(): string {
-    const fps = `${this._frameCount} FPS`;
-    if (!this._showRenderStats) return fps;
+  private _buildPanelHtml(): string {
+    // Shared helpers ─────────────────────────────────────────────────────────
+    const esc = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    const row = (label: string, value: string, valueColor = '#00ffcc') =>
+      `<div style="display:flex;justify-content:space-between;align-items:baseline;` +
+      `gap:16px;padding:3px 0;">`+
+      `<span style="color:#8899aa;font-size:11px;text-transform:uppercase;` +
+      `letter-spacing:0.06em;white-space:nowrap">${esc(label)}</span>`+
+      `<span style="color:${valueColor};font-weight:bold;white-space:nowrap">${value}</span>`+
+      `</div>`;
+    const sep = () =>
+      `<div style="border-top:1px solid rgba(255,255,255,0.1);margin:4px 0"></div>`;
 
-    const renderInfo = this.scene.getRenderInfo();
-    const bulletStats = this._run?.getBulletStatsSnapshot();
-    if (!bulletStats) {
-      return `${fps} | calls ${renderInfo.calls}`;
+    const parts: string[] = [];
+
+    // FPS ─────────────────────────────────────────────────────────────────────
+    const fpsColor = this._currentFps < 30 ? '#ff4444' : this._currentFps < 50 ? '#ffcc00' : '#00ffcc';
+    parts.push(row('FPS', `${this._currentFps}`, fpsColor));
+
+    // Render stats ────────────────────────────────────────────────────────────
+    if (this._showRenderStats && this._cachedObjectStats) {
+      parts.push(sep());
+      parts.push(row('Draw calls', `${this._cachedRenderCalls}`));
+      parts.push(row('Objects', `${this._cachedObjectStats.total}`));
+      if (this._cachedBulletStats) {
+        parts.push(row('Bullets', `${this._cachedBulletStats.total} / ${this._cachedBulletStats.renderUnits}`));
+      }
+      const cats = Object.entries(this._cachedObjectStats.byCategory)
+        .sort((a, b) => b[1] - a[1]);
+      if (cats.length > 0) {
+        parts.push(sep());
+        for (const [key, units] of cats) {
+          parts.push(row(key, `${units}`, '#7fd8c8'));
+        }
+      }
     }
 
-    const sourceStats = Object.entries(bulletStats.renderUnitsBySourceKey)
-      .sort((a, b) => b[1] - a[1])
-      .map(([key, units]) => `${key}:${bulletStats.bySourceKey[key] ?? 0}/${units}`)
-      .join(' ');
+    // Alloc stats ─────────────────────────────────────────────────────────────
+    if (this._showAllocStats) {
+      parts.push(sep());
+      const delta = this._allocDeltaKb;
+      const sign  = delta >= 0 ? '+' : '';
+      const allocColor = delta > 200 ? '#ff4444' : delta > 50 ? '#ffcc00' : '#00cc66';
+      parts.push(row('Alloc / frame', `${sign}${delta.toFixed(0)} KB`, allocColor));
+      parts.push(row('Peak alloc',   `+${this._peakAllocKb.toFixed(0)} KB`, '#ff9955'));
+      const mem = (performance as any).memory as { usedJSHeapSize: number } | undefined;
+      if (mem) {
+        const heapMb = (mem.usedJSHeapSize / 1048576).toFixed(1);
+        parts.push(row('Heap used', `${heapMb} MB`, '#aaaaaa'));
+      }
+    }
 
-    const objectStats = this.scene.getSceneObjectStats();
-    const categoryStats = Object.entries(objectStats.byCategory)
-      .sort((a, b) => b[1] - a[1])
-      .map(([key, units]) => `${key}:${units}`)
-      .join(' ');
-    const detailStats = Object.entries(objectStats.byDetail)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([key, units]) => `${key}:${units}`)
-      .join(' ');
-
-    return `${fps} | calls ${renderInfo.calls} | objects ${objectStats.total}${categoryStats ? ` | cats ${categoryStats}` : ''}${detailStats ? ` | details ${detailStats}` : ''} | bullets ${bulletStats.total}/${bulletStats.renderUnits}${sourceStats ? ` | ${sourceStats}` : ''}`;
+    return parts.join('');
   }
 
   // ── STATE MACHINE ──────────────────────────────────────────────────────────
