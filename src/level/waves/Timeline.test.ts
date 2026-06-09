@@ -82,14 +82,14 @@ describe('Timeline wave compiler', () => {
     const timeline = new Timeline(scale);
     timeline.anchor('start', 100);
 
-    // positive fractional rounding: anchor 100, offset 21, scale 0.5 -> Math.round(100 + 10.5) -> 111
+    // positive fractional rounding: anchor 100 * 0.5 = 50, offset 21, scale 0.5 -> Math.round(50 + 10.5) -> 61
     timeline.add('start', 21, [{ kind: StageEventType.LAVA_PULSE }]);
 
-    // negative scaled offsets: anchor 100, offset -21, scale 0.5 -> Math.round(100 - 10.5) -> Math.round(89.5) -> 90
+    // negative scaled offsets: anchor 100 * 0.5 = 50, offset -21, scale 0.5 -> Math.round(50 - 10.5) -> 40
     timeline.add('start', -21, [{ kind: StageEventType.LAVA_PULSE }]);
 
     const compiled = timeline.build();
-    expect(compiled.map((e) => e.at)).toEqual([90, 111]);
+    expect(compiled.map((e) => e.at)).toEqual([40, 61]);
   });
 
   it('throws an error if an anchor referenced by add() is not defined during compile', () => {

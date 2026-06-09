@@ -35,6 +35,7 @@ export class Bullet implements IBullet {
   readonly isPlayerBullet: boolean;
   readonly damage: number;
   readonly isPiercing: boolean;
+  remainingPierce?: number;
   readonly hw: number;
   readonly hh: number;
   readonly type: BulletType;
@@ -73,6 +74,7 @@ export class Bullet implements IBullet {
     this.isPlayerBullet = def.faction === ProjectileFaction.PLAYER;
     this.damage         = damageOverride !== null ? damageOverride : def.damage.amount;
     this.isPiercing     = def.damage.piercing;
+    this.remainingPierce = def.damage.pierceCount;
     this._getTargetPos  = getTargetPos;
     this.hw             = def.collision.halfWidth;
     this.hh             = def.collision.halfHeight;
@@ -134,6 +136,7 @@ export class Bullet implements IBullet {
     this.active = true;
     this._inScene = true;
     this._getTargetPos = getTargetPos;
+    this.remainingPierce = this._definition.damage.pierceCount;
     this._vx = vx;
     this._vy = vy;
     this._waveTime = 0;

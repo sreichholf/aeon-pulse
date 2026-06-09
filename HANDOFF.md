@@ -1,83 +1,94 @@
-# AEON PULSE Vitest Harness And Next Test Slice Handoff
+# AEON PULSE Game Action & Balance Overhaul Handoff
 
-This handoff captures the current Vitest harness work and outlines future test coverage opportunities now that all core, recommended, and architectural refactoring slices have been successfully implemented and verified.
+This handoff outlines the design decisions and implementation plan for the Game Action and Balance Overhaul. The design has been fully aligned and grilled using the `/grill-with-docs` process.
 
-## Current State
+## Summary of Grilled Decisions
 
-- Node is visible in this shell as `v24.16.0`.
-- npm is visible as `11.13.0`.
-- Vitest is installed: `vitest@^4.1.8`.
-- `vitest.config.ts` limits collection to `src/**/*.test.ts` and uses the `node` environment, so Chrome profile artifacts under `.tmp/` are ignored.
-- ADR 0013 documents the Vitest module-test harness.
-- `AGENTS.md` describes `npm test` as part of normal verification.
-- `CONTEXT.md` includes the core testing and gameplay vocabulary.
+### 1. Weapon Progression & Recovery Balance
+*   **Tier 1 (Rapid) Buff:** Firing cooldown reduced from `0.14s` to `0.08s` (12.5 shots/sec) to make it a fast, narrow laser stream. This prevents the "recovery slog" where dying and returning to Tier 1 feels unplayable.
+*   **Differentiated Cooldowns:**
+    *   Tier 1 (Rapid): `0.08s`
+    *   Tier 2 (Twin): `0.10s`
+    *   Tier 3 (Spread): `0.12s`
+    *   Tier 4 (Wave) & Tier 5 (Focused Plasma): `0.14s`
+*   **Tap-Fire Piercing Limit:** Basic tap-fired Wave and Plasma bullets will no longer have infinite piercing. Instead, they will be **Semi-Piercing Projectiles** (piercing exactly `1` enemy, disappearing on the second).
+*   **Charge Shot Pierce:** Infinite piercing remains exclusive to **Charge Shots**, giving players a strategic choice to hold charge for sweeping lanes.
 
-## Tests Already Added
+### 2. Pacing & Level Action Density
+*   **Timeline Compression:** Wave timeline absolute offsets in all chapters (`chapter1.ts` to `chapter4.ts`) will be scaled down by **35%** (a timeline scale factor of `0.65`).
+*   **Level Duration Snapping:** Shorten standard levels to match compressed timelines. `bossAt` scroll distance across all chapters will be reduced from `11200` to `7300` units.
+*   **Terrain Alignment:** Terrain control points (`terrainPoints` in `Levels.ts`) will have their `at` coordinates scaled inline by `0.65` during instantiation (e.g., inside `Levels.ts` factory methods) to preserve spatial layout.
+*   **Ambient Popcorn Spawner:** To remove "nothing happens" dead periods on screen, `LevelManager.ts` will implement a timer-based spawner that trickles minor enemies into the game at random Y heights every `2.5s to 4.0s` (randomized).
+    *   **Chapter 1 Pool:** `Straight` (70%), `Sine` (30%)
+    *   **Chapter 2 Pool:** `Straight` (40%), `Sine` (40%), `Charger` (20%)
+    *   **Chapter 3 Pool:** `Straight` (30%), `Sine` (30%), `Swarm` (40%)
+    *   **Chapter 4 Pool:** `Straight` (30%), `Sine` (30%), `Charger` (20%), `Swarm` (20%)
 
-The Vitest harness now includes 14 test suites protecting the core game mechanics, campaign configurations, level wave compiling, stage transitions, bullet pooling, game tick resolution, campaign clear resolution, database card presentation, terrain collision boundaries, procedural construction helpers, projectile instancing, and score/lives tracking:
+---
 
-1. **Collision & Combat Seam:**
-   - `src/systems/Collisions.test.ts`
-   - `src/systems/CombatResolution.test.ts`
-   - Tests collision contact order, bullet piercing vs non-piercing, terrain bounds suppression, combat resolution mutations, hit events, and stale contact semantics.
+## Proposed Codebase Changes
 
-2. **Campaign Module & Attempt Resolution:**
-   - `src/campaign/Campaign.test.ts`
-   - `src/campaign/CampaignAttempt.test.ts`
-   - Tests campaign level structure, wrapping navigation, and isolated progression logic (score bonus math, lives/chapter rewards, next level and transition state calculation).
+### [MODIFY] [types.ts](file:///e:/Develop/GitHub/aeon-pulse/src/types.ts)
+*   Add `remainingPierce?: number` to `IBullet` interface to track finite penetrations.
 
-3. **Wave Timeline Compiler & Builders:**
-   - `src/level/waves/Timeline.test.ts`
-   - `src/level/waves/Waves.test.ts`
-   - Tests wave timeline compiled sorting and grouping logic, and verifies that all 20 campaign levels build valid, non-empty, chronologically sorted wave entries referencing valid EnemyTypes and StageEventTypes.
+### [MODIFY] [BulletsPlayer.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/BulletsPlayer.ts)
+*   Add `pierceCount?: number` option to `BulletDef`.
+*   Set `piercing: true` and `pierceCount: 1` on `ProjectileSourceKey.PLAYER_WAVE` and `ProjectileSourceKey.PLAYER_PLASMA`.
+*   Verify that `PLAYER_CHARGE` (and other heavy charge bullets) keep `piercing: true` with `pierceCount: undefined` (infinite).
 
-4. **Level & Terrain Managers:**
-   - `src/level/LevelManager.test.ts`
-   - `src/level/Terrain.test.ts`
-   - Tests `scrollX` updates, stage event spawning, boss triggers, and linear wall boundary calculations (including volcanic lava pulse and Terrain4 column-clamps).
+### [MODIFY] [BulletsEnemy.ts] / [ProjectileDefinitions.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/ProjectileDefinitions.ts)
+*   Extend `ProjectileDamage` and `deepenDefinition` to carry and pass `pierceCount` through to `Bullet` instantiation.
 
-5. **Projectile Pool & Instancer:**
-   - `src/systems/ProjectilePool.test.ts`
-   - `src/systems/ProjectileInstancer.test.ts`
-   - Verifies bullet creation, recycling of released bullets, property matching (tint and damage override keys), and the instanced rendering mesh compilation, dynamic batching, matrix mapping, and material disposal self-cleaning.
+### [MODIFY] [Bullet.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Bullet.ts)
+*   Store `remainingPierce` mutable variable on bullet construction, reading from the projectile definition.
 
-6. **Gameplay Physics and Tick System:**
-   - `src/systems/Gameplay.test.ts`
-   - Tests background and level manager updates, player and enemy terrain boundaries clamp updates, bullet spawning from player/enemy/boss entities, and cleanup rules for dead/offscreen entities.
+### [MODIFY] [CombatResolution.ts](file:///e:/Develop/GitHub/aeon-pulse/src/systems/CombatResolution.ts)
+*   In `PLAYER_BULLET_ENEMY` resolution:
+    *   If `bullet.isPiercing` is true:
+        *   If `bullet.remainingPierce` is defined, decrement it. If it reaches `0`, set `bullet.active = false`.
+        *   Otherwise (infinite pierce), keep it active.
+    *   If `bullet.isPiercing` is false, set `bullet.active = false`.
 
-7. **Tactical Database Presentation Adapter:**
-   - `src/viewer/TacticalDossierCard.test.ts`
-   - Tests database card wrapper behavior, including mesh/metadata properties extraction, float/idle hover animation math, bullet preview triggering and disposal, position locking/lerping, and proper component disposal.
+### [MODIFY] [Player.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Player.ts)
+*   Modify `_fireTap()` and `_fireCharged()` to use the appropriate bullet source keys:
+    *   Use new `PLAYER_WAVE_TAP` (semi-piercing) for basic tap fires, or construct them with a damage/pierce override.
+*   Update `RAPID_COOLDOWN` dynamically depending on `this.weaponTier` (0.08s for Tier 1, 0.10s for Tier 2, 0.12s for Tier 3, 0.14s for Tiers 4/5).
 
-8. **Procedural Geometry Utilities:**
-   - `src/utils/ProceduralToolkit.test.ts`
-   - Tests shared BufferGeometry utilities (like ensureNonIndexed and addVertexColor) to ensure correctness across multiple geometry classes and colors.
+### [MODIFY] [chapter1.ts] / [chapter2.ts] / [chapter3.ts] / [chapter4.ts]
+*   Pass `0.65` into the `Timeline` constructors in each chapter file:
+    ```typescript
+    new Timeline<ChapterXAnchor>(0.65)
+    ```
 
-9. **Score & Lives Manager:**
-   - `src/systems/ScoreManager.test.ts`
-   - Tests score calculation, life limits (0..3 bounds), game over checks, high score storage, leaderboard limits, and difficulty configuration isolation.
+### [MODIFY] [Levels.ts](file:///e:/Develop/GitHub/aeon-pulse/src/level/Levels.ts)
+*   Change `bossAt: 11200` to `7300` across all chapters.
+*   Update `createTerrain` definitions to scale `pts` inline:
+    ```typescript
+    createTerrain: (scene, pts) => new Terrain(scene, pts.map(pt => ({ ...pt, at: pt.at * 0.65 })))
+    ```
 
-Current test status:
-- `npm test` passed: 14 files, 104 tests
-- `npm run build` passed
-- `git diff --check` passed
+### [MODIFY] [LevelManager.ts](file:///e:/Develop/GitHub/aeon-pulse/src/level/LevelManager.ts)
+*   Implement `_popcornTimer` in `update()`.
+*   Define chapter popcorn lists and spawn a random popcorn enemy at a random Y location when the timer fires, resetting to `2.5s + Math.random() * 1.5s`.
 
-## Committed Baseline
+---
 
-All 14 test files and refactored gameplay classes are committed to git. Run `git status` to confirm.
+## Suggested Skills
 
-## Recommended Future Test Slices
+*   **diagnose**: Use this skill if any of the three-point lighting, bullet instancing, or collision event mutations throw runtime errors.
+*   **prototype**: Useful if you want to test the feel of `0.08s` fire rate or the popcorn trickle before committing the full timeline compression.
 
-If further module-level testing is desired, the following targets are recommended:
+---
 
-1. **Input Mapping (`src/systems/InputManager.ts`):**
-   - Test key mapping, custom action updates, keyboard polling states, and input history/debouncing.
+## Verification Plan
 
-2. **Sound Sequencing (`src/systems/audio/SFXLibrary.ts` / `MusicSequencer.ts`):**
-   - Mock Web Audio nodes and verify correct synth parameters, sequencing schedules, and MusicCue transitions.
-
-## Next Recommended Steps
-
-1. Run `npm test` to verify all 104 tests pass.
-2. Run `npm run build` to verify the production bundle remains green.
-3. Select any additional systems or UI components for unit testing if needed.
+1.  **Compiler & Test Verification:**
+    *   Run `npm run build` to verify clean build bundles.
+    *   Run `npm test` to ensure Vitest suites pass.
+2.  **Tactical Database Check:**
+    *   Press `V` on the Title screen to check that the Aeon Pulse Craft and enemies render correctly and previews cycle without issue.
+3.  **Manual Playtesting Smoke Checklist:**
+    *   Verify Tier 1 Rapid fire rate feels fast and handles single targets cleanly.
+    *   Confirm Timeline Compression has removed empty scroll stretches in early levels.
+    *   Verify that basic Wave and Focused Plasma bullets only pierce one enemy and vanish on the second, but Charge Shots still clear columns infinitely.
+    *   Check that random popcorn enemies spawn in gaps to keep the screen active.

@@ -37,7 +37,16 @@ function resolveCollisionContact(contact: CollisionContact, onHit: (event: HitEv
       if (!bullet.active || !enemy.isAlive) return;
 
       const death = enemy.hit(bullet.damage);
-      if (!bullet.isPiercing) bullet.active = false;
+      if (bullet.isPiercing) {
+        if (bullet.remainingPierce !== undefined) {
+          bullet.remainingPierce--;
+          if (bullet.remainingPierce <= 0) {
+            bullet.active = false;
+          }
+        }
+      } else {
+        bullet.active = false;
+      }
 
       if (death) {
         onHit({

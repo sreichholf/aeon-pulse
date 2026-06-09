@@ -1,6 +1,6 @@
 import { LEVELS, type LevelConfig } from './Levels.ts';
 import type { CampaignLevelRecord } from '../campaign/Campaign.ts';
-import type { IBackgroundWithSpeed } from '../types.ts';
+import { type IBackgroundWithSpeed, EnemyType } from '../types.ts';
 import type { StageEvent, WaveEntry } from './StageEvents.ts';
 
 // Minimal interface for the game host — avoids importing Game.ts directly
@@ -10,6 +10,7 @@ export interface LevelGameHost {
   spawnBoss(): void;
   completeLevel(): void;
   isLevelClearGateOpen(): boolean;
+  spawnEnemy(type: EnemyType, x: number, y: number): void;
 }
 
 export class LevelManager {
@@ -23,6 +24,7 @@ export class LevelManager {
   private _levelCompleted: boolean;
   private _waves: WaveEntry[];
   private _config: LevelConfig;
+  private _popcornTimer: number;
 
   constructor(game: LevelGameHost, level: CampaignLevelRecord) {
     this._game        = game;
@@ -36,6 +38,7 @@ export class LevelManager {
     this._bossSpawned = false;
     this._levelCompleted = false;
     this._waves       = def.buildWaves(level);
+    this._popcornTimer = 1.5;
 
     if (game.background) game.background.baseSpeed = this._scrollSpeed;
   }
@@ -67,6 +70,62 @@ export class LevelManager {
       this._levelCompleted = true;
       this._game.completeLevel();
     }
+
+    if (!this._levelCompleted && !this._bossSpawned) {
+      this._popcornTimer -= dt;
+      if (this._popcornTimer <= 0) {
+        this._spawnAmbientPopcorn();
+        this._popcornTimer = 2.5 + Math.random() * 1.5;
+      }
+    }
+  }
+
+  private _spawnAmbientPopcorn(): void {
+    const chapter = this._level.chapterNumber;
+    let pool: { type: EnemyType; weight: number }[] = [];
+
+    if (chapter === 1) {
+      pool = [
+        { type: EnemyType.STRAIGHT, weight: 0.7 },
+        { type: EnemyType.SINE, weight: 0.3 }
+      ];
+    } else if (chapter === 2) {
+      pool = [
+        { type: EnemyType.STRAIGHT, weight: 0.4 },
+        { type: EnemyType.SINE, weight: 0.4 },
+        { type: EnemyType.CHARGER, weight: 0.2 }
+      ];
+    } else if (chapter === 3) {
+      pool = [
+        { type: EnemyType.STRAIGHT, weight: 0.3 },
+        { type: EnemyType.SINE, weight: 0.3 },
+        { type: EnemyType.SWARM, weight: 0.4 }
+      ];
+    } else {
+      pool = [
+        { type: EnemyType.STRAIGHT, weight: 0.3 },
+        { type: EnemyType.SINE, weight: 0.3 },
+        { type: EnemyType.CHARGER, weight: 0.2 },
+        { type: EnemyType.SWARM, weight: 0.2 }
+      ];
+    }
+
+    const rand = Math.random();
+    let cumulative = 0;
+    let selectedType = EnemyType.STRAIGHT;
+
+    for (const item of pool) {
+      cumulative += item.weight;
+      if (rand <= cumulative) {
+        selectedType = item.type;
+        break;
+      }
+    }
+
+    const spawnX = 550;
+    const spawnY = (Math.random() - 0.5) * 400; // range -200 to 200
+
+    this._game.spawnEnemy(selectedType, spawnX, spawnY);
   }
 
   destroy(): void {}

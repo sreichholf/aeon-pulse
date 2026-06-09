@@ -677,7 +677,7 @@ export class Player {
     // First-press tap shot (all tiers)
     if (firePressed && this._fireTimer <= 0) {
       this._fireTap();
-      this._fireTimer = RAPID_COOLDOWN;
+      this._fireTimer = this._getFireCooldown();
       this._audio.stopChargeHum();
     }
 
@@ -722,6 +722,21 @@ export class Player {
 
   private _wingCannonRightX(): number { return this._mesh.position.x + 6; }
   private _wingCannonRightY(): number { return this._mesh.position.y - 12; }
+
+  private _getFireCooldown(): number {
+    switch (this.weaponTier) {
+      case WeaponTier.RAPID:
+        return 0.08;
+      case WeaponTier.TWIN:
+        return 0.10;
+      case WeaponTier.SPREAD:
+        return 0.12;
+      case WeaponTier.WAVE:
+      case WeaponTier.PLASMA:
+      default:
+        return 0.14;
+    }
+  }
 
   private _fireTap(): void {
     const nx = this._noseCannonX(), ny = this._noseCannonY();

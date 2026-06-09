@@ -76,3 +76,12 @@ Enemy bullet damage is currently irrelevant because any hit causes instant life 
 - Finale boss fights have a predictable feel regardless of which chapter they appear in.
 - Boss 1 now has a clear three-act structure with each phase introducing exactly one new threat.
 - If a shield mechanic is added later, enemy bullet damage values will need revisiting alongside it.
+
+## Amendment — Weapon Tier Balancing and Pierce Limits
+
+**Date:** 2026-06-09
+
+Refer to ADR 0018 for recent balancing changes regarding weapon tier performance, including:
+1. Buffing Tier 1 firing rate (reducing cooldown to `0.08s`) to make recovery more viable.
+2. Restricting tap-fire Wave and Plasma projectiles to semi-piercing (`pierceCount = 1`), leaving infinite piercing exclusive to fully charged shots.
+3. Snapping level durations and using timeline compression alongside an ambient popcorn spawner to eliminate dead screen time.

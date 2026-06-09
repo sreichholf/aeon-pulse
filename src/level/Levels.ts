@@ -39,7 +39,7 @@ export interface LevelConfig {
 export const LEVELS: Record<number, LevelConfig> = {
   1: {
     scrollSpeed: 100,
-    bossAt: 11200,
+    bossAt: 7300,
     terrainPoints: [],
     playfieldBounds: CHAPTER_1_PLAYFIELD_BOUNDS,
     buildWaves: (level) => buildChapter1Waves(level.id),
@@ -49,7 +49,7 @@ export const LEVELS: Record<number, LevelConfig> = {
   },
   2: {
     scrollSpeed: 120,
-    bossAt: 11200,
+    bossAt: 7300,
     playfieldBounds: null,
     terrainPoints: [
       { at: 0,    top:  230, bottom: -230 },
@@ -70,12 +70,12 @@ export const LEVELS: Record<number, LevelConfig> = {
     ],
     buildWaves: (level) => buildChapter2Waves(level.id),
     createBackground: (scene) => new Background2(scene, 120),
-    createTerrain: (scene, pts) => new Terrain(scene, pts),
+    createTerrain: (scene, pts) => new Terrain(scene, pts.map(pt => ({ ...pt, at: pt.at * 0.65 }))),
     createBoss: (params) => new Boss2(params),
   },
   3: {
     scrollSpeed: 130,
-    bossAt: 11200,
+    bossAt: 7300,
     playfieldBounds: null,
     terrainPoints: [
       { at: 0,    top:  200, bottom: -200 },
@@ -95,12 +95,12 @@ export const LEVELS: Record<number, LevelConfig> = {
     ],
     buildWaves: (level) => buildChapter3Waves(level.id),
     createBackground: (scene) => new Background3(scene),
-    createTerrain: (scene, pts) => new Terrain3(scene, pts),
+    createTerrain: (scene, pts) => new Terrain3(scene, pts.map(pt => ({ ...pt, at: pt.at * 0.65 }))),
     createBoss: (params) => new Boss3(params),
   },
   4: {
     scrollSpeed: 140,
-    bossAt: 11200,
+    bossAt: 7300,
     playfieldBounds: null,
     terrainPoints: [
       { at: 0,    top:  215, bottom: -210 },
@@ -128,7 +128,7 @@ export const LEVELS: Record<number, LevelConfig> = {
     ],
     buildWaves: (level) => buildChapter4Waves(level.id),
     createBackground: (scene) => new Background4(scene),
-    createTerrain: (scene, pts) => new Terrain4(scene, pts),
+    createTerrain: (scene, pts) => new Terrain4(scene, pts.map(pt => ({ ...pt, at: pt.at * 0.65 }))),
     createBoss: (params) => new Boss4(params),
   },
 };

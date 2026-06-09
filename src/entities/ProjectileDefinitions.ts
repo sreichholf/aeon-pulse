@@ -130,6 +130,7 @@ function deepenDefinition(sourceKey: string, def: BulletDef): ProjectileDefiniti
     damage: {
       amount: def.damage,
       piercing: def.piercing,
+      pierceCount: def.pierceCount,
     },
     movement: movementFor(def),
     presentation: {

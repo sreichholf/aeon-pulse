@@ -182,6 +182,7 @@ export interface IBullet extends ICollidable {
   readonly isPlayerBullet: boolean;
   readonly damage: number;
   readonly isPiercing: boolean;
+  remainingPierce?: number;
   readonly isOffscreen: boolean;
   readonly type: BulletType;
   readonly sourceKey?: string;

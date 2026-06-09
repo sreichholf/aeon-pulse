@@ -31,5 +31,11 @@ We have successfully implemented the **Scaled Anchor & Offset Timeline Module** 
 2. **Anchor Alignment:** Wave beats are composed relative to these anchors, locking critical spawns directly to key terrain milestones while allowing intermediate skirmishes to be defined at relative offsets.
 3. **Pacing Scale Factors:** The `Timeline` class supports a dynamic scale multiplier that compresses or stretches offset-based intermediate beats (e.g. for fine-grained difficulty adjustments) while leaving absolute milestones perfectly aligned to the terrain.
 
+## Amendment — Absolute Anchor Scaling
+
+**Date:** 2026-06-09
+
+To support complete level timeline compression (as part of balancing and pacing changes in ADR 0018), absolute anchors are now scaled by the Timeline scale multiplier as well. This keeps absolute milestones perfectly aligned with terrain control points, which are also scaled inline.
+
 
 

@@ -162,7 +162,7 @@ export function sporeTriadBeat(yA: number, yB: number, yC: number, dx = 120): Be
 // --- LEVEL TIMELINES ---
 
 function chapter3_1(): Timeline<Chapter3Anchor> {
-  return new Timeline<Chapter3Anchor>()
+  return new Timeline<Chapter3Anchor>(0.65)
     .anchor(Chapter3Anchor.START, 0)
     .anchor(Chapter3Anchor.MID, 5000)
     .add(Chapter3Anchor.START, 300, sineRowBeat(5, 0, 250))
@@ -180,7 +180,7 @@ function chapter3_1(): Timeline<Chapter3Anchor> {
 }
 
 function chapter3_2(): Timeline<Chapter3Anchor> {
-  return new Timeline<Chapter3Anchor>()
+  return new Timeline<Chapter3Anchor>(0.65)
     .anchor(Chapter3Anchor.START, 0)
     .anchor(Chapter3Anchor.MID, 5200)
     .add(Chapter3Anchor.START, 300, sineRowBeat(5, 0, 260))
@@ -198,7 +198,7 @@ function chapter3_2(): Timeline<Chapter3Anchor> {
 }
 
 function chapter3_3(): Timeline<Chapter3Anchor> {
-  return new Timeline<Chapter3Anchor>()
+  return new Timeline<Chapter3Anchor>(0.65)
     .anchor(Chapter3Anchor.START, 0)
     .anchor(Chapter3Anchor.MID, 5300)
     .add(Chapter3Anchor.START, 320, sineRowBeat(5, 0, 250))
@@ -218,7 +218,7 @@ function chapter3_3(): Timeline<Chapter3Anchor> {
 }
 
 function chapter3_4(): Timeline<Chapter3Anchor> {
-  return new Timeline<Chapter3Anchor>()
+  return new Timeline<Chapter3Anchor>(0.65)
     .anchor(Chapter3Anchor.START, 0)
     .anchor(Chapter3Anchor.MID, 6400)
     .add(Chapter3Anchor.START, 300, sineRowBeat(5, 0, 260))
@@ -238,7 +238,7 @@ function chapter3_4(): Timeline<Chapter3Anchor> {
 }
 
 function chapter3_5(): Timeline<Chapter3Anchor> {
-  return new Timeline<Chapter3Anchor>()
+  return new Timeline<Chapter3Anchor>(0.65)
     .anchor(Chapter3Anchor.START, 0)
     .anchor(Chapter3Anchor.MID, 6200)
     .add(Chapter3Anchor.START, 300, sineRowBeat(5, 0, 260))

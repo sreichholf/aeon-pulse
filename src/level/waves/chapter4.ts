@@ -183,7 +183,7 @@ export function dualTurretStalactiteBeat(turretYA: number, turretYB: number, sta
 // --- LEVEL TIMELINES ---
 
 function chapter4_1(): Timeline<Chapter4Anchor> {
-  return new Timeline<Chapter4Anchor>()
+  return new Timeline<Chapter4Anchor>(0.65)
     .anchor(Chapter4Anchor.START, 0)
     .anchor(Chapter4Anchor.MID, 5000)
     .add(Chapter4Anchor.START, 320, sineRowBeat(5, 0, 250))
@@ -201,7 +201,7 @@ function chapter4_1(): Timeline<Chapter4Anchor> {
 }
 
 function chapter4_2(): Timeline<Chapter4Anchor> {
-  return new Timeline<Chapter4Anchor>()
+  return new Timeline<Chapter4Anchor>(0.65)
     .anchor(Chapter4Anchor.START, 0)
     .anchor(Chapter4Anchor.MID, 5200)
     .add(Chapter4Anchor.START, 300, sineRowBeat(5, 0, 250))
@@ -220,7 +220,7 @@ function chapter4_2(): Timeline<Chapter4Anchor> {
 }
 
 function chapter4_3(): Timeline<Chapter4Anchor> {
-  return new Timeline<Chapter4Anchor>()
+  return new Timeline<Chapter4Anchor>(0.65)
     .anchor(Chapter4Anchor.START, 0)
     .anchor(Chapter4Anchor.MID, 5400)
     .add(Chapter4Anchor.START, 300, sineRowBeat(5, 0, 250))
@@ -239,7 +239,7 @@ function chapter4_3(): Timeline<Chapter4Anchor> {
 }
 
 function chapter4_4(): Timeline<Chapter4Anchor> {
-  return new Timeline<Chapter4Anchor>()
+  return new Timeline<Chapter4Anchor>(0.65)
     .anchor(Chapter4Anchor.START, 0)
     .anchor(Chapter4Anchor.MID, 6200)
     .add(Chapter4Anchor.START, 300, sineRowBeat(6, 0, 270))
@@ -263,7 +263,7 @@ function chapter4_4(): Timeline<Chapter4Anchor> {
 }
 
 function chapter4_5(): Timeline<Chapter4Anchor> {
-  return new Timeline<Chapter4Anchor>()
+  return new Timeline<Chapter4Anchor>(0.65)
     .anchor(Chapter4Anchor.START, 0)
     .anchor(Chapter4Anchor.MID, 6200)
     .add(Chapter4Anchor.START, 320, straightRowBeat(6, 0, 250))

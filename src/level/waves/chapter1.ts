@@ -174,7 +174,7 @@ export function mixedMirrorSineDiverVBeat(
 
 // Level 1-1 (Rookie / Pattern Literacy)
 function chapter1_1(): Timeline<Chapter1Anchor> {
-  return new Timeline<Chapter1Anchor>()
+  return new Timeline<Chapter1Anchor>(0.65)
     .anchor(Chapter1Anchor.START, 0)
     .anchor(Chapter1Anchor.MID, 5000)
     .add(Chapter1Anchor.START, 320, straightRowBeat(4, 0, 220))
@@ -195,7 +195,7 @@ function chapter1_1(): Timeline<Chapter1Anchor> {
 
 // Level 1-2 (Density Literacy)
 function chapter1_2(): Timeline<Chapter1Anchor> {
-  return new Timeline<Chapter1Anchor>()
+  return new Timeline<Chapter1Anchor>(0.65)
     .anchor(Chapter1Anchor.START, 0)
     .anchor(Chapter1Anchor.MID, 5000)
     .add(Chapter1Anchor.START, 300, straightRowBeat(5, 0, 250))
@@ -216,7 +216,7 @@ function chapter1_2(): Timeline<Chapter1Anchor> {
 
 // Level 1-3 (Mixed-Wave Literacy)
 function chapter1_3(): Timeline<Chapter1Anchor> {
-  return new Timeline<Chapter1Anchor>()
+  return new Timeline<Chapter1Anchor>(0.65)
     .anchor(Chapter1Anchor.START, 0)
     .anchor(Chapter1Anchor.MID, 4500)
     .add(Chapter1Anchor.START, 300, straightRowBeat(4, 0, 220))
@@ -235,7 +235,7 @@ function chapter1_3(): Timeline<Chapter1Anchor> {
 
 // Level 1-4 (Endurance Recovery)
 function chapter1_4(): Timeline<Chapter1Anchor> {
-  return new Timeline<Chapter1Anchor>()
+  return new Timeline<Chapter1Anchor>(0.65)
     .anchor(Chapter1Anchor.START, 0)
     .anchor(Chapter1Anchor.MID, 6500)
     .add(Chapter1Anchor.START, 280, straightRowBeat(5, 0, 260))
@@ -258,7 +258,7 @@ function chapter1_4(): Timeline<Chapter1Anchor> {
 
 // Level 1-5 (Chapter Finale)
 function chapter1_5(): Timeline<Chapter1Anchor> {
-  return new Timeline<Chapter1Anchor>()
+  return new Timeline<Chapter1Anchor>(0.65)
     .anchor(Chapter1Anchor.START, 0)
     .anchor(Chapter1Anchor.MID, 6000)
     .add(Chapter1Anchor.START, 320, straightRowBeat(5, 0, 260))

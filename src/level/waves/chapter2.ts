@@ -126,7 +126,7 @@ export function dualDiverSineRowBeat(diverCount: number, diverYStep: number, sin
 // --- LEVEL TIMELINES ---
 
 function chapter2_1(): Timeline<Chapter2Anchor> {
-  return new Timeline<Chapter2Anchor>()
+  return new Timeline<Chapter2Anchor>(0.65)
     .anchor(Chapter2Anchor.START, 0)
     .anchor(Chapter2Anchor.MID, 4800)
     .add(Chapter2Anchor.START, 320, straightRowBeat(5, 0, 250))
@@ -145,7 +145,7 @@ function chapter2_1(): Timeline<Chapter2Anchor> {
 }
 
 function chapter2_2(): Timeline<Chapter2Anchor> {
-  return new Timeline<Chapter2Anchor>()
+  return new Timeline<Chapter2Anchor>(0.65)
     .anchor(Chapter2Anchor.START, 0)
     .anchor(Chapter2Anchor.MID, 5000)
     .add(Chapter2Anchor.START, 300, straightRowBeat(5, 0, 260))
@@ -165,7 +165,7 @@ function chapter2_2(): Timeline<Chapter2Anchor> {
 }
 
 function chapter2_3(): Timeline<Chapter2Anchor> {
-  return new Timeline<Chapter2Anchor>()
+  return new Timeline<Chapter2Anchor>(0.65)
     .anchor(Chapter2Anchor.START, 0)
     .anchor(Chapter2Anchor.MID, 5000)
     .add(Chapter2Anchor.START, 320, straightRowBeat(5, 0, 250))
@@ -184,7 +184,7 @@ function chapter2_3(): Timeline<Chapter2Anchor> {
 }
 
 function chapter2_4(): Timeline<Chapter2Anchor> {
-  return new Timeline<Chapter2Anchor>()
+  return new Timeline<Chapter2Anchor>(0.65)
     .anchor(Chapter2Anchor.START, 0)
     .anchor(Chapter2Anchor.MID, 6100)
     .add(Chapter2Anchor.START, 300, straightRowBeat(5, 0, 260))
@@ -210,7 +210,7 @@ function chapter2_4(): Timeline<Chapter2Anchor> {
 }
 
 function chapter2_5(): Timeline<Chapter2Anchor> {
-  return new Timeline<Chapter2Anchor>()
+  return new Timeline<Chapter2Anchor>(0.65)
     .anchor(Chapter2Anchor.START, 0)
     .anchor(Chapter2Anchor.MID, 6000)
     .add(Chapter2Anchor.START, 300, straightRowBeat(5, 0, 260))

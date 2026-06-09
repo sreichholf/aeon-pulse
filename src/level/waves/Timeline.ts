@@ -64,7 +64,7 @@ export class Timeline<Anchor extends string = string> {
    * Registers a named anchor marker locked to an absolute scroll position.
    */
   anchor(name: Anchor, absoluteAt: number): this {
-    this._anchors.set(name, absoluteAt);
+    this._anchors.set(name, Math.round(absoluteAt * this._scale));
     return this;
   }
 

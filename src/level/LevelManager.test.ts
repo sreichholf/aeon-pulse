@@ -10,6 +10,7 @@ function createMockHost(overrides: Partial<LevelGameHost> = {}): LevelGameHost {
     spawnBoss: vi.fn(),
     completeLevel: vi.fn(),
     isLevelClearGateOpen: vi.fn().mockReturnValue(false),
+    spawnEnemy: vi.fn(),
     ...overrides,
   };
 }
@@ -47,13 +48,13 @@ describe('LevelManager', () => {
     const levelRecord = getCampaignLevel('1-1'); // scrollSpeed: 100
     const manager = new LevelManager(host, levelRecord);
 
-    // The first wave for level 1-1 is at 320.
+    // The first wave for level 1-1 is at 320 * 0.65 = 208.
     // Advance scrollX close to the first wave but not matching it.
-    manager.update(3.19); // scrollX = 319
+    manager.update(2.07); // scrollX = 207 (actually 206.99999999999997 due to float precision)
     expect(host.handleStageEvent).not.toHaveBeenCalled();
 
-    // Advance scrollX to reach the first wave.
-    manager.update(0.01); // scrollX = 320
+    // Advance scrollX to reach and comfortably exceed the first wave position.
+    manager.update(0.02); // scrollX = 209 (comfortably >= 208)
     expect(host.handleStageEvent).toHaveBeenCalled();
 
     // Verify multiple events within that first wave are emitted.
@@ -63,16 +64,16 @@ describe('LevelManager', () => {
 
   it('triggers boss spawning on finale level once waves are cleared and scrollX >= bossAt', () => {
     const host = createMockHost();
-    const levelRecord = getCampaignLevel('1-5'); // isFinale: true, archetype 1, bossAt: 11200
+    const levelRecord = getCampaignLevel('1-5'); // isFinale: true, archetype 1, bossAt: 7300
     const manager = new LevelManager(host, levelRecord);
 
-    // Chapter 1-5 has its last wave at 10840.
-    // Advance until we have spawned all waves (10840) but haven't reached bossAt (11200).
-    manager.update(108.4); // scrollX = 10840
+    // Chapter 1-5 has its last wave at 6000 * 0.65 + 4840 * 0.65 = 3900 + 3146 = 7046.
+    // Advance until we have spawned all waves (7046) but haven't reached bossAt (7300).
+    manager.update(70.5); // scrollX = 7050 (comfortably >= 7046)
     expect(host.spawnBoss).not.toHaveBeenCalled();
 
     // Advance past bossAt.
-    manager.update(3.6); // scrollX = 11200
+    manager.update(3.0); // scrollX = 7350 (comfortably >= 7300)
     expect(host.spawnBoss).toHaveBeenCalledTimes(1);
 
     // Subsequent updates should not trigger another boss spawn.
@@ -89,8 +90,8 @@ describe('LevelManager', () => {
     const levelRecord = getCampaignLevel('1-1'); // isFinale: false, scrollSpeed: 100, last wave: 7800
     const manager = new LevelManager(host, levelRecord);
 
-    // Advance past the last wave (7800).
-    manager.update(78.0); // scrollX = 7800
+    // Advance past the last wave (7800 * 0.65 = 5070).
+    manager.update(51.0); // scrollX = 5100 (comfortably >= 5070)
     
     // Clear gate is closed, should not complete.
     expect(host.completeLevel).not.toHaveBeenCalled();

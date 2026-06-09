@@ -22,6 +22,7 @@ export interface BulletDef {
   damage: number;
   isPlayer: boolean;
   piercing: boolean;
+  pierceCount?: number;
   homing?: boolean;
   wave?: boolean;
   waveAmp?: number;
@@ -161,7 +162,7 @@ export const playerDefs: Record<string, BulletDef> = {
   },
 
   [ProjectileSourceKey.PLAYER_WAVE]: {
-    w: 48, h: 20, hw: 20, hh: 8, damage: 2, isPlayer: true, piercing: true, wave: true, key: ProjectileSourceKey.PLAYER_WAVE,
+    w: 48, h: 20, hw: 20, hh: 8, damage: 2, isPlayer: true, piercing: true, pierceCount: 1, wave: true, key: ProjectileSourceKey.PLAYER_WAVE,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -192,7 +193,7 @@ export const playerDefs: Record<string, BulletDef> = {
   },
 
   [ProjectileSourceKey.PLAYER_PLASMA]: {
-    w: 48, h: 48, hw: 20, hh: 20, damage: 2, isPlayer: true, piercing: true, wave: true, key: ProjectileSourceKey.PLAYER_PLASMA,
+    w: 48, h: 48, hw: 20, hh: 20, damage: 2, isPlayer: true, piercing: true, pierceCount: 1, wave: true, key: ProjectileSourceKey.PLAYER_PLASMA,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {

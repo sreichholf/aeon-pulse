@@ -260,6 +260,22 @@ _Avoid_: Live bullet capture, fire-rate-driven cycling, stale-gate logic
 The ordered list of projectile definition source keys declared per entity in `EntityCatalog`. This list is the sole source of truth for which projectile presentations appear in the Tactical Database and in what order. An empty list means no bullet preview.
 _Avoid_: Viewer bullet type list, dynamic bullet observation, entity-driven preview, implicit type detection
 
+**Semi-Piercing Projectile**:
+A player projectile (like Wave or Focused Plasma tap fire) that penetrates exactly one target and disappears on the second.
+_Avoid_: Limited piercing bullet, single-piercing shot
+
+**Timeline Compression**:
+The 35% scale-down of wave timelines to increase wave density and action pacing.
+_Avoid_: Speed scaling, wave squeezing
+
+**Ambient Popcorn Spawner**:
+The background system that spawns random popcorn enemies during timeline gaps to keep the screen active.
+_Avoid_: Random hazard spawner, filler generator
+
+**Level Duration Snapping**:
+Shortening level scroll distances (e.g. from 11,200 to 8,000 units) to match compressed timelines.
+_Avoid_: Level shrinking, scroll capping
+
 ## Example Dialogue
 
 Dev: "Should `3-2` use the organic corridor?"
