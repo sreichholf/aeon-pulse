@@ -14,7 +14,7 @@ This handoff captures the current Vitest harness work and outlines future test c
 
 ## Tests Already Added
 
-The Vitest harness now includes 12 test suites protecting the core game mechanics, campaign configurations, level wave compiling, stage transitions, bullet pooling, game tick resolution, campaign clear resolution, database card presentation, terrain collision boundaries, and procedural construction helpers:
+The Vitest harness now includes 14 test suites protecting the core game mechanics, campaign configurations, level wave compiling, stage transitions, bullet pooling, game tick resolution, campaign clear resolution, database card presentation, terrain collision boundaries, procedural construction helpers, projectile instancing, and score/lives tracking:
 
 1. **Collision & Combat Seam:**
    - `src/systems/Collisions.test.ts`
@@ -38,7 +38,8 @@ The Vitest harness now includes 12 test suites protecting the core game mechanic
 
 5. **Projectile Pool & Instancer:**
    - `src/systems/ProjectilePool.test.ts`
-   - Verifies bullet creation, recycling of released bullets, property matching (tint and damage override keys), exclusion of non-poolable bullet types (like HOMING), and memory cleanup on pool clear.
+   - `src/systems/ProjectileInstancer.test.ts`
+   - Verifies bullet creation, recycling of released bullets, property matching (tint and damage override keys), and the instanced rendering mesh compilation, dynamic batching, matrix mapping, and material disposal self-cleaning.
 
 6. **Gameplay Physics and Tick System:**
    - `src/systems/Gameplay.test.ts`
@@ -52,28 +53,31 @@ The Vitest harness now includes 12 test suites protecting the core game mechanic
    - `src/utils/ProceduralToolkit.test.ts`
    - Tests shared BufferGeometry utilities (like ensureNonIndexed and addVertexColor) to ensure correctness across multiple geometry classes and colors.
 
+9. **Score & Lives Manager:**
+   - `src/systems/ScoreManager.test.ts`
+   - Tests score calculation, life limits (0..3 bounds), game over checks, high score storage, leaderboard limits, and difficulty configuration isolation.
+
 Current test status:
-- `npm test` passed: 12 files, 79 tests
+- `npm test` passed: 14 files, 104 tests
 - `npm run build` passed
 - `git diff --check` passed
 
 ## Committed Baseline
 
-All 12 test files and refactored gameplay classes are committed to git. Run `git status` to confirm.
+All 14 test files and refactored gameplay classes are committed to git. Run `git status` to confirm.
 
 ## Recommended Future Test Slices
 
 If further module-level testing is desired, the following targets are recommended:
 
-1. **Projectile Instancer (`src/systems/ProjectileInstancer.ts`):**
-   - Test that bullet meshes are properly batched into `THREE.InstancedMesh` groups.
-   - Verify index tracking and correct transformations (translation and rotation) are written to the instance matrices.
+1. **Input Mapping (`src/systems/InputManager.ts`):**
+   - Test key mapping, custom action updates, keyboard polling states, and input history/debouncing.
 
-2. **Score Manager (`src/systems/ScoreManager.ts`):**
-   - Test score calculation, combo multiplier scaling, high-score storage across different `DifficultyMode` values, and top-scores persistence.
+2. **Sound Sequencing (`src/systems/audio/SFXLibrary.ts` / `MusicSequencer.ts`):**
+   - Mock Web Audio nodes and verify correct synth parameters, sequencing schedules, and MusicCue transitions.
 
 ## Next Recommended Steps
 
-1. Run `npm test` to verify all 79 tests pass.
+1. Run `npm test` to verify all 104 tests pass.
 2. Run `npm run build` to verify the production bundle remains green.
 3. Select any additional systems or UI components for unit testing if needed.
