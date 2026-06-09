@@ -98,8 +98,8 @@ export class Boss extends BossBase {
   private _coreGroup: THREE.Group | null = null;
   private _energyMat: THREE.MeshPhongMaterial | null = null;
 
-  constructor({ scene, sprites, getPlayerPos, onDeath, audio }: BossConstructorParams) {
-    super(scene, sprites, getPlayerPos, onDeath, audio, STOP_X, ENTRY_SPEED, TOTAL_HP, DISPLAY_W, DISPLAY_H);
+  constructor({ scene, sprites, getPlayerPos, onDeath, audio, projectileFactory }: BossConstructorParams) {
+    super(scene, sprites, getPlayerPos, onDeath, audio, STOP_X, ENTRY_SPEED, TOTAL_HP, DISPLAY_W, DISPLAY_H, projectileFactory);
 
     this.score = 5000;
     this._phaseIdx = 0;
@@ -199,7 +199,14 @@ export class Boss extends BossBase {
       }
       case 'homing': {
         const getPos: GetPositionFn = () => this._getPlayerPos();
-        this._newBullets.push(new Bullet(this._scene, this._sprites, BulletType.HOMING, ox, oy, -pattern.speed, 0, getPos));
+        this._newBullets.push(this._projectileFactory({
+          type: BulletType.HOMING,
+          x: ox,
+          y: oy,
+          vx: -pattern.speed,
+          vy: 0,
+          getTargetPos: getPos,
+        }));
         break;
       }
       case 'circular': {
@@ -213,7 +220,7 @@ export class Boss extends BossBase {
   }
 
   private _spawnBullet(type: string, x: number, y: number, vx: number, vy: number): void {
-    this._newBullets.push(new Bullet(this._scene, this._sprites, type, x, y, vx, vy));
+    this._newBullets.push(this._projectileFactory({ type, x, y, vx, vy }));
   }
 
   protected override _checkPhase(): void {

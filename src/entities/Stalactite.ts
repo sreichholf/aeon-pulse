@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { BulletType, type GetPositionFn, type IBullet, type ITerrain, type IAudio, type IScene } from '../types.ts';
+import { BulletType, type GetPositionFn, type IBullet, type ITerrain, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
-import { Bullet } from './Bullet.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 
@@ -50,8 +49,9 @@ export class Stalactite extends Enemy {
     getScrollX: (() => number) | null,
     terrain: ITerrain | null,
     audio: IAudio | null,
+    projectileFactory: ProjectileFactoryFn,
   ) {
-    super(scene, sprites, null, 0, 0, 12, 32, x, y);
+    super(scene, sprites, null, 0, 0, 12, 32, x, y, projectileFactory);
     this._hp           = 1;
     this.score         = 150;
     this._getPlayerPos = getPlayerPos;
@@ -428,15 +428,13 @@ export class Stalactite extends Enemy {
 
     for (const angle of angles) {
       this._newBullets.push(
-        new Bullet(
-          this._scene,
-          this._sprites,
-          'lava',
-          this.x,
-          this.y - 28,
-          Math.cos(angle) * speed,
-          Math.sin(angle) * speed
-        )
+        this._projectileFactory({
+          type: 'lava',
+          x: this.x,
+          y: this.y - 28,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+        })
       );
     }
 

@@ -220,12 +220,13 @@ export interface BossConstructorParams {
   onDeath: () => void;
   audio: IAudio;
   spawnEnemy: SpawnEnemyFn;
+  projectileFactory: ProjectileFactoryFn;
 }
 
 // ── Terrain ───────────────────────────────────────────────────────────────────
 export interface ITerrain {
   getWallsAt(scrollX: number): TerrainBounds;
-  getActualWallsAt?(x: number): TerrainBounds;
+  getActualWallsAt(x: number): TerrainBounds;
   update?(scrollX: number, dt: number): void;
   triggerLavaPulse?(): void;
   destroy?(): void;

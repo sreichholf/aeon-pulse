@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { BossBase } from './BossBase.ts';
-import { Bullet } from './Bullet.ts';
 import { BulletType, type GetPositionFn, type IAudio, type IScene, type ICollidable, type BossConstructorParams } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed, addVertexColor } from '../utils/ProceduralToolkit.ts';
@@ -62,8 +61,8 @@ export class Boss2 extends BossBase {
   private _lasers: LaserState[];
   private _drillMesh: THREE.Group | null = null;
 
-  constructor({ scene, sprites, getPlayerPos, onDeath, audio }: BossConstructorParams) {
-    super(scene, sprites, getPlayerPos, onDeath, audio, STOP_X, ENTRY_SPEED, TOTAL_HP, DISPLAY_W, DISPLAY_H);
+  constructor({ scene, sprites, getPlayerPos, onDeath, audio, projectileFactory }: BossConstructorParams) {
+    super(scene, sprites, getPlayerPos, onDeath, audio, STOP_X, ENTRY_SPEED, TOTAL_HP, DISPLAY_W, DISPLAY_H, projectileFactory);
 
     this.score = 8000;
     this._phaseIdx = 0;
@@ -151,7 +150,13 @@ export class Boss2 extends BossBase {
       if (laser.recharge <= 0) {
         const oy = this._mesh.position.y + laser.portOffset;
         const ox = this._muzzleX();
-        this._newBullets.push(new Bullet(this._scene, this._sprites, BulletType.BOSS_LASER, ox, oy, -550, 0));
+        this._newBullets.push(this._projectileFactory({
+          type: BulletType.BOSS_LASER,
+          x: ox,
+          y: oy,
+          vx: -550,
+          vy: 0,
+        }));
         laser.recharge = phase.laserFreq;
       }
     }
@@ -184,8 +189,22 @@ export class Boss2 extends BossBase {
 
   private _fireHoming(): void {
     const ox = this._muzzleX(), oy = this._mesh?.position.y ?? 0;
-    this._newBullets.push(new Bullet(this._scene, this._sprites, BulletType.HOMING, ox, oy, -150,  150, this._getPlayerPos));
-    this._newBullets.push(new Bullet(this._scene, this._sprites, BulletType.HOMING, ox, oy, -150, -150, this._getPlayerPos));
+    this._newBullets.push(this._projectileFactory({
+      type: BulletType.HOMING,
+      x: ox,
+      y: oy,
+      vx: -150,
+      vy: 150,
+      getTargetPos: this._getPlayerPos,
+    }));
+    this._newBullets.push(this._projectileFactory({
+      type: BulletType.HOMING,
+      x: ox,
+      y: oy,
+      vx: -150,
+      vy: -150,
+      getTargetPos: this._getPlayerPos,
+    }));
   }
 
   private _fireSpread({ count, speed, halfAngle }: SpreadConfig): void {
@@ -195,7 +214,13 @@ export class Boss2 extends BossBase {
     const step = count === 1 ? 0 : halfAngle * 2 / (count - 1);
     for (let i = 0; i < count; i++) {
       const a = aim - halfAngle + step * i;
-      this._newBullets.push(new Bullet(this._scene, this._sprites, BulletType.BOSS, ox, oy, Math.cos(a) * speed, Math.sin(a) * speed));
+      this._newBullets.push(this._projectileFactory({
+        type: BulletType.BOSS,
+        x: ox,
+        y: oy,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed,
+      }));
     }
   }
 
@@ -203,7 +228,13 @@ export class Boss2 extends BossBase {
     const ox = this._muzzleX(), oy = this._mesh?.position.y ?? 0;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
-      this._newBullets.push(new Bullet(this._scene, this._sprites, BulletType.BOSS, ox, oy, Math.cos(a) * speed, Math.sin(a) * speed));
+      this._newBullets.push(this._projectileFactory({
+        type: BulletType.BOSS,
+        x: ox,
+        y: oy,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed,
+      }));
     }
   }
 

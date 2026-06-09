@@ -10,7 +10,7 @@ import { Obstacle } from './Obstacle.ts';
 import { RockDrake } from './RockDrake.ts';
 import { Stalactite } from './Stalactite.ts';
 import { LEVELS } from '../level/Levels.ts';
-import { EnemyType, type BossConstructorParams, type GetPositionFn, type IAudio, type IBoss, type IEnemy, type IScene, type ITerrain, type SpawnEnemyFn } from '../types.ts';
+import { EnemyType, type BossConstructorParams, type GetPositionFn, type IAudio, type IBoss, type IEnemy, type IScene, type ITerrain, type SpawnEnemyFn, type ProjectileFactoryFn } from '../types.ts';
 
 export interface SpawnEnemyParams {
   scene: IScene;
@@ -21,6 +21,7 @@ export interface SpawnEnemyParams {
   audio: IAudio | null;
   getScrollX: () => number;
   terrain: ITerrain | null;
+  projectileFactory: ProjectileFactoryFn;
 }
 
 type ViewerCentering = 'bounds' | 'origin';
@@ -50,6 +51,7 @@ export interface SpawnBossParams {
   onDeath: () => void;
   audio: IAudio | null;
   spawnEnemyCallback: SpawnEnemyFn;
+  projectileFactory: ProjectileFactoryFn;
 }
 
 export interface BossCatalogEntry {
@@ -61,53 +63,53 @@ export const ENEMY_CATALOG: readonly EnemyCatalogEntry[] = [
   {
     type: EnemyType.STRAIGHT,
     viewer: { page: 'stage-enemies', order: 10, scale: 0.85, centering: 'bounds' },
-    spawn: ({ scene, sprites, x, y, getPos, audio }) => new EnemyStraight(scene, sprites, x, y, getPos, audio),
+    spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemyStraight(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.SINE,
     viewer: { page: 'stage-enemies', order: 20, scale: 0.85, centering: 'bounds' },
-    spawn: ({ scene, sprites, x, y, getPos, audio }) => new EnemySine(scene, sprites, x, y, getPos, audio),
+    spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemySine(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.DIVER,
     viewer: { page: 'stage-enemies', order: 30, scale: 0.85, centering: 'bounds' },
-    spawn: ({ scene, sprites, x, y, getPos, audio }) => new EnemyDiver(scene, sprites, x, y, getPos, audio),
+    spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemyDiver(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.SWARM,
     viewer: { page: 'stage-enemies', order: 40, scale: 0.85, centering: 'bounds' },
-    spawn: ({ scene, sprites, x, y, getPos, audio }) => new EnemySwarm(scene, sprites, x, y, getPos, audio),
+    spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemySwarm(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.TURRET,
     viewer: { page: 'stage-enemies', order: 50, scale: 0.85, centering: 'bounds' },
-    spawn: ({ scene, sprites, x, y, getPos, audio }) => new EnemyTurret(scene, sprites, x, y, getPos, audio),
+    spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemyTurret(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.CHARGER,
     viewer: { page: 'stage-enemies', order: 60, scale: 0.85, centering: 'origin' },
-    spawn: ({ scene, sprites, x, y, getPos, audio }) => new EnemyCharger(scene, sprites, x, y, getPos, audio),
+    spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemyCharger(scene, sprites, x, y, getPos, projectileFactory, audio),
   },
   {
     type: EnemyType.SPORE,
     viewer: { page: 'stage-enemies', order: 70, scale: 0.85, centering: 'bounds' },
-    spawn: ({ scene, sprites, x, y, getPos }) => new EnemySpore(scene, sprites, x, y, getPos),
+    spawn: ({ scene, sprites, x, y, getPos, projectileFactory }) => new EnemySpore(scene, sprites, x, y, getPos, projectileFactory),
   },
   {
     type: EnemyType.OBSTACLE,
     viewer: { page: 'stage-enemies', order: 80, scale: 0.60, centering: 'bounds' },
-    spawn: ({ scene, sprites, x, y }) => new Obstacle(scene, sprites, x, y),
+    spawn: ({ scene, sprites, x, y, projectileFactory }) => new Obstacle(scene, sprites, x, y, projectileFactory),
   },
   {
     type: EnemyType.ROCK_DRAKE,
     viewer: { page: 'stage-enemies', order: 90, scale: 0.75, centering: 'bounds' },
-    spawn: ({ scene, sprites, x, y, getPos }) => new RockDrake(scene, sprites, x, y, getPos),
+    spawn: ({ scene, sprites, x, y, getPos, projectileFactory }) => new RockDrake(scene, sprites, x, y, getPos, projectileFactory),
   },
   {
     type: EnemyType.STALACTITE,
     viewer: { page: 'stage-enemies', order: 100, scale: 0.70, centering: 'bounds' },
-    spawn: ({ scene, sprites, x, y, getPos, getScrollX, terrain, audio }) =>
-      new Stalactite(scene, sprites, x, y, getPos, getScrollX, terrain, audio),
+    spawn: ({ scene, sprites, x, y, getPos, getScrollX, terrain, audio, projectileFactory }) =>
+      new Stalactite(scene, sprites, x, y, getPos, getScrollX, terrain, audio, projectileFactory),
   },
 ] as const;
 
@@ -140,7 +142,7 @@ export function getBossCatalogEntries(): BossCatalogEntry[] {
   return [...BOSS_CATALOG].sort((a, b) => a.level - b.level);
 }
 
-export function spawnCatalogBoss(level: number, { scene, sprites, getPos, onDeath, audio, spawnEnemyCallback }: SpawnBossParams): IBoss {
+export function spawnCatalogBoss(level: number, { scene, sprites, getPos, onDeath, audio, spawnEnemyCallback, projectileFactory }: SpawnBossParams): IBoss {
   const def = LEVELS[level as keyof typeof LEVELS]!;
   const params: BossConstructorParams = {
     scene,
@@ -149,6 +151,7 @@ export function spawnCatalogBoss(level: number, { scene, sprites, getPos, onDeat
     onDeath,
     audio: audio ?? { play: () => {} },
     spawnEnemy: spawnEnemyCallback,
+    projectileFactory,
   };
   return def.createBoss(params);
 }

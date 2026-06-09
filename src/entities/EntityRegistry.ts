@@ -4,13 +4,13 @@ import { EnemyType, type IEnemy, type IBoss } from '../types.ts';
 /**
  * Spawns an enemy by its type.
  */
-export function spawnEnemy(type: EnemyType, { scene, sprites, x, y, getPos, audio, getScrollX, terrain }: SpawnEnemyParams): IEnemy | null {
-  return spawnCatalogEnemy(type, { scene, sprites, x, y, getPos, audio, getScrollX, terrain });
+export function spawnEnemy(type: EnemyType, params: SpawnEnemyParams): IEnemy | null {
+  return spawnCatalogEnemy(type, params);
 }
 
 /**
  * Spawns a boss based on the current level archetype.
  */
-export function spawnBoss(levelArchetype: number, { scene, sprites, getPos, onDeath, audio, spawnEnemyCallback }: SpawnBossParams): IBoss {
-  return spawnCatalogBoss(levelArchetype, { scene, sprites, getPos, onDeath, audio, spawnEnemyCallback });
+export function spawnBoss(levelArchetype: number, params: SpawnBossParams): IBoss {
+  return spawnCatalogBoss(levelArchetype, params);
 }

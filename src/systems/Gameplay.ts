@@ -25,9 +25,7 @@ export function tickGameplay(world: WorldState, dt: number): void {
 
     if (world.player) {
       const playerWorldX = levelManager.scrollX + world.player.x;
-      world.player.terrainBounds = typeof terrain.getActualWallsAt === 'function'
-        ? terrain.getActualWallsAt(playerWorldX)
-        : terrain.getWallsAt(playerWorldX);
+      world.player.terrainBounds = terrain.getActualWallsAt(playerWorldX);
     }
   }
 
@@ -40,9 +38,7 @@ export function tickGameplay(world: WorldState, dt: number): void {
   for (const enemy of world.enemies) {
     if (enemy.isSpaceShip && terrain && levelManager) {
       const enemyWorldX = levelManager.scrollX + enemy.x;
-      enemy.terrainBounds = typeof terrain.getActualWallsAt === 'function'
-        ? terrain.getActualWallsAt(enemyWorldX)
-        : terrain.getWallsAt(enemyWorldX);
+      enemy.terrainBounds = terrain.getActualWallsAt(enemyWorldX);
     }
     for (const b of enemy.update(dt)) world.bullets.push(b);
   }

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { Explosion } from './Explosion.ts';
 import { Entity } from './Entity.ts';
-import type { GetPositionFn, IBullet, EntityMetadata, IAudio, IScene, IBoss, HitZone, ICollidable, PlayfieldBounds } from '../types.ts';
+import type { GetPositionFn, IBullet, EntityMetadata, IAudio, IScene, IBoss, HitZone, ICollidable, PlayfieldBounds, ProjectileFactoryFn } from '../types.ts';
 import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 const HALF_W = GAME_WIDTH / 2;
@@ -31,6 +31,7 @@ export abstract class BossBase extends Entity implements IBoss {
   protected _mesh!: THREE.Object3D | null;
   protected _explosion: Explosion | null;
   protected _displayName!: string;
+  protected _projectileFactory: ProjectileFactoryFn;
   playfieldBounds: PlayfieldBounds | null;
   score: number = 0;
 
@@ -49,6 +50,7 @@ export abstract class BossBase extends Entity implements IBoss {
     hp: number,
     displayW: number,
     displayH: number,
+    projectileFactory: ProjectileFactoryFn,
   ) {
     super();
     this._scene        = scene;
@@ -56,6 +58,7 @@ export abstract class BossBase extends Entity implements IBoss {
     this._getPlayerPos = getPlayerPos;
     this._onDeath      = onDeath;
     this._audio        = audio;
+    this._projectileFactory = projectileFactory;
 
     this._hp          = hp;
     this._maxHp       = hp;

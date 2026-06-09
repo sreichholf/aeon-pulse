@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { BossBase } from './BossBase.ts';
-import { Bullet } from './Bullet.ts';
 import { BulletType, EnemyType, type GetPositionFn, type IAudio, type SpawnEnemyFn, type IScene, type BossConstructorParams } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed, addVertexColor } from '../utils/ProceduralToolkit.ts';
@@ -128,8 +127,8 @@ export class Boss4 extends BossBase {
   private _headJoint1!: THREE.Mesh;
   private _headJoint2!: THREE.Mesh;
 
-  constructor({ scene, sprites, getPlayerPos, onDeath, audio, spawnEnemy }: BossConstructorParams) {
-    super(scene, sprites, getPlayerPos, onDeath, audio, STOP_X, ENTRY_SPEED, HP_PLATE * 2 + HP_CORE, DISPLAY_W, DISPLAY_H);
+  constructor({ scene, sprites, getPlayerPos, onDeath, audio, spawnEnemy, projectileFactory }: BossConstructorParams) {
+    super(scene, sprites, getPlayerPos, onDeath, audio, STOP_X, ENTRY_SPEED, HP_PLATE * 2 + HP_CORE, DISPLAY_W, DISPLAY_H, projectileFactory);
 
     this._spawnEnemy = spawnEnemy;
     this._hpPlateL    = HP_PLATE;
@@ -482,10 +481,13 @@ export class Boss4 extends BossBase {
       const angle = baseAngle + spread * (frac - 0.5);
       const speed = 145;
 
-      this._newBullets.push(new Bullet(
-        this._scene, this._sprites, BulletType.LAVA, ox, oy,
-        Math.cos(angle) * speed, Math.sin(angle) * speed,
-      ));
+      this._newBullets.push(this._projectileFactory({
+        type: BulletType.LAVA,
+        x: ox,
+        y: oy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+      }));
     }
     this._audio.play('shoot');
   }
@@ -499,14 +501,20 @@ export class Boss4 extends BossBase {
       const angle = (Math.PI / 4.5) * (frac - 0.5);
       const speed = 190;
 
-      this._newBullets.push(new Bullet(
-        this._scene, this._sprites, BulletType.LAVA, ox, this.y,
-        Math.cos(Math.PI / 2 + angle) * speed, Math.sin(Math.PI / 2 + angle) * speed,
-      ));
-      this._newBullets.push(new Bullet(
-        this._scene, this._sprites, BulletType.LAVA, ox, this.y,
-        Math.cos(-Math.PI / 2 + angle) * speed, Math.sin(-Math.PI / 2 + angle) * speed,
-      ));
+      this._newBullets.push(this._projectileFactory({
+        type: BulletType.LAVA,
+        x: ox,
+        y: this.y,
+        vx: Math.cos(Math.PI / 2 + angle) * speed,
+        vy: Math.sin(Math.PI / 2 + angle) * speed,
+      }));
+      this._newBullets.push(this._projectileFactory({
+        type: BulletType.LAVA,
+        x: ox,
+        y: this.y,
+        vx: Math.cos(-Math.PI / 2 + angle) * speed,
+        vy: Math.sin(-Math.PI / 2 + angle) * speed,
+      }));
     }
     this._audio.play('shoot');
   }

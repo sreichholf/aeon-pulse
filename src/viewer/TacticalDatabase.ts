@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { spawnEnemy, spawnBoss } from '../entities/EntityRegistry.ts';
+import { Bullet } from '../entities/Bullet.ts';
 import { getBossCatalogEntries, getStageEnemyCatalogEntries, type EnemyViewerPresentation } from '../entities/EntityCatalog.ts';
 import type { UI } from '../ui/UI.ts';
 import { type IAudio, type IBullet, type GetPositionFn, type EntityMetadata, type IScene } from '../types.ts';
@@ -143,6 +144,18 @@ export class TacticalDatabase {
         audio: { play: () => { } },
         getScrollX: () => 0,
         terrain: null,
+        projectileFactory: (spawn) => new Bullet(
+          this._scene,
+          this._sprites,
+          spawn.type,
+          spawn.x,
+          spawn.y,
+          spawn.vx,
+          spawn.vy,
+          spawn.getTargetPos ?? null,
+          spawn.tint ?? null,
+          spawn.damageOverride ?? null
+        ),
       });
       if (spawnedEnemy && spawnedEnemy._mesh) {
         this._applyEnemyViewerPresentation(spawnedEnemy._mesh, entry.viewer, x, y);
@@ -193,6 +206,18 @@ export class TacticalDatabase {
         onDeath: () => { },
         audio: { play: () => { } },
         spawnEnemyCallback: () => { },
+        projectileFactory: (spawn) => new Bullet(
+          this._scene,
+          this._sprites,
+          spawn.type,
+          spawn.x,
+          spawn.y,
+          spawn.vx,
+          spawn.vy,
+          spawn.getTargetPos ?? null,
+          spawn.tint ?? null,
+          spawn.damageOverride ?? null
+        ),
       });
       if (spawnedBoss && spawnedBoss._mesh) {
         spawnedBoss._mesh.position.set(x, y, 0);

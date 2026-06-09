@@ -128,8 +128,8 @@ export class GameplayRun implements LevelGameHost {
       this._deps.sprites,
       this._deps.input,
       this._deps.audio,
-      mode,
       (spawn) => this._projectilePool.create(spawn),
+      mode,
       this._deps.invinciblePlayer ?? false,
       this._deps.playerModel,
     );
@@ -288,12 +288,10 @@ export class GameplayRun implements LevelGameHost {
       audio: this._deps.audio,
       getScrollX: () => this._levelManager?.scrollX ?? 0,
       terrain: this._terrain,
+      projectileFactory: (spawn) => this._projectilePool.create(spawn),
     });
 
     if (enemy) {
-      if ('setProjectileFactory' in enemy && typeof enemy.setProjectileFactory === 'function') {
-        enemy.setProjectileFactory((spawn) => this._projectilePool.create(spawn));
-      }
       if (this._playfieldBounds) {
         enemy.terrainBounds = this._playfieldBounds;
       }
@@ -321,6 +319,7 @@ export class GameplayRun implements LevelGameHost {
       onDeath,
       audio: this._deps.audio,
       spawnEnemyCallback: (type, x, y) => this.spawnEnemy(type, x, y),
+      projectileFactory: (spawn) => this._projectilePool.create(spawn),
     });
     if (this._playfieldBounds) {
       this._boss.playfieldBounds = this._playfieldBounds;

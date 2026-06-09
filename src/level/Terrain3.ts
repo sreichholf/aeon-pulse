@@ -175,6 +175,10 @@ export class Terrain3 implements ITerrain {
     return { top: last.top, bottom: last.bottom };
   }
 
+  getActualWallsAt(scrollX: number): TerrainBounds {
+    return this.getWallsAt(scrollX);
+  }
+
   update(scrollX: number): void {
     this._time += 0.016;
 

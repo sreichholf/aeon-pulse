@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { BossBase } from './BossBase.ts';
-import { Bullet } from './Bullet.ts';
 import { Explosion } from './Explosion.ts';
 import { BulletType, EnemyType, type GetPositionFn, type IAudio, type SpawnEnemyFn, type IScene, type BossConstructorParams } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -67,8 +66,8 @@ export class Boss3 extends BossBase {
   private _pupilMesh!: THREE.Mesh;
   private _corneaMesh!: THREE.Mesh;
 
-  constructor({ scene, sprites, getPlayerPos, onDeath, audio, spawnEnemy }: BossConstructorParams) {
-    super(scene, sprites, getPlayerPos, onDeath, audio, STOP_X, ENTRY_SPEED, TOTAL_HP, DISPLAY_W, DISPLAY_H);
+  constructor({ scene, sprites, getPlayerPos, onDeath, audio, spawnEnemy, projectileFactory }: BossConstructorParams) {
+    super(scene, sprites, getPlayerPos, onDeath, audio, STOP_X, ENTRY_SPEED, TOTAL_HP, DISPLAY_W, DISPLAY_H, projectileFactory);
 
     this._spawnEnemy = spawnEnemy;
     this.score = 15000;
@@ -164,9 +163,13 @@ export class Boss3 extends BossBase {
         const vx = -480 * Math.cos(sweepAngle);
         const vy = 480 * Math.sin(sweepAngle);
 
-        this._newBullets.push(new Bullet(
-          this._scene, this._sprites, BulletType.BOSS_LASER, this.x - 30, this.y, vx, vy
-        ));
+        this._newBullets.push(this._projectileFactory({
+          type: BulletType.BOSS_LASER,
+          x: this.x - 30,
+          y: this.y,
+          vx,
+          vy,
+        }));
         this._audio.play('bioLaser');
       }
 
@@ -175,10 +178,14 @@ export class Boss3 extends BossBase {
         this._sporeTimer = 2.4;
         for (let i = 0; i < 4; i++) {
           const ang = (i / 4) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-          this._newBullets.push(new Bullet(
-            this._scene, this._sprites, BulletType.HOMING, this.x - 10, this.y,
-            Math.cos(ang) * 160, Math.sin(ang) * 160, this._getPlayerPos
-          ));
+          this._newBullets.push(this._projectileFactory({
+            type: BulletType.HOMING,
+            x: this.x - 10,
+            y: this.y,
+            vx: Math.cos(ang) * 160,
+            vy: Math.sin(ang) * 160,
+            getTargetPos: this._getPlayerPos,
+          }));
         }
       }
 
@@ -189,9 +196,13 @@ export class Boss3 extends BossBase {
           this._rippleTimer = 0.35;
           this._rippleCount--;
 
-          this._newBullets.push(new Bullet(
-            this._scene, this._sprites, BulletType.WAVE, this.x - 40, this.y, -320, 0
-          ));
+          this._newBullets.push(this._projectileFactory({
+            type: BulletType.WAVE,
+            x: this.x - 40,
+            y: this.y,
+            vx: -320,
+            vy: 0,
+          }));
           this._audio.play('bioLaser');
         }
       }
@@ -231,12 +242,20 @@ export class Boss3 extends BossBase {
             const vx = (dx / dist) * 440;
             const vy = (dy / dist) * 440;
 
-            this._newBullets.push(new Bullet(
-              this._scene, this._sprites, 'bossLaser', this.x - 20, this.y - 12, vx, vy
-            ));
-            this._newBullets.push(new Bullet(
-              this._scene, this._sprites, 'bossLaser', this.x - 20, this.y + 12, vx, vy
-            ));
+            this._newBullets.push(this._projectileFactory({
+              type: BulletType.BOSS_LASER,
+              x: this.x - 20,
+              y: this.y - 12,
+              vx,
+              vy,
+            }));
+            this._newBullets.push(this._projectileFactory({
+              type: BulletType.BOSS_LASER,
+              x: this.x - 20,
+              y: this.y + 12,
+              vx,
+              vy,
+            }));
             this._audio.play('bioLaser');
           }
         }

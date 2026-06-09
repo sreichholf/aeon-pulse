@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { Enemy } from './Enemy.ts';
-import { Bullet } from './Bullet.ts';
-import { BulletType, type GetPositionFn, type IScene } from '../types.ts';
+import { BulletType, type GetPositionFn, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 
@@ -17,8 +16,9 @@ export class EnemySpore extends Enemy {
     x: number,
     y: number,
     getPlayerPos: GetPositionFn,
+    projectileFactory: ProjectileFactoryFn,
   ) {
-    super(scene, sprites, null, 0, 0, 16, 16, x, y);
+    super(scene, sprites, null, 0, 0, 16, 16, x, y, projectileFactory);
     this._hp           = 4;
     this.score         = 300;
     this._dropChance   = 0.06;
@@ -120,12 +120,14 @@ export class EnemySpore extends Enemy {
     for (let i = 0; i < 4; i++) {
       const a     = (i / 4) * Math.PI * 2;
       const speed = 120;
-      this._pendingBullets.push(new Bullet(
-        this._scene, this._sprites, BulletType.HOMING,
-        ox, oy,
-        Math.cos(a) * speed, Math.sin(a) * speed,
-        this._getPlayerPos,
-      ));
+      this._pendingBullets.push(this._projectileFactory({
+        type: BulletType.HOMING,
+        x: ox,
+        y: oy,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed,
+        getTargetPos: this._getPlayerPos,
+      }));
     }
   }
 }

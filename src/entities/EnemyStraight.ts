@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
-import { Bullet } from './Bullet.ts';
-import { BulletType, type GetPositionFn, type IAudio, type IScene } from '../types.ts';
+import { BulletType, type GetPositionFn, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed, addVertexColor } from '../utils/ProceduralToolkit.ts';
 
@@ -107,9 +106,10 @@ export class EnemyStraight extends Enemy {
     x: number,
     y: number,
     getPlayerPos: GetPositionFn,
+    projectileFactory: ProjectileFactoryFn,
     _audio: IAudio | null = null,
   ) {
-    super(scene, sprites, null, 0, 0, HW, HH, x, y);
+    super(scene, sprites, null, 0, 0, HW, HH, x, y, projectileFactory);
     this._hp           = 1;
     this.score         = 100;
     this._dropChance   = 0.07;
@@ -254,8 +254,8 @@ export class EnemyStraight extends Enemy {
     const spawnRight = { type: BulletType.ENEMY, x: rightWorldPos.x, y: rightWorldPos.y, vx, vy };
 
     this._newBullets.push(
-      this._projectileFactory?.(spawnLeft) ?? new Bullet(this._scene, this._sprites, BulletType.ENEMY, spawnLeft.x, spawnLeft.y, vx, vy),
-      this._projectileFactory?.(spawnRight) ?? new Bullet(this._scene, this._sprites, BulletType.ENEMY, spawnRight.x, spawnRight.y, vx, vy)
+      this._projectileFactory(spawnLeft),
+      this._projectileFactory(spawnRight)
     );
 
     this._kickback = 7.0;    // Brutal recoil slam to the right (+X)

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
-import { Bullet } from './Bullet.ts';
-import { BulletType, type GetPositionFn, type IAudio, type IScene } from '../types.ts';
+import { BulletType, type GetPositionFn, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed, addVertexColor } from '../utils/ProceduralToolkit.ts';
 
@@ -41,9 +40,10 @@ export class EnemyTurret extends Enemy {
     x: number,
     y: number,
     getPlayerPos: GetPositionFn,
+    projectileFactory: ProjectileFactoryFn,
     audio: IAudio | null,
   ) {
-    super(scene, sprites, null, 0, 0, HW, HH, x, y);
+    super(scene, sprites, null, 0, 0, HW, HH, x, y, projectileFactory);
     this._hp           = 3;
     this.score         = 300;
     this._dropChance   = 0.07;
@@ -422,7 +422,14 @@ export class EnemyTurret extends Enemy {
         const vy = Math.sin(aimAngle) * speed;
 
         this._newBullets.push(
-          new Bullet(this._scene, this._sprites, BulletType.BOSS_LASER, firePos.x, firePos.y, vx, vy, null, 0x00ffff)
+          this._projectileFactory({
+            type: BulletType.BOSS_LASER,
+            x: firePos.x,
+            y: firePos.y,
+            vx,
+            vy,
+            tint: 0x00ffff,
+          })
         );
       }
     }

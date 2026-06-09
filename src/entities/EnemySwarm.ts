@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
-import type { GetPositionFn, IAudio, IScene } from '../types.ts';
+import type { GetPositionFn, IAudio, IScene, ProjectileFactoryFn } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 
@@ -29,9 +29,10 @@ export class EnemySwarm extends Enemy {
     x: number,
     y: number,
     getPlayerPos: GetPositionFn,
+    projectileFactory: ProjectileFactoryFn,
     _audio: IAudio | null = null,
   ) {
-    super(scene, sprites, null, 0, 0, HW, HH, x, y);
+    super(scene, sprites, null, 0, 0, HW, HH, x, y, projectileFactory);
     this._hp           = 1;
     this.score         = 50;
     this._getPlayerPos = getPlayerPos;

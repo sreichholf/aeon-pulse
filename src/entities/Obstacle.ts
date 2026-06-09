@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import { Enemy } from './Enemy.ts';
-import type { IScene } from '../types.ts';
+import type { IScene, ProjectileFactoryFn } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 
 
 export class Obstacle extends Enemy {
-  constructor(scene: IScene, sprites: Record<string, THREE.Texture>, x: number, y: number) {
-    super(scene, sprites, null, 0, 0, 25, 55, x, y);
+  constructor(scene: IScene, sprites: Record<string, THREE.Texture>, x: number, y: number, projectileFactory: ProjectileFactoryFn) {
+    super(scene, sprites, null, 0, 0, 25, 55, x, y, projectileFactory);
     this._hp          = 25;
     this.score        = 500;
     this._displayName = 'Obstacle';

@@ -75,10 +75,11 @@ describe('tickGameplay', () => {
     // Non-spaceship enemy terrain bounds should remain null
     expect(enemyNonSpaceShip.terrainBounds).toBeNull();
 
-    // Test case 2: fallback to getWallsAt if getActualWallsAt is not defined
+    // Test case 2: verify getActualWallsAt is called for all terrain implementations
     const terrainClassic = {
       update: vi.fn(),
-      getWallsAt: vi.fn().mockReturnValue({ top: 120, bottom: -120 }),
+      getActualWallsAt: vi.fn().mockReturnValue({ top: 120, bottom: -120 }),
+      getWallsAt: vi.fn(),
     } as unknown as ITerrain;
 
     const world2: WorldState = {
@@ -94,8 +95,8 @@ describe('tickGameplay', () => {
     };
 
     tickGameplay(world2, 0.1);
-    expect(terrainClassic.getWallsAt).toHaveBeenCalledWith(150); // Player
-    expect(terrainClassic.getWallsAt).toHaveBeenCalledWith(180); // Spaceship enemy
+    expect(terrainClassic.getActualWallsAt).toHaveBeenCalledWith(150); // Player
+    expect(terrainClassic.getActualWallsAt).toHaveBeenCalledWith(180); // Spaceship enemy
     expect(player.terrainBounds).toEqual({ top: 120, bottom: -120 });
   });
 

@@ -147,6 +147,10 @@ export class Terrain implements ITerrain {
     return { top: last.top, bottom: last.bottom };
   }
 
+  getActualWallsAt(scrollX: number): TerrainBounds {
+    return this.getWallsAt(scrollX);
+  }
+
   // ── Infinite Scrolling & Real-time Scaling Update Loop ──
 
   update(scrollX: number): void {
