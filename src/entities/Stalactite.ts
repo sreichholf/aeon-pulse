@@ -66,8 +66,32 @@ export class Stalactite extends Enemy {
     this._shatterTimer   = 0;
     this._time           = 0;
     this._shards         = [];
-    this._shardMaterials = null;
-    this._shardGeometries = null;
+
+    // Pre-allocate physical shrapnel shards geometries and materials
+    const shardRockMat = new THREE.MeshPhongMaterial({
+      color: 0x44372e,
+      emissive: 0x1e1007,
+      specular: 0x382c24,
+      shininess: 35,
+      transparent: true,
+      opacity: 1
+    });
+
+    const shardLavaMat = new THREE.MeshPhongMaterial({
+      color: 0xff3300,
+      emissive: 0xff3300,
+      shininess: 20,
+      transparent: true,
+      opacity: 1
+    });
+
+    this._shardMaterials = [shardRockMat, shardLavaMat];
+
+    this._shardGeometries = [
+      new THREE.BoxGeometry(4.5, 4.5, 4.5),
+      new THREE.ConeGeometry(2.5, 6, 4),
+      new THREE.SphereGeometry(3, 4, 4)
+    ];
 
     // Initialize joint/tip material refs
     this._jointMat    = null;
@@ -441,58 +465,41 @@ export class Stalactite extends Enemy {
     // 2. Spawn 3D physical shrapnel shards!
     this._shards = [];
 
-    const shardRockMat = new THREE.MeshPhongMaterial({
-      color: 0x44372e,
-      emissive: 0x1e1007,
-      specular: 0x382c24,
-      shininess: 35,
-      transparent: true,
-      opacity: 1
-    });
+    if (this._shardGeometries && this._shardMaterials) {
+      const shardRockMat = this._shardMaterials[0]!;
+      const shardLavaMat = this._shardMaterials[1]!;
 
-    const shardLavaMat = new THREE.MeshPhongMaterial({
-      color: 0xff3300,
-      emissive: 0xff3300,
-      shininess: 20,
-      transparent: true,
-      opacity: 1
-    });
+      // Reset material opacities for the fade effect
+      shardRockMat.opacity = 1;
+      shardLavaMat.opacity = 1;
 
-    this._shardMaterials = [shardRockMat, shardLavaMat];
+      const numShards = 6;
+      for (let i = 0; i < numShards; i++) {
+        const geo = this._shardGeometries[i % this._shardGeometries.length]!;
+        const mat = i % 2 === 0 ? shardRockMat : shardLavaMat;
+        const shardMesh = new THREE.Mesh(geo, mat);
 
-    const shardGeometries: THREE.BufferGeometry[] = [
-      new THREE.BoxGeometry(4.5, 4.5, 4.5),
-      new THREE.ConeGeometry(2.5, 6, 4),
-      new THREE.SphereGeometry(3, 4, 4)
-    ];
-    this._shardGeometries = shardGeometries;
+        shardMesh.position.set(
+          this.x + (Math.random() - 0.5) * 8,
+          this.y - 28,
+          (Math.random() - 0.5) * 10
+        );
+        this._scene.add(shardMesh);
 
-    const numShards = 6;
-    for (let i = 0; i < numShards; i++) {
-      const geo = shardGeometries[i % shardGeometries.length];
-      const mat = i % 2 === 0 ? shardRockMat : shardLavaMat;
-      const shardMesh = new THREE.Mesh(geo, mat);
+        const vx = (Math.random() - 0.5) * 200 - SCROLL_SPD * 0.5;
+        const vy = 120 + Math.random() * 150;
+        const vz = (Math.random() - 0.5) * 120;
 
-      shardMesh.position.set(
-        this.x + (Math.random() - 0.5) * 8,
-        this.y - 28,
-        (Math.random() - 0.5) * 10
-      );
-      this._scene.add(shardMesh);
+        const rx = (Math.random() - 0.5) * 10;
+        const ry = (Math.random() - 0.5) * 10;
+        const rz = (Math.random() - 0.5) * 10;
 
-      const vx = (Math.random() - 0.5) * 200 - SCROLL_SPD * 0.5;
-      const vy = 120 + Math.random() * 150;
-      const vz = (Math.random() - 0.5) * 120;
-
-      const rx = (Math.random() - 0.5) * 10;
-      const ry = (Math.random() - 0.5) * 10;
-      const rz = (Math.random() - 0.5) * 10;
-
-      this._shards.push({
-        mesh: shardMesh,
-        vx, vy, vz,
-        rx, ry, rz
-      });
+        this._shards.push({
+          mesh: shardMesh,
+          vx, vy, vz,
+          rx, ry, rz
+        });
+      }
     }
   }
 

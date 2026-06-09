@@ -110,6 +110,7 @@ export class Terrain4 implements ITerrain {
   private _scrollX: number;
   private _time: number;
   private _instanceHelper: THREE.Object3D;
+  private _tipCache: Map<number, { topTips: number[], botTips: number[] }>;
 
   constructor(scene: IScene, points: ControlPoint[]) {
     this._scene  = scene;
@@ -235,6 +236,7 @@ export class Terrain4 implements ITerrain {
     this._scrollX = 0;
     this._time = 0;
     this._instanceHelper = new THREE.Object3D();
+    this._tipCache = new Map();
     this.update(0);
   }
 
@@ -285,18 +287,26 @@ export class Terrain4 implements ITerrain {
       top    = last.top;
       bottom = last.bottom;
     } else {
-      top    = pts[0]!.top;
-      bottom = pts[0]!.bottom;
-      let prev = pts[0]!;
-      for (const cur of pts.slice(1)) {
-        if (scrollX >= prev.at && scrollX <= cur.at) {
-          const t = (scrollX - prev.at) / (cur.at - prev.at);
-          top    = prev.top    + (cur.top    - prev.top)    * t;
-          bottom = prev.bottom + (cur.bottom - prev.bottom) * t;
+      // Binary search to find the segment containing scrollX
+      let low = 0;
+      let high = pts.length - 2;
+      let idx = 0;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (scrollX >= pts[mid]!.at && scrollX <= pts[mid + 1]!.at) {
+          idx = mid;
           break;
+        } else if (scrollX < pts[mid]!.at) {
+          high = mid - 1;
+        } else {
+          low = mid + 1;
         }
-        prev = cur;
       }
+      const prev = pts[idx]!;
+      const cur = pts[idx + 1]!;
+      const t = (scrollX - prev.at) / (cur.at - prev.at);
+      top    = prev.top    + (cur.top    - prev.top)    * t;
+      bottom = prev.bottom + (cur.bottom - prev.bottom) * t;
     }
     bottom += this._getPulseOffset();
     return { top, bottom };
@@ -316,36 +326,68 @@ export class Terrain4 implements ITerrain {
     for (let slotOffset = -1; slotOffset <= 1; slotOffset++) {
       const slot = centerSlot + slotOffset;
       const slotWorldX = slot * S;
-      const poolIndex = Math.abs(slot) % this._slotCount;
+      
+      const cached = this._tipCache.get(slot);
+      if (cached) {
+        const poolIndex = Math.abs(slot) % this._slotCount;
+        const topCols = this._topSlots[poolIndex]!;
+        const botCols = this._botSlots[poolIndex]!;
 
-      const topCols = this._topSlots[poolIndex]!;
-      const botCols = this._botSlots[poolIndex]!;
+        // Check top columns (d = 1 and d = 2 overlap with player's Z plane)
+        for (let d = 1; d <= 2; d++) {
+          const col = topCols[d]!;
+          const colWorldX = slotWorldX + col.dx;
 
-      // Check top columns (d = 1 and d = 2 overlap with player's Z plane)
-      for (let d = 1; d <= 2; d++) {
-        const col = topCols[d]!
-        const colWorldX = slotWorldX + col.dx;
-
-        // Horizontally overlapping this column?
-        if (Math.abs(scrollX - colWorldX) < col.radius) {
-          const tWalls = this.getWallsAt(colWorldX);
-          const topHeight = Math.max(1, (GAME_HEIGHT / 2 - tWalls.top) + col.heightOffset);
-          const tipY = GAME_HEIGHT / 2 - topHeight;
-          actualTop = Math.min(actualTop, tipY);
+          // Horizontally overlapping this column?
+          if (Math.abs(scrollX - colWorldX) < col.radius) {
+            const tipY = cached.topTips[d]!;
+            actualTop = Math.min(actualTop, tipY);
+          }
         }
-      }
 
-      // Check bottom columns (d = 1 and d = 2 overlap with player's Z plane)
-      for (let d = 1; d <= 2; d++) {
-        const col = botCols[d]!
-        const colWorldX = slotWorldX + col.dx;
+        // Check bottom columns (d = 1 and d = 2 overlap with player's Z plane)
+        for (let d = 1; d <= 2; d++) {
+          const col = botCols[d]!;
+          const colWorldX = slotWorldX + col.dx;
 
-        // Horizontally overlapping this column?
-        if (Math.abs(scrollX - colWorldX) < col.radius) {
-          const bWalls = this.getWallsAt(colWorldX);
-          const botHeight = Math.max(1, (bWalls.bottom - (-GAME_HEIGHT / 2)) + col.heightOffset);
-          const tipY = -GAME_HEIGHT / 2 + botHeight;
-          actualBottom = Math.max(actualBottom, tipY);
+          // Horizontally overlapping this column?
+          if (Math.abs(scrollX - colWorldX) < col.radius) {
+            const tipY = cached.botTips[d]!;
+            actualBottom = Math.max(actualBottom, tipY);
+          }
+        }
+      } else {
+        // Fallback for offscreen / uncached coordinates
+        const poolIndex = Math.abs(slot) % this._slotCount;
+        const topCols = this._topSlots[poolIndex]!;
+        const botCols = this._botSlots[poolIndex]!;
+
+        // Check top columns (d = 1 and d = 2 overlap with player's Z plane)
+        for (let d = 1; d <= 2; d++) {
+          const col = topCols[d]!;
+          const colWorldX = slotWorldX + col.dx;
+
+          // Horizontally overlapping this column?
+          if (Math.abs(scrollX - colWorldX) < col.radius) {
+            const tWalls = this.getWallsAt(colWorldX);
+            const topHeight = Math.max(1, (GAME_HEIGHT / 2 - tWalls.top) + col.heightOffset);
+            const tipY = GAME_HEIGHT / 2 - topHeight;
+            actualTop = Math.min(actualTop, tipY);
+          }
+        }
+
+        // Check bottom columns (d = 1 and d = 2 overlap with player's Z plane)
+        for (let d = 1; d <= 2; d++) {
+          const col = botCols[d]!;
+          const colWorldX = slotWorldX + col.dx;
+
+          // Horizontally overlapping this column?
+          if (Math.abs(scrollX - colWorldX) < col.radius) {
+            const bWalls = this.getWallsAt(colWorldX);
+            const botHeight = Math.max(1, (bWalls.bottom - (-GAME_HEIGHT / 2)) + col.heightOffset);
+            const tipY = -GAME_HEIGHT / 2 + botHeight;
+            actualBottom = Math.max(actualBottom, tipY);
+          }
         }
       }
     }
@@ -365,6 +407,9 @@ export class Terrain4 implements ITerrain {
   update(scrollX: number, dt: number = 0): void {
     this._scrollX = scrollX;
     this._time += dt;
+
+    // Clear column tip Y cache for the new frame
+    this._tipCache.clear();
 
     // 1. Advance pulse timer & compute lava intensity curve
     if (this._pulsing) {
@@ -444,6 +489,9 @@ export class Terrain4 implements ITerrain {
       );
 
       // 4B. Update individual Column meshes (Z = -28 to 8)
+      const topTips = [0, 0, 0];
+      const botTips = [0, 0, 0];
+
       for (let d = 0; d < 3; d++) {
         const tCol = topCols[d]!;
         const bCol = botCols[d]!;
@@ -456,6 +504,7 @@ export class Terrain4 implements ITerrain {
 
         // Position, scale & rotate Top Column
         const topHeight = Math.max(1, (GAME_HEIGHT / 2 - tWalls.top) + tCol.heightOffset);
+        topTips[d] = GAME_HEIGHT / 2 - topHeight;
         this._setInstanceTransform(
           this._topColumnMesh,
           topColumnCount++,
@@ -466,6 +515,7 @@ export class Terrain4 implements ITerrain {
 
         // Position, scale & rotate Bottom Column
         const botHeight = Math.max(1, (bWalls.bottom - (-GAME_HEIGHT / 2)) + bCol.heightOffset);
+        botTips[d] = -GAME_HEIGHT / 2 + botHeight;
         this._setInstanceTransform(
           this._botColumnMesh,
           botColumnCount++,
@@ -474,6 +524,7 @@ export class Terrain4 implements ITerrain {
           [bCol.radius, botHeight, 0.2],
         );
       }
+      this._tipCache.set(slot, { topTips, botTips });
     }
 
     this._topBackingMesh.count = topBackingCount;

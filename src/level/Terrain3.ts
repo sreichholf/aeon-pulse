@@ -161,18 +161,29 @@ export class Terrain3 implements ITerrain {
     const last = pts[pts.length - 1]!;
     if (scrollX <= first.at) return { top: first.top, bottom: first.bottom };
     if (scrollX >= last.at) return { top: last.top, bottom: last.bottom };
-    let prev = first;
-    for (const cur of pts.slice(1)) {
-      if (scrollX >= prev.at && scrollX <= cur.at) {
-        const t = (scrollX - prev.at) / (cur.at - prev.at);
-        return {
-          top: prev.top + (cur.top - prev.top) * t,
-          bottom: prev.bottom + (cur.bottom - prev.bottom) * t,
-        };
+    
+    // Binary search to find the segment containing scrollX
+    let low = 0;
+    let high = pts.length - 2;
+    let idx = 0;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (scrollX >= pts[mid]!.at && scrollX <= pts[mid + 1]!.at) {
+        idx = mid;
+        break;
+      } else if (scrollX < pts[mid]!.at) {
+        high = mid - 1;
+      } else {
+        low = mid + 1;
       }
-      prev = cur;
     }
-    return { top: last.top, bottom: last.bottom };
+    const prev = pts[idx]!;
+    const cur = pts[idx + 1]!;
+    const t = (scrollX - prev.at) / (cur.at - prev.at);
+    return {
+      top: prev.top + (cur.top - prev.top) * t,
+      bottom: prev.bottom + (cur.bottom - prev.bottom) * t,
+    };
   }
 
   getActualWallsAt(scrollX: number): TerrainBounds {
