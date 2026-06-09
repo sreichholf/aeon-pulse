@@ -9,8 +9,8 @@ export function spawnEnemy(type: EnemyType, params: SpawnEnemyParams): IEnemy | 
 }
 
 /**
- * Spawns a boss based on the current level archetype.
+ * Spawns a boss based on the current boss archetype.
  */
-export function spawnBoss(levelArchetype: number, params: SpawnBossParams): IBoss {
-  return spawnCatalogBoss(levelArchetype, params);
+export function spawnBoss(bossArchetype: number, params: SpawnBossParams): IBoss {
+  return spawnCatalogBoss(bossArchetype, params);
 }

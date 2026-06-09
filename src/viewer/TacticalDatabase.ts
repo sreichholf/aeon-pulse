@@ -207,7 +207,7 @@ export class TacticalDatabase {
 
     for (let i = 0; i < bossEntries.length; i++) {
       const entry = bossEntries[i]!;
-      const { level } = entry;
+      const { bossArchetype } = entry;
       const { scale } = entry.viewer;
       const col = i % 2;
       const row = Math.floor(i / 2);
@@ -215,7 +215,7 @@ export class TacticalDatabase {
       const x = (col - 0.5) * 320;
       const y = (0.5 - row) * 190;
 
-      const spawnedBoss = spawnBoss(level, {
+      const spawnedBoss = spawnBoss(bossArchetype, {
         scene: this._scene,
         sprites: this._sprites,
         getPos,

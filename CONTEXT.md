@@ -120,6 +120,10 @@ _Avoid_: Level boss, stage boss
 The campaign data that assigns a boss encounter to a chapter finale. Current bosses are the initial finale bosses, but chapter number should not permanently imply a boss class.
 _Avoid_: Chapter-to-boss hard mapping
 
+**Boss Archetype**:
+The stable factory identity for a finale boss presentation and constructor family. A Boss Archetype may currently match a chapter archetype number, but it is not a Level ID or a chapter number.
+_Avoid_: Boss level, chapter-to-boss hard mapping
+
 **Level End Event**:
 The authored completion moment for a non-finale level after its required waves, enemies, and visible rewards have resolved.
 _Avoid_: No-boss boss spawn, implicit timeout, fixed end position

@@ -42,7 +42,7 @@ export interface EnemyCatalogEntry {
 }
 
 export interface BossViewerPresentation {
-  level: number;
+  bossArchetype: number;
   scale: number;
 }
 
@@ -57,7 +57,7 @@ export interface SpawnBossParams {
 }
 
 export interface BossCatalogEntry {
-  level: number;
+  bossArchetype: number;
   viewer: BossViewerPresentation;
   /** Ordered list of projectile source keys to cycle through in the Tactical Database preview. */
   viewerProjectileKeys: ProjectileSourceKey[];
@@ -128,10 +128,10 @@ export const ENEMY_CATALOG: readonly EnemyCatalogEntry[] = [
 ] as const;
 
 export const BOSS_CATALOG: readonly BossCatalogEntry[] = [
-  { level: 1, viewer: { level: 1, scale: 0.52 }, viewerProjectileKeys: [ProjectileSourceKey.BOSS, ProjectileSourceKey.HOMING] },
-  { level: 2, viewer: { level: 2, scale: 0.45 }, viewerProjectileKeys: [ProjectileSourceKey.BOSS, ProjectileSourceKey.HOMING, ProjectileSourceKey.BOSS_LASER] },
-  { level: 3, viewer: { level: 3, scale: 0.36 }, viewerProjectileKeys: [ProjectileSourceKey.BOSS_LASER, ProjectileSourceKey.HOMING, ProjectileSourceKey.WAVE] },
-  { level: 4, viewer: { level: 4, scale: 0.33 }, viewerProjectileKeys: [ProjectileSourceKey.LAVA] },
+  { bossArchetype: 1, viewer: { bossArchetype: 1, scale: 0.52 }, viewerProjectileKeys: [ProjectileSourceKey.BOSS, ProjectileSourceKey.HOMING] },
+  { bossArchetype: 2, viewer: { bossArchetype: 2, scale: 0.45 }, viewerProjectileKeys: [ProjectileSourceKey.BOSS, ProjectileSourceKey.HOMING, ProjectileSourceKey.BOSS_LASER] },
+  { bossArchetype: 3, viewer: { bossArchetype: 3, scale: 0.36 }, viewerProjectileKeys: [ProjectileSourceKey.BOSS_LASER, ProjectileSourceKey.HOMING, ProjectileSourceKey.WAVE] },
+  { bossArchetype: 4, viewer: { bossArchetype: 4, scale: 0.33 }, viewerProjectileKeys: [ProjectileSourceKey.LAVA] },
 ] as const;
 
 const ENEMY_BY_TYPE = new Map<EnemyType, EnemyCatalogEntry>(
@@ -153,11 +153,11 @@ export function spawnCatalogEnemy(type: EnemyType, params: SpawnEnemyParams): IE
 }
 
 export function getBossCatalogEntries(): BossCatalogEntry[] {
-  return [...BOSS_CATALOG].sort((a, b) => a.level - b.level);
+  return [...BOSS_CATALOG].sort((a, b) => a.bossArchetype - b.bossArchetype);
 }
 
-export function spawnCatalogBoss(level: number, { scene, sprites, getPos, onDeath, audio, spawnEnemyCallback, projectileFactory }: SpawnBossParams): IBoss {
-  const def = LEVELS[level as keyof typeof LEVELS]!;
+export function spawnCatalogBoss(bossArchetype: number, { scene, sprites, getPos, onDeath, audio, spawnEnemyCallback, projectileFactory }: SpawnBossParams): IBoss {
+  const def = LEVELS[bossArchetype as keyof typeof LEVELS]!;
   const params: BossConstructorParams = {
     scene,
     sprites,
