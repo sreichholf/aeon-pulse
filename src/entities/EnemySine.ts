@@ -4,7 +4,25 @@ import type { GetPositionFn, IAudio, IScene } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  return geo.index ? geo.toNonIndexed() : geo.clone();
+  const cloned = geo.index ? geo.toNonIndexed() : geo.clone();
+  if (cloned.hasAttribute('uv')) {
+    cloned.deleteAttribute('uv');
+  }
+  return cloned;
+}
+
+function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
+  const posAttr = geo.getAttribute('position');
+  if (!posAttr) return;
+
+  const colors = new Float32Array(posAttr.count * 3);
+  const color = new THREE.Color(colorHex);
+  for (let i = 0; i < posAttr.count; i++) {
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 
 const SPEED         = 110;
@@ -180,19 +198,13 @@ export class EnemySine extends Enemy {
     this._visualsGroup = visuals;
 
     // --- Materials (Bio-Mechanical Interceptor Design System) ---
-    const hullMat = new THREE.MeshPhongMaterial({
-      color: 0x2ebd2e,
+    const structuralMat = new THREE.MeshPhongMaterial({
+      color: 0xffffff,
       emissive: 0x003305,
       shininess: 90,
-      specular: 0x339933, // wet green-tinted specular sheen
+      specular: 0x339933,
       flatShading: true,
-    });
-
-    const brightMat = new THREE.MeshPhongMaterial({
-      color: 0x5ce65c,
-      shininess: 70,
-      specular: 0x44aa44,
-      flatShading: true,
+      vertexColors: true,
     });
 
     const cockpitMat = new THREE.MeshPhongMaterial({
@@ -233,28 +245,35 @@ export class EnemySine extends Enemy {
     // ── 1. CENTRAL SPHERICAL CORE & CARAPACE PANELS (2x Scaled) ──────────────
     // Base Core Sphere (Radius 12)
     const coreGeo = new THREE.SphereGeometry(12, 16, 16);
-    const coreMesh = new THREE.Mesh(coreGeo, engineMetalMat);
-    visuals.add(coreMesh);
 
     // Segmented Carapace Panels: Top, Bottom, and Rear bands (Radius ~12.4)
     const topPanelGeo = new THREE.SphereGeometry(12.4, 16, 8, 0, Math.PI * 2, 0, Math.PI / 3);
     const bottomPanelGeo = new THREE.SphereGeometry(12.4, 16, 8, 0, Math.PI * 2, Math.PI * 2 / 3, Math.PI / 3);
-    const panelGeos = [
-      ensureNonIndexed(topPanelGeo),
-      ensureNonIndexed(bottomPanelGeo),
-    ];
-    const mergedPanelGeo = mergeGeometries(panelGeos);
-    const panelsMesh = new THREE.Mesh(mergedPanelGeo, hullMat);
-    visuals.add(panelsMesh);
+    const rearPanelGeo = new THREE.SphereGeometry(12.2, 16, 8, Math.PI / 2, Math.PI, Math.PI / 4, Math.PI / 2);
+
+    const coreCloned = ensureNonIndexed(coreGeo);
+    addVertexColor(coreCloned, 0x0c260c);
+
+    const topPanelCloned = ensureNonIndexed(topPanelGeo);
+    addVertexColor(topPanelCloned, 0x2ebd2e);
+
+    const bottomPanelCloned = ensureNonIndexed(bottomPanelGeo);
+    addVertexColor(bottomPanelCloned, 0x2ebd2e);
+
+    const rearPanelCloned = ensureNonIndexed(rearPanelGeo);
+    addVertexColor(rearPanelCloned, 0x5ce65c);
+
+    const coreGeos = [coreCloned, topPanelCloned, bottomPanelCloned, rearPanelCloned];
+    const mergedCoreGeo = mergeGeometries(coreGeos);
+    const coreMesh = new THREE.Mesh(mergedCoreGeo, structuralMat);
+    visuals.add(coreMesh);
 
     // Clean up temporary geometries
-    panelGeos.forEach(g => g.dispose());
+    coreGeos.forEach(g => g.dispose());
+    coreGeo.dispose();
     topPanelGeo.dispose();
     bottomPanelGeo.dispose();
-
-    const rearPanelGeo = new THREE.SphereGeometry(12.2, 16, 8, Math.PI / 2, Math.PI, Math.PI / 4, Math.PI / 2);
-    const rearPanel = new THREE.Mesh(rearPanelGeo, brightMat);
-    visuals.add(rearPanel);
+    rearPanelGeo.dispose();
 
     // ── 2. DEEP BIO-APERTURE OPTIC EYE (2x Scaled) ───────────────────────────
     // Glass Outer Lens Dome (Hemisphere radius 6.0 pointing along -X direction)
@@ -288,19 +307,22 @@ export class EnemySine extends Enemy {
     // Claw 1: Top-Front (TF) - Pivot Group centered at hinge joint (-2, 11, 0)
     this._clawTF = new THREE.Group();
     this._clawTF.position.set(-2, 11, 0);
-    const shieldTF = new THREE.Mesh(shieldGeo, hullMat);
-    shieldTF.position.set(-6, 4, 0);
-    shieldTF.rotation.z = 0.2;
+
+    const shieldTFCloned = ensureNonIndexed(shieldGeo);
+    shieldTFCloned.rotateZ(0.2);
+    shieldTFCloned.translate(-6, 4, 0);
+    addVertexColor(shieldTFCloned, 0x2ebd2e);
 
     const spikeTFCloned = ensureNonIndexed(spikeGeo);
     spikeTFCloned.rotateZ(0.5);
     spikeTFCloned.translate(-13, 2.6, 0);
+    addVertexColor(spikeTFCloned, 0x0c260c);
     const hingeTFCloned = ensureNonIndexed(hingeGeo);
-    const clawTFGeos = [spikeTFCloned, hingeTFCloned];
+    addVertexColor(hingeTFCloned, 0x0c260c);
+    const clawTFGeos = [shieldTFCloned, spikeTFCloned, hingeTFCloned];
     const mergedClawTFGeo = mergeGeometries(clawTFGeos);
-    const clawTFMesh = new THREE.Mesh(mergedClawTFGeo, engineMetalMat);
+    const clawTFMesh = new THREE.Mesh(mergedClawTFGeo, structuralMat);
 
-    this._clawTF.add(shieldTF);
     this._clawTF.add(clawTFMesh);
     visuals.add(this._clawTF);
 
@@ -309,19 +331,22 @@ export class EnemySine extends Enemy {
     // Claw 2: Top-Back (TB) - Pivot Group centered at hinge joint (2, 11, 0)
     this._clawTB = new THREE.Group();
     this._clawTB.position.set(2, 11, 0);
-    const shieldTB = new THREE.Mesh(shieldGeo, hullMat);
-    shieldTB.position.set(6, 4, 0);
-    shieldTB.rotation.z = -0.2;
+
+    const shieldTBCloned = ensureNonIndexed(shieldGeo);
+    shieldTBCloned.rotateZ(-0.2);
+    shieldTBCloned.translate(6, 4, 0);
+    addVertexColor(shieldTBCloned, 0x2ebd2e);
 
     const spikeTBCloned = ensureNonIndexed(spikeGeo);
     spikeTBCloned.rotateZ(-0.5);
     spikeTBCloned.translate(13, 2.6, 0);
+    addVertexColor(spikeTBCloned, 0x0c260c);
     const hingeTBCloned = ensureNonIndexed(hingeGeo);
-    const clawTBGeos = [spikeTBCloned, hingeTBCloned];
+    addVertexColor(hingeTBCloned, 0x0c260c);
+    const clawTBGeos = [shieldTBCloned, spikeTBCloned, hingeTBCloned];
     const mergedClawTBGeo = mergeGeometries(clawTBGeos);
-    const clawTBMesh = new THREE.Mesh(mergedClawTBGeo, engineMetalMat);
+    const clawTBMesh = new THREE.Mesh(mergedClawTBGeo, structuralMat);
 
-    this._clawTB.add(shieldTB);
     this._clawTB.add(clawTBMesh);
     visuals.add(this._clawTB);
 
@@ -330,19 +355,22 @@ export class EnemySine extends Enemy {
     // Claw 3: Bottom-Front (BF) - Pivot Group centered at hinge joint (-2, -11, 0)
     this._clawBF = new THREE.Group();
     this._clawBF.position.set(-2, -11, 0);
-    const shieldBF = new THREE.Mesh(shieldGeo, hullMat);
-    shieldBF.position.set(-6, -4, 0);
-    shieldBF.rotation.z = -0.2;
+
+    const shieldBFCloned = ensureNonIndexed(shieldGeo);
+    shieldBFCloned.rotateZ(-0.2);
+    shieldBFCloned.translate(-6, -4, 0);
+    addVertexColor(shieldBFCloned, 0x2ebd2e);
 
     const spikeBFCloned = ensureNonIndexed(spikeGeo);
     spikeBFCloned.rotateZ(-0.5);
     spikeBFCloned.translate(-13, -2.6, 0);
+    addVertexColor(spikeBFCloned, 0x0c260c);
     const hingeBFCloned = ensureNonIndexed(hingeGeo);
-    const clawBFGeos = [spikeBFCloned, hingeBFCloned];
+    addVertexColor(hingeBFCloned, 0x0c260c);
+    const clawBFGeos = [shieldBFCloned, spikeBFCloned, hingeBFCloned];
     const mergedClawBFGeo = mergeGeometries(clawBFGeos);
-    const clawBFMesh = new THREE.Mesh(mergedClawBFGeo, engineMetalMat);
+    const clawBFMesh = new THREE.Mesh(mergedClawBFGeo, structuralMat);
 
-    this._clawBF.add(shieldBF);
     this._clawBF.add(clawBFMesh);
     visuals.add(this._clawBF);
 
@@ -351,23 +379,29 @@ export class EnemySine extends Enemy {
     // Claw 4: Bottom-Back (BB) - Pivot Group centered at hinge joint (2, -11, 0)
     this._clawBB = new THREE.Group();
     this._clawBB.position.set(2, -11, 0);
-    const shieldBB = new THREE.Mesh(shieldGeo, hullMat);
-    shieldBB.position.set(6, -4, 0);
-    shieldBB.rotation.z = 0.2;
+
+    const shieldBBCloned = ensureNonIndexed(shieldGeo);
+    shieldBBCloned.rotateZ(0.2);
+    shieldBBCloned.translate(6, -4, 0);
+    addVertexColor(shieldBBCloned, 0x2ebd2e);
 
     const spikeBBCloned = ensureNonIndexed(spikeGeo);
     spikeBBCloned.rotateZ(0.5);
     spikeBBCloned.translate(13, -2.6, 0);
+    addVertexColor(spikeBBCloned, 0x0c260c);
     const hingeBBCloned = ensureNonIndexed(hingeGeo);
-    const clawBBGeos = [spikeBBCloned, hingeBBCloned];
+    addVertexColor(hingeBBCloned, 0x0c260c);
+    const clawBBGeos = [shieldBBCloned, spikeBBCloned, hingeBBCloned];
     const mergedClawBBGeo = mergeGeometries(clawBBGeos);
-    const clawBBMesh = new THREE.Mesh(mergedClawBBGeo, engineMetalMat);
+    const clawBBMesh = new THREE.Mesh(mergedClawBBGeo, structuralMat);
 
-    this._clawBB.add(shieldBB);
     this._clawBB.add(clawBBMesh);
     visuals.add(this._clawBB);
 
     clawBBGeos.forEach(g => g.dispose());
+    shieldGeo.dispose();
+    spikeGeo.dispose();
+    hingeGeo.dispose();
 
     // ── 4. DUAL THRUST-VECTORING THRUSTERS (2x Scaled) ───────────────────────
     const nozzleGeo = new THREE.CylinderGeometry(3.2, 2.0, 7.0, 12);

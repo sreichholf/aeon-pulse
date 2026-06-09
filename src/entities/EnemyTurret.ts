@@ -8,6 +8,20 @@ function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   return geo.index ? geo.toNonIndexed() : geo.clone();
 }
 
+function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
+  const posAttr = geo.getAttribute('position');
+  if (!posAttr) return;
+
+  const colors = new Float32Array(posAttr.count * 3);
+  const color = new THREE.Color(colorHex);
+  for (let i = 0; i < posAttr.count; i++) {
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
 const SPEED         = 120;
 const FIRE_INTERVAL = 2.5;
 const HW = 18, HH = 18;
@@ -90,10 +104,11 @@ export class EnemyTurret extends Enemy {
     });
 
     const sleeveMat = new THREE.MeshPhongMaterial({
-      color: 0x60728c,      // Polished gunmetal slate steel casing
+      color: 0xffffff,      // Vertex-colored barrel and slate casing
       emissive: 0x151b24,   // High-contrast industrial base shadows
       shininess: 75,
       specular: 0xffffff,   // Strong crisp highlights
+      vertexColors: true,
     });
 
     this._ventMat = new THREE.MeshPhongMaterial({
@@ -223,27 +238,32 @@ export class EnemyTurret extends Enemy {
     // Layer 1: Heavy central steel barrel cylinder (curved profile catches bright horizontal glints)
     const barrelGeo = new THREE.CylinderGeometry(4.5, 4.5, 34.0, 16);
     barrelGeo.rotateZ(Math.PI / 2);
-    const barrel = new THREE.Mesh(barrelGeo, baseMat);
-    barrel.position.set(-10, 0, 0);
-    this._cannonGroup.add(barrel);
+    const recoilGeos: THREE.BufferGeometry[] = [];
+
+    const barrelCloned = ensureNonIndexed(barrelGeo);
+    barrelCloned.translate(-10, 0, 0);
+    addVertexColor(barrelCloned, 0x8e9bb0);
+    recoilGeos.push(barrelCloned);
 
     // Layer 2: Flanking slate-steel outer plates (top and bottom armor sleeves)
     const plateGeo = new THREE.BoxGeometry(26, 3.0, 10.0);
-    const sleeveGeos: THREE.BufferGeometry[] = [];
 
     const plateTopCloned = ensureNonIndexed(plateGeo);
     plateTopCloned.translate(-10, 4.5, 0);
-    sleeveGeos.push(plateTopCloned);
+    addVertexColor(plateTopCloned, 0x60728c);
+    recoilGeos.push(plateTopCloned);
 
     const plateBottomCloned = ensureNonIndexed(plateGeo);
     plateBottomCloned.translate(-10, -4.5, 0);
-    sleeveGeos.push(plateBottomCloned);
+    addVertexColor(plateBottomCloned, 0x60728c);
+    recoilGeos.push(plateBottomCloned);
 
-    const mergedSleeveGeo = mergeGeometries(sleeveGeos);
+    const mergedSleeveGeo = mergeGeometries(recoilGeos);
     const sleeveMesh = new THREE.Mesh(mergedSleeveGeo, sleeveMat);
     this._cannonGroup.add(sleeveMesh);
 
-    sleeveGeos.forEach(g => g.dispose());
+    recoilGeos.forEach(g => g.dispose());
+    barrelGeo.dispose();
     plateGeo.dispose();
 
     // Recessed warning-orange/red heat vents flanking the armor

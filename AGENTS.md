@@ -17,6 +17,50 @@ There is no automated test suite. Verification is:
 
 For render-performance work, see `docs/render-optimization-notes.md` and `scripts/collect-render-stats.mjs`.
 
+### Manual Playtesting
+
+Use manual browser playtesting to verify gameplay feel, visuals, progression, and any change that touches entities, rendering, input, audio, UI, waves, terrain, or campaign flow.
+
+**Setup**:
+1. Run `npm run build` first. Fix build errors before opening the browser.
+2. Start the dev server with `npm run dev`.
+3. Open `http://localhost:5173`.
+4. If another process owns port `5173`, use the alternate Vite URL printed by the command instead.
+5. Use a fresh page load after code changes if HMR state may hide startup or constructor problems.
+
+**Starting a focused test run**:
+- On the title screen, press `Tab` to cycle difficulty mode.
+- When advanced title options are enabled, press `UP` / `DOWN` to choose a campaign level and `LEFT` / `RIGHT` to choose the starting weapon tier.
+- Press `Enter` or `Space` to start.
+- Use `M` to mute/unmute music when audio is not the test target.
+- Use `V` from the title screen to open the tactical database when validating entity or boss presentation.
+
+**Core controls during play**:
+- Move with `W` / `A` / `S` / `D` or arrow keys.
+- Fire or charge with `Space`.
+- Pause/unpause with `Escape` or `P`.
+- Continue through interstitial screens with `Enter` or `Space`.
+
+**Gameplay smoke checklist**:
+- Start at least one early level, one terrain-heavy level, and any level directly affected by the change.
+- Confirm the player can move, fire, take hits, collect powerups, pause, resume, die, and continue/restart without console errors.
+- For level or wave changes, play until the authored clear gate, exit flyout, boss spawn, or level-complete screen is reached.
+- For boss changes, verify entrance, phase transitions, attacks, hit flash, death sequence, scoring, and post-boss progression.
+- For difficulty changes, test at least Rookie and Ace if shields, damage, scoring, or high scores are involved.
+
+**Visual/render smoke checklist**:
+- Watch changed entities at gameplay scale and in the tactical database when cataloged there.
+- Verify moving parts still animate independently: claws, wings, recoil groups, nozzles, flames, warning lights, pupils, trails, and boss sub-groups should not be frozen by geometry merging.
+- Verify transparent pieces still blend correctly and are not hidden behind merged opaque geometry.
+- Verify damage flashes, charge pulses, muzzle flashes, and emissive warning states affect only the intended parts.
+- Watch for z-fighting, missing geometry, wrong pivots, inverted rotations, oversized hit visuals, blank meshes, or objects that remain after death.
+
+**Render-stat playtesting**:
+- Use the FPS/render counter when `ENABLE_RENDER_STATS` is enabled or via the runtime flag query-string override.
+- Exercise dense scenes with no-fire and tier-5 tap-fire patterns.
+- Compare draw-call peaks against recent profiler runs before declaring a render optimization complete.
+- If the in-app browser cannot start, fall back to the authorized CDP profiler workflow below and report that manual visual inspection was not completed.
+
 ### Automated Browser Testing (Windows)
 
 For render-performance profiling, a headless browser run using the Chrome DevTools Protocol (CDP) is the authorized way to capture automated gameplay render metrics.

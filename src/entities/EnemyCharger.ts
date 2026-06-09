@@ -4,7 +4,36 @@ import type { GetPositionFn, IAudio, IScene } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 function ensureNonIndexed(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  return geo.index ? geo.toNonIndexed() : geo.clone();
+  const cloned = geo.index ? geo.toNonIndexed() : geo.clone();
+  if (cloned.hasAttribute('uv')) {
+    cloned.deleteAttribute('uv');
+  }
+  return cloned;
+}
+
+function addVertexColor(geo: THREE.BufferGeometry, colorHex: number): void {
+  const posAttr = geo.getAttribute('position');
+  if (!posAttr) return;
+
+  const colors = new Float32Array(posAttr.count * 3);
+  const color = new THREE.Color(colorHex);
+  for (let i = 0; i < posAttr.count; i++) {
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+function coloredGeometry(
+  source: THREE.BufferGeometry,
+  colorHex: number,
+  transform?: (geo: THREE.BufferGeometry) => void,
+): THREE.BufferGeometry {
+  const geo = ensureNonIndexed(source);
+  if (transform) transform(geo);
+  addVertexColor(geo, colorHex);
+  return geo;
 }
 
 const SPEED        = 150;
@@ -72,14 +101,10 @@ export class EnemyCharger extends Enemy {
     return baseOffset * Math.cos(this._mesh!.rotation.y);
   }
 
-  // Track a material or geometry for batched disposal.
-  // Note: `res.isGeometry` is a legacy property that doesn't exist on BufferGeometry
-  // in three.js v0.130+ — geometries will not be tracked via this path and are
-  // disposed individually. This mirrors the original JS behaviour.
   private _trackResource<T extends THREE.Material | THREE.BufferGeometry>(res: T): T {
     if (!res) return res;
     if ((res as THREE.Material).isMaterial) this._materialsList.push(res as THREE.Material);
-    else if ((res as { isGeometry?: boolean }).isGeometry) this._geometriesList.push(res as THREE.BufferGeometry);
+    else if ((res as { isBufferGeometry?: boolean }).isBufferGeometry) this._geometriesList.push(res as THREE.BufferGeometry);
     return res;
   }
 
@@ -92,18 +117,12 @@ export class EnemyCharger extends Enemy {
     group.add(this._shipGroup);
 
     // Modern material design (Overcharged Plasma theme)
-    const matteMat = this._trackResource(new THREE.MeshPhongMaterial({
-      color: 0x1c1e22,       // Dark matte charcoal-grey
-      emissive: 0x050608,
-      shininess: 12,
-      specular: 0x222222,
-    }));
-
-    const metalMat = this._trackResource(new THREE.MeshPhongMaterial({
-      color: 0x607080,       // Anodized dark-blue slate metal
-      emissive: 0x0e1218,
-      shininess: 85,
-      specular: 0xaaaaaa,
+    const structuralMat = this._trackResource(new THREE.MeshPhongMaterial({
+      color: 0xffffff,       // Vertex-colored matte/metal structural surfaces
+      emissive: 0x080b10,
+      shininess: 60,
+      specular: 0x7f8b96,
+      vertexColors: true,
     }));
 
     const neonMat = this._trackResource(new THREE.MeshPhongMaterial({
@@ -138,23 +157,37 @@ export class EnemyCharger extends Enemy {
 
     // ── 1. FUSELAGE / BODY (Glaive-Class Interceptor) ──
     // Chunky & premium main body nose pointing left (-X)
-    const bodyGeo = this._trackResource(new THREE.ConeGeometry(10.5, 34, 8));
-    bodyGeo.rotateZ(Math.PI / 2);
-    const body = new THREE.Mesh(bodyGeo, matteMat);
-    body.position.set(-2, 0, 0);
-    this._shipGroup.add(body);
+    const bodyGeo = new THREE.ConeGeometry(10.5, 34, 8);
+    const ventGeo = new THREE.CylinderGeometry(5.5, 5.5, 2, 8);
+    const fuselageGeos = [
+      coloredGeometry(bodyGeo, 0x1c1e22, geo => {
+        geo.rotateZ(Math.PI / 2);
+        geo.translate(-2, 0, 0);
+      }),
+      coloredGeometry(ventGeo, 0x607080, geo => {
+        geo.rotateZ(Math.PI / 2);
+        geo.translate(8, 0, 0);
+      }),
+    ];
+    const fuselageGeo = this._trackResource(mergeGeometries(fuselageGeos));
+    const fuselageMesh = new THREE.Mesh(fuselageGeo, structuralMat);
+    this._shipGroup.add(fuselageMesh);
+
+    fuselageGeos.forEach(g => g.dispose());
+    bodyGeo.dispose();
+    ventGeo.dispose();
 
     // Glowing energy stripe down the middle spine + nose cap + reactor core
-    const spineGeo = this._trackResource(new THREE.BoxGeometry(22, 2.5, 4.5));
+    const spineGeo = new THREE.BoxGeometry(22, 2.5, 4.5);
     const spineCloned = ensureNonIndexed(spineGeo);
     spineCloned.translate(-1, 0, 0);
 
-    const noseGeo = this._trackResource(new THREE.ConeGeometry(4.5, 10, 8));
+    const noseGeo = new THREE.ConeGeometry(4.5, 10, 8);
     const noseCloned = ensureNonIndexed(noseGeo);
     noseCloned.rotateZ(Math.PI / 2);
     noseCloned.translate(-22, 0, 0);
 
-    const reactorGeo = this._trackResource(new THREE.SphereGeometry(7, 16, 16));
+    const reactorGeo = new THREE.SphereGeometry(7, 16, 16);
     const reactorCloned = ensureNonIndexed(reactorGeo);
     reactorCloned.translate(6, 0, 0);
 
@@ -164,13 +197,9 @@ export class EnemyCharger extends Enemy {
     this._shipGroup.add(energyMesh);
 
     energyGeos.forEach(g => g.dispose());
-
-    // Reactor Metal Vent Ring
-    const ventGeo = this._trackResource(new THREE.CylinderGeometry(5.5, 5.5, 2, 8));
-    ventGeo.rotateZ(Math.PI / 2);
-    const vent = new THREE.Mesh(ventGeo, metalMat);
-    vent.position.set(8, 0, 0);
-    this._shipGroup.add(vent);
+    spineGeo.dispose();
+    noseGeo.dispose();
+    reactorGeo.dispose();
 
     // ── 2. VERTICAL SCISSOR WINGS (XY Gameplay Plane) ──
     // We construct top and bottom wings attached to pivots rotating on the Z-axis
@@ -183,10 +212,24 @@ export class EnemyCharger extends Enemy {
     this._shipGroup.add(this._bottomWingGroup);
 
     // Top wing blade (Angled swept wing geometry, bold height)
-    const topWingGeo = this._trackResource(new THREE.BoxGeometry(18, 6, 2.5));
-    topWingGeo.translate(-4, 3, 0); // Shift geometry relative to pivot
-    const topWing = new THREE.Mesh(topWingGeo, metalMat);
-    this._topWingGroup.add(topWing);
+    const topWingGeo = new THREE.BoxGeometry(18, 6, 2.5);
+    const topNozzleGeo = new THREE.CylinderGeometry(2.5, 3.2, 5, 8);
+    const topStructureGeos = [
+      coloredGeometry(topWingGeo, 0x607080, geo => {
+        geo.translate(-4, 3, 0);
+      }),
+      coloredGeometry(topNozzleGeo, 0x1c1e22, geo => {
+        geo.rotateZ(Math.PI / 2);
+        geo.translate(3, 6, 0);
+      }),
+    ];
+    const topStructureGeo = this._trackResource(mergeGeometries(topStructureGeos));
+    const topStructure = new THREE.Mesh(topStructureGeo, structuralMat);
+    this._topWingGroup.add(topStructure);
+
+    topStructureGeos.forEach(g => g.dispose());
+    topWingGeo.dispose();
+    topNozzleGeo.dispose();
 
     // Top wing energy channel
     const topChannelGeo = this._trackResource(new THREE.BoxGeometry(14, 1.5, 2.7));
@@ -194,31 +237,31 @@ export class EnemyCharger extends Enemy {
     const topChannel = new THREE.Mesh(topChannelGeo, neonMat);
     this._topWingGroup.add(topChannel);
 
-    // Top wingtip thruster housing
-    const topNozzleGeo = this._trackResource(new THREE.CylinderGeometry(2.5, 3.2, 5, 8));
-    topNozzleGeo.rotateZ(Math.PI / 2);
-    topNozzleGeo.translate(3, 6, 0);
-    const topNozzle = new THREE.Mesh(topNozzleGeo, matteMat);
-    this._topWingGroup.add(topNozzle);
-
     // Bottom wing blade
-    const bottomWingGeo = this._trackResource(new THREE.BoxGeometry(18, 6, 2.5));
-    bottomWingGeo.translate(-4, -3, 0);
-    const bottomWing = new THREE.Mesh(bottomWingGeo, metalMat);
-    this._bottomWingGroup.add(bottomWing);
+    const bottomWingGeo = new THREE.BoxGeometry(18, 6, 2.5);
+    const bottomNozzleGeo = new THREE.CylinderGeometry(3.2, 2.5, 5, 8);
+    const bottomStructureGeos = [
+      coloredGeometry(bottomWingGeo, 0x607080, geo => {
+        geo.translate(-4, -3, 0);
+      }),
+      coloredGeometry(bottomNozzleGeo, 0x1c1e22, geo => {
+        geo.rotateZ(Math.PI / 2);
+        geo.translate(3, -6, 0);
+      }),
+    ];
+    const bottomStructureGeo = this._trackResource(mergeGeometries(bottomStructureGeos));
+    const bottomStructure = new THREE.Mesh(bottomStructureGeo, structuralMat);
+    this._bottomWingGroup.add(bottomStructure);
+
+    bottomStructureGeos.forEach(g => g.dispose());
+    bottomWingGeo.dispose();
+    bottomNozzleGeo.dispose();
 
     // Bottom wing energy channel
     const bottomChannelGeo = this._trackResource(new THREE.BoxGeometry(14, 1.5, 2.7));
     bottomChannelGeo.translate(-3, -6.1, 0);
     const bottomChannel = new THREE.Mesh(bottomChannelGeo, neonMat);
     this._bottomWingGroup.add(bottomChannel);
-
-    // Bottom wingtip thruster housing
-    const bottomNozzleGeo = this._trackResource(new THREE.CylinderGeometry(3.2, 2.5, 5, 8));
-    bottomNozzleGeo.rotateZ(Math.PI / 2);
-    bottomNozzleGeo.translate(3, -6, 0);
-    const bottomNozzle = new THREE.Mesh(bottomNozzleGeo, matteMat);
-    this._bottomWingGroup.add(bottomNozzle);
 
     // ── 3. TWIN-ENGINE PLUMES (Wingtip spikes) ──
     const plumeTGeo = this._trackResource(new THREE.ConeGeometry(1.8, 12, 8));
