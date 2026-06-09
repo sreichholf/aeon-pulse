@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
-import type { GetPositionFn, IAudio, IScene, ProjectileFactoryFn } from '../types.ts';
+import { ProjectileSourceKey, type GetPositionFn, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed, addVertexColor } from '../utils/ProceduralToolkit.ts';
 
@@ -46,7 +46,7 @@ export class EnemyDiver extends Enemy {
   get isSpaceShip(): boolean { return true; }
 
   _shootAtPlayer(): void {
-    super._shootAtPlayer(340, 'enemyDiver');
+    super._shootAtPlayer(340, ProjectileSourceKey.ENEMY_DIVER);
   }
 
   _tick(dt: number): void {

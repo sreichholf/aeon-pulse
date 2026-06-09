@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BulletType } from '../types.ts';
+import { BulletType, ProjectileSourceKey } from '../types.ts';
 
 export interface BulletAnimRefs {
   [key: string]: THREE.Object3D | THREE.Material | number | THREE.Object3D[];
@@ -16,8 +16,8 @@ export type CacheStore = { geos: GeoCache; mats: MatCache };
 export type GetFn<T>  = (key: string, builder: () => T) => T;
 
 export interface BulletDef {
-  /** The canonical BulletType for IBullet.type, or an internal sub-key (e.g. 'enemySine') not in BulletType. */
-  key: BulletType | string;
+  /** The canonical BulletType for IBullet.type, or an internal source key not in BulletType. */
+  key: BulletType | ProjectileSourceKey;
   w: number; h: number; hw: number; hh: number;
   damage: number;
   isPlayer: boolean;
@@ -32,8 +32,8 @@ export interface BulletDef {
 }
 
 export const playerDefs: Record<string, BulletDef> = {
-  player: {
-    w: 28, h: 8, hw: 11, hh: 3, damage: 1, isPlayer: true, piercing: false, key: 'player',
+  [ProjectileSourceKey.PLAYER]: {
+    w: 28, h: 8, hw: 11, hh: 3, damage: 1, isPlayer: true, piercing: false, key: ProjectileSourceKey.PLAYER,
     alignToVelocity: true,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -73,8 +73,8 @@ export const playerDefs: Record<string, BulletDef> = {
     animate(_dt, _mesh, _refs) {},
   },
 
-  playerCharge: {
-    w: 72, h: 24, hw: 30, hh: 9, damage: 3, isPlayer: true, piercing: true, key: 'playerCharge',
+  [ProjectileSourceKey.PLAYER_CHARGE]: {
+    w: 72, h: 24, hw: 30, hh: 9, damage: 3, isPlayer: true, piercing: true, key: ProjectileSourceKey.PLAYER_CHARGE,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, _emissiveVal: number, _specVal = 0xffffff, _shine = 30, _flat = false) => {
@@ -118,8 +118,8 @@ export const playerDefs: Record<string, BulletDef> = {
     },
   },
 
-  playerChargeSide: {
-    w: 64, h: 20, hw: 24, hh: 7, damage: 2, isPlayer: true, piercing: false, key: 'playerCharge',
+  [ProjectileSourceKey.PLAYER_CHARGE_SIDE]: {
+    w: 64, h: 20, hw: 24, hh: 7, damage: 2, isPlayer: true, piercing: false, key: ProjectileSourceKey.PLAYER_CHARGE,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, _emissiveVal: number, _specVal = 0xffffff, _shine = 30, _flat = false) => {
@@ -160,8 +160,8 @@ export const playerDefs: Record<string, BulletDef> = {
     },
   },
 
-  playerWave: {
-    w: 48, h: 20, hw: 20, hh: 8, damage: 2, isPlayer: true, piercing: true, wave: true, key: 'playerWave',
+  [ProjectileSourceKey.PLAYER_WAVE]: {
+    w: 48, h: 20, hw: 20, hh: 8, damage: 2, isPlayer: true, piercing: true, wave: true, key: ProjectileSourceKey.PLAYER_WAVE,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -191,8 +191,8 @@ export const playerDefs: Record<string, BulletDef> = {
     },
   },
 
-  playerPlasma: {
-    w: 48, h: 48, hw: 20, hh: 20, damage: 2, isPlayer: true, piercing: true, wave: true, key: 'playerPlasma',
+  [ProjectileSourceKey.PLAYER_PLASMA]: {
+    w: 48, h: 48, hw: 20, hh: 20, damage: 2, isPlayer: true, piercing: true, wave: true, key: ProjectileSourceKey.PLAYER_PLASMA,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {

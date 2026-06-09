@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BulletType, type GetPositionFn, type IBullet, type ITerrain, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
+import { ProjectileSourceKey, type GetPositionFn, type IBullet, type ITerrain, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
@@ -429,7 +429,7 @@ export class Stalactite extends Enemy {
     for (const angle of angles) {
       this._newBullets.push(
         this._projectileFactory({
-          type: 'lava',
+          type: ProjectileSourceKey.LAVA,
           x: this.x,
           y: this.y - 28,
           vx: Math.cos(angle) * speed,

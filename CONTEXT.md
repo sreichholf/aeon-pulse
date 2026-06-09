@@ -252,12 +252,11 @@ _Avoid_: Collision detection, scene/audio side effects
 The Tactical Database behavior of iterating through an entity's declared projectile types one-by-one, showing each for a fixed 5-second window. Cycling is driven by the catalog-declared list and a card-owned timer, not by the entity's live fire cadence.
 _Avoid_: Live bullet capture, fire-rate-driven cycling, stale-gate logic
 
-**Viewer Bullet Type List**:
-The ordered list of `BulletType` values declared per entity in `EntityCatalog` (`viewerBulletTypes`). This list is the sole source of truth for which projectile types appear in the Tactical Database and in what order. An empty list means no bullet preview.
-_Avoid_: Dynamic bullet observation, entity-driven preview, implicit type detection
+**Viewer Projectile Key List**:
+The ordered list of projectile definition source keys declared per entity in `EntityCatalog`. This list is the sole source of truth for which projectile presentations appear in the Tactical Database and in what order. An empty list means no bullet preview.
+_Avoid_: Viewer bullet type list, dynamic bullet observation, entity-driven preview, implicit type detection
 
 ## Example Dialogue
 
 Dev: "Should `3-2` use the organic corridor?"
 Designer: "Yes. It belongs to Chapter 3, so it follows the Chapter 3 archetype, but its wave layout and terrain rhythm can differ from `3-1`."
-

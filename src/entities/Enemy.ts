@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { Entity } from './Entity.ts';
-import { BulletType, type HitResult, type GetPositionFn, type TerrainBounds, type IBullet, type EntityMetadata, type IEnemy, type IScene, type ProjectileFactoryFn } from '../types.ts';
+import { ProjectileSourceKey, type HitResult, type GetPositionFn, type TerrainBounds, type IBullet, type EntityMetadata, type IEnemy, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 export const HALF_W = GAME_WIDTH  / 2;
@@ -169,7 +169,7 @@ export class Enemy extends Entity implements IEnemy {
     });
   }
 
-  _shootAtPlayer(speed = 260, type: string = BulletType.ENEMY): void {
+  _shootAtPlayer(speed = 260, type: ProjectileSourceKey = ProjectileSourceKey.ENEMY): void {
     if (!this._getPlayerPos) return;
     const { x: px, y: py } = this._getPlayerPos();
     const dx = px - this.x, dy = py - this.y;
@@ -184,7 +184,7 @@ export class Enemy extends Entity implements IEnemy {
     const base = Math.atan2(py - this.y, px - this.x);
     for (let i = -1; i <= 1; i++) {
       const a = base + i * spread;
-      const spawn = { type: BulletType.ENEMY, x: this.x, y: this.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed };
+      const spawn = { type: ProjectileSourceKey.ENEMY, x: this.x, y: this.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed };
       this._newBullets.push(this._projectileFactory(spawn));
     }
   }

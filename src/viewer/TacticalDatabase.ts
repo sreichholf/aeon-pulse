@@ -78,16 +78,17 @@ export class TacticalDatabase {
   /**
    * Returns a ViewerBulletFactory that constructs a static Bullet preview
    * at the card's position, closed over the current scene and sprites.
-   * Velocity is zero — the card pins the bullet's position every frame.
+   * Velocity points left so directional projectiles have the same orientation as hostile shots.
+   * The card pins the bullet's position every frame, so preview velocity does not create drift.
    */
   private _makeBulletFactory(x: number, y: number): ViewerBulletFactory {
-    return (type) => new Bullet(
+    return (projectileKey) => new Bullet(
       this._scene,
       this._sprites,
-      type,
+      projectileKey,
       x,
       y,
-      0,
+      -1,
       0,
       null,
       null,
@@ -173,7 +174,7 @@ export class TacticalDatabase {
         this._applyEnemyViewerPresentation(spawnedEnemy._mesh, entry.viewer, x, y);
 
         const card = new TacticalDossierCard(spawnedEnemy, this._scene, {
-          bulletTypes: entry.viewerBulletTypes,
+          projectileKeys: entry.viewerProjectileKeys,
           bulletFactory: this._makeBulletFactory(x, y),
         });
         this._entities.push(card);
@@ -236,7 +237,7 @@ export class TacticalDatabase {
         spawnedBoss._mesh.position.y -= (center.y - y);
 
         const card = new TacticalDossierCard(spawnedBoss, this._scene, {
-          bulletTypes: entry.viewerBulletTypes,
+          projectileKeys: entry.viewerProjectileKeys,
           bulletFactory: this._makeBulletFactory(x, y),
         });
         this._entities.push(card);

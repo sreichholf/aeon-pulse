@@ -1,9 +1,10 @@
 import * as THREE from 'three';
+import { ProjectileSourceKey } from '../types.ts';
 import type { BulletDef } from './BulletsPlayer.ts';
 
 export const enemyDefs: Record<string, BulletDef> = {
-  enemy: {
-    w: 16, h: 16, hw: 5, hh: 5, damage: 1, isPlayer: false, piercing: false, key: 'enemy',
+  [ProjectileSourceKey.ENEMY]: {
+    w: 16, h: 16, hw: 5, hh: 5, damage: 1, isPlayer: false, piercing: false, key: ProjectileSourceKey.ENEMY,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -27,8 +28,8 @@ export const enemyDefs: Record<string, BulletDef> = {
     animate(_dt, _mesh, _refs) {},
   },
 
-  enemySine: {
-    w: 16, h: 16, hw: 5, hh: 5, damage: 1, isPlayer: false, piercing: false, wave: true, waveAmp: 35, waveSpeed: 10, key: 'enemySine',
+  [ProjectileSourceKey.ENEMY_SINE]: {
+    w: 16, h: 16, hw: 5, hh: 5, damage: 1, isPlayer: false, piercing: false, wave: true, waveAmp: 35, waveSpeed: 10, key: ProjectileSourceKey.ENEMY_SINE,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -58,8 +59,8 @@ export const enemyDefs: Record<string, BulletDef> = {
     },
   },
 
-  enemyDiver: {
-    w: 16, h: 10, hw: 5, hh: 4, damage: 1, isPlayer: false, piercing: false, key: 'enemyDiver',
+  [ProjectileSourceKey.ENEMY_DIVER]: {
+    w: 16, h: 10, hw: 5, hh: 4, damage: 1, isPlayer: false, piercing: false, key: ProjectileSourceKey.ENEMY_DIVER,
     alignToVelocity: true,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -89,8 +90,8 @@ export const enemyDefs: Record<string, BulletDef> = {
     },
   },
 
-  enemySwarm: {
-    w: 18, h: 6, hw: 6, hh: 3, damage: 1, isPlayer: false, piercing: false, key: 'enemySwarm',
+  [ProjectileSourceKey.ENEMY_SWARM]: {
+    w: 18, h: 6, hw: 6, hh: 3, damage: 1, isPlayer: false, piercing: false, key: ProjectileSourceKey.ENEMY_SWARM,
     alignToVelocity: true,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -120,8 +121,8 @@ export const enemyDefs: Record<string, BulletDef> = {
     },
   },
 
-  homing: {
-    w: 14, h: 14, hw: 4, hh: 4, damage: 1, isPlayer: false, piercing: false, homing: true, key: 'homing',
+  [ProjectileSourceKey.HOMING]: {
+    w: 14, h: 14, hw: 4, hh: 4, damage: 1, isPlayer: false, piercing: false, homing: true, key: ProjectileSourceKey.HOMING,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -171,8 +172,8 @@ export const enemyDefs: Record<string, BulletDef> = {
     },
   },
 
-  boss: {
-    w: 22, h: 22, hw: 7, hh: 7, damage: 2, isPlayer: false, piercing: false, key: 'boss',
+  [ProjectileSourceKey.BOSS]: {
+    w: 22, h: 22, hw: 7, hh: 7, damage: 2, isPlayer: false, piercing: false, key: ProjectileSourceKey.BOSS,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -224,8 +225,8 @@ export const enemyDefs: Record<string, BulletDef> = {
     },
   },
 
-  bossLaser: {
-    w: 60, h: 12, hw: 25, hh: 5, damage: 2, isPlayer: false, piercing: false, key: 'bossLaser',
+  [ProjectileSourceKey.BOSS_LASER]: {
+    w: 60, h: 12, hw: 25, hh: 5, damage: 2, isPlayer: false, piercing: false, key: ProjectileSourceKey.BOSS_LASER,
     alignToVelocity: true,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -265,8 +266,8 @@ export const enemyDefs: Record<string, BulletDef> = {
     animate(_dt, _mesh, _refs) {},
   },
 
-  wave: {
-    w: 72, h: 72, hw: 30, hh: 30, damage: 2, isPlayer: false, piercing: false, key: 'wave',
+  [ProjectileSourceKey.WAVE]: {
+    w: 72, h: 72, hw: 30, hh: 30, damage: 2, isPlayer: false, piercing: false, key: ProjectileSourceKey.WAVE,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {
@@ -294,8 +295,8 @@ export const enemyDefs: Record<string, BulletDef> = {
     animate(_dt, _mesh, _refs) {},
   },
 
-  lava: {
-    w: 32, h: 32, hw: 12, hh: 12, damage: 2, isPlayer: false, piercing: false, key: 'lava',
+  [ProjectileSourceKey.LAVA]: {
+    w: 32, h: 32, hw: 12, hh: 12, damage: 2, isPlayer: false, piercing: false, key: ProjectileSourceKey.LAVA,
     alignToVelocity: false,
     build(tint, _cache, getMat, getGeo) {
       const getBulletMat = (key: string, colorVal: number, emissiveVal: number, specVal = 0xffffff, shine = 30, flat = false) => {

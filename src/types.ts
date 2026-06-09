@@ -41,6 +41,23 @@ export enum BulletType {
   LAVA = 'lava',
 }
 
+export enum ProjectileSourceKey {
+  PLAYER = 'player',
+  PLAYER_CHARGE = 'playerCharge',
+  PLAYER_CHARGE_SIDE = 'playerChargeSide',
+  PLAYER_WAVE = 'playerWave',
+  PLAYER_PLASMA = 'playerPlasma',
+  ENEMY = 'enemy',
+  ENEMY_SINE = 'enemySine',
+  ENEMY_DIVER = 'enemyDiver',
+  ENEMY_SWARM = 'enemySwarm',
+  HOMING = 'homing',
+  BOSS = 'boss',
+  BOSS_LASER = 'bossLaser',
+  WAVE = 'wave',
+  LAVA = 'lava',
+}
+
 export enum RenderCategory {
   BACKGROUND = 'background',
   TERRAIN = 'terrain',
@@ -109,7 +126,7 @@ export type GetPositionFn = () => Vec2;
 export type SpawnEnemyFn  = (type: EnemyType, x: number, y: number) => void;
 
 export interface ProjectileSpawn {
-  type: string;
+  type: ProjectileSourceKey | BulletType;
   x: number;
   y: number;
   vx: number;

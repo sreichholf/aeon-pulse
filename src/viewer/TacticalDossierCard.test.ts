@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { TacticalDossierCard, type WrappedEntity, type ViewerBullet } from './TacticalDossierCard.ts';
-import { BulletType } from '../types.ts';
+import { ProjectileSourceKey } from '../types.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ describe('TacticalDossierCard', () => {
     expect(entity.update).toHaveBeenCalledTimes(2);
   });
 
-  it('shows first bullet immediately on the first update when bulletTypes provided', () => {
+  it('shows first bullet immediately on the first update when projectileKeys are provided', () => {
     const mesh = new THREE.Mesh();
     mesh.position.set(0, 0, 0);
     const entity: WrappedEntity = { _mesh: mesh, update: vi.fn().mockReturnValue([]) };
@@ -95,7 +95,7 @@ describe('TacticalDossierCard', () => {
     const card = new TacticalDossierCard(entity, makeScene(), {
       viewerX: 0,
       viewerY: 0,
-      bulletTypes: [BulletType.ENEMY],
+      projectileKeys: [ProjectileSourceKey.ENEMY_SINE],
       bulletFactory: factory,
     });
 
@@ -104,11 +104,11 @@ describe('TacticalDossierCard', () => {
 
     // First tick → bullet appears immediately (timer starts at lifetime)
     card.update(0.1);
-    expect(factory).toHaveBeenCalledWith(BulletType.ENEMY);
+    expect(factory).toHaveBeenCalledWith(ProjectileSourceKey.ENEMY_SINE);
     expect(card.viewerBullet).toBe(bullet);
   });
 
-  it('cycles to the next bullet type after 5 seconds', () => {
+  it('cycles to the next projectile key after 5 seconds', () => {
     const mesh = new THREE.Mesh();
     mesh.position.set(0, 0, 0);
     const entity: WrappedEntity = { _mesh: mesh, update: vi.fn().mockReturnValue([]) };
@@ -121,7 +121,7 @@ describe('TacticalDossierCard', () => {
 
     const card = new TacticalDossierCard(entity, makeScene(), {
       viewerX: 0, viewerY: 0,
-      bulletTypes: [BulletType.ENEMY, BulletType.HOMING],
+      projectileKeys: [ProjectileSourceKey.ENEMY_DIVER, ProjectileSourceKey.HOMING],
       bulletFactory: factory,
     });
 
@@ -138,10 +138,10 @@ describe('TacticalDossierCard', () => {
     card.update(0.1);
     expect(bullet1.destroy).toHaveBeenCalledTimes(1);
     expect(card.viewerBullet).toBe(bullet2);
-    expect(factory).toHaveBeenCalledWith(BulletType.HOMING);
+    expect(factory).toHaveBeenCalledWith(ProjectileSourceKey.HOMING);
   });
 
-  it('wraps around to the first bullet type after exhausting the list', () => {
+  it('wraps around to the first projectile key after exhausting the list', () => {
     const mesh = new THREE.Mesh();
     mesh.position.set(0, 0, 0);
     const entity: WrappedEntity = { _mesh: mesh, update: vi.fn().mockReturnValue([]) };
@@ -152,31 +152,31 @@ describe('TacticalDossierCard', () => {
 
     const card = new TacticalDossierCard(entity, makeScene(), {
       viewerX: 0, viewerY: 0,
-      bulletTypes: [BulletType.BOSS, BulletType.HOMING],
+      projectileKeys: [ProjectileSourceKey.BOSS, ProjectileSourceKey.HOMING],
       bulletFactory: factory,
     });
 
     // Tick 1: shows BOSS immediately
     card.update(0.1);
-    expect(factory).toHaveBeenLastCalledWith(BulletType.BOSS);
+    expect(factory).toHaveBeenLastCalledWith(ProjectileSourceKey.BOSS);
 
     // Tick 2: after 5 s → shows HOMING
     card.update(5.0);
-    expect(factory).toHaveBeenLastCalledWith(BulletType.HOMING);
+    expect(factory).toHaveBeenLastCalledWith(ProjectileSourceKey.HOMING);
 
     // Tick 3: after another 5 s → wraps back to BOSS
     card.update(5.0);
-    expect(factory).toHaveBeenLastCalledWith(BulletType.BOSS);
+    expect(factory).toHaveBeenLastCalledWith(ProjectileSourceKey.BOSS);
   });
 
-  it('shows no bullet preview when bulletTypes is empty', () => {
+  it('shows no bullet preview when projectileKeys is empty', () => {
     const mesh = new THREE.Mesh();
     const entity: WrappedEntity = { _mesh: mesh, update: vi.fn().mockReturnValue([]) };
     const factory = vi.fn();
 
     const card = new TacticalDossierCard(entity, makeScene(), {
       viewerX: 0, viewerY: 0,
-      bulletTypes: [],
+      projectileKeys: [],
       bulletFactory: factory,
     });
 
@@ -195,7 +195,7 @@ describe('TacticalDossierCard', () => {
 
     const card = new TacticalDossierCard(entity, makeScene(), {
       viewerX: 30, viewerY: 50,
-      bulletTypes: [BulletType.ENEMY],
+      projectileKeys: [ProjectileSourceKey.ENEMY_SWARM],
       bulletFactory: factory,
     });
 
@@ -222,7 +222,7 @@ describe('TacticalDossierCard', () => {
     };
 
     const card = new TacticalDossierCard(entity, scene, {
-      bulletTypes: [BulletType.ENEMY],
+      projectileKeys: [ProjectileSourceKey.ENEMY],
       bulletFactory: factory,
     });
 

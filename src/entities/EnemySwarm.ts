@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
-import type { GetPositionFn, IAudio, IScene, ProjectileFactoryFn } from '../types.ts';
+import { ProjectileSourceKey, type GetPositionFn, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 
@@ -48,7 +48,7 @@ export class EnemySwarm extends Enemy {
   get isSpaceShip(): boolean { return true; }
 
   _shootAtPlayer(): void {
-    super._shootAtPlayer(290 + Math.random() * 60, 'enemySwarm');
+    super._shootAtPlayer(290 + Math.random() * 60, ProjectileSourceKey.ENEMY_SWARM);
   }
 
   _tick(dt: number): void {

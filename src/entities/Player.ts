@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BulletType, DifficultyMode, type IBullet, type ProjectileFactoryFn, type TerrainBounds, type Vec2, type IScene } from '../types.ts';
+import { BulletType, DifficultyMode, ProjectileSourceKey, type IBullet, type ProjectileFactoryFn, type TerrainBounds, type Vec2, type IScene } from '../types.ts';
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.ts';
 import { Action } from '../systems/InputManager.ts';
 import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
@@ -777,13 +777,13 @@ export class Player {
     } else if (this.weaponTier === WeaponTier.PLASMA) {
       // Tier 5 Charge: Heavy center plasma from Nose, side support from Wing Cannons
       this._spawn(BulletType.PLAYER_PLASMA, nx, ny, 550,    0, null, 2);
-      this._spawn('playerChargeSide',       lx, ly, 540,  190, '#00ffd5');
-      this._spawn('playerChargeSide',       rx, ry, 540, -190, '#00ffd5');
+      this._spawn(ProjectileSourceKey.PLAYER_CHARGE_SIDE, lx, ly, 540,  190, '#00ffd5');
+      this._spawn(ProjectileSourceKey.PLAYER_CHARGE_SIDE, rx, ry, 540, -190, '#00ffd5');
     }
     this._audio.play('playerChargeShoot', this.weaponTier);
   }
 
-  private _spawn(type: string, x: number, y: number, vx: number, vy: number, tint: string | null = null, dmgOverride: number | null = null): void {
+  private _spawn(type: BulletType | ProjectileSourceKey, x: number, y: number, vx: number, vy: number, tint: string | null = null, dmgOverride: number | null = null): void {
     const tintNum = tint ? parseInt(tint.replace('#', ''), 16) : null;
     const spawn = { type, x, y, vx, vy, getTargetPos: null, tint: tintNum, damageOverride: dmgOverride };
     this._newBullets.push(this._projectileFactory(spawn));

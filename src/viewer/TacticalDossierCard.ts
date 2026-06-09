@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { type BulletType, type EntityMetadata, type GetPositionFn } from '../types.ts';
+import { type EntityMetadata, type GetPositionFn, type ProjectileSourceKey } from '../types.ts';
 
 export interface ViewerBullet {
   update(dt: number): void;
@@ -22,10 +22,10 @@ export interface WrappedEntity {
   [key: string]: unknown;
 }
 
-/** Factory the card uses to construct one preview bullet by type. */
-export type ViewerBulletFactory = (type: BulletType) => ViewerBullet;
+/** Factory the card uses to construct one preview bullet by projectile source key. */
+export type ViewerBulletFactory = (projectileKey: ProjectileSourceKey) => ViewerBullet;
 
-/** Duration each bullet type is displayed before cycling to the next. */
+/** Duration each projectile key is displayed before cycling to the next. */
 const BULLET_PREVIEW_LIFETIME = 5.0;
 
 export class TacticalDossierCard {
@@ -42,7 +42,7 @@ export class TacticalDossierCard {
   private _viewerBaseRotation: THREE.Euler | null = null;
 
   // Catalog-driven bullet preview cycling (ADR 0017)
-  private _bulletTypes: BulletType[];
+  private _projectileKeys: ProjectileSourceKey[];
   private _bulletFactory: ViewerBulletFactory | null;
   private _bulletIndex: number = 0;
   private _bulletTimer: number;          // starts at lifetime so first bullet fires immediately
@@ -55,7 +55,7 @@ export class TacticalDossierCard {
       viewerX?: number;
       viewerY?: number;
       viewerIdle?: boolean;
-      bulletTypes?: BulletType[];
+      projectileKeys?: ProjectileSourceKey[];
       bulletFactory?: ViewerBulletFactory;
     }
   ) {
@@ -64,7 +64,7 @@ export class TacticalDossierCard {
     this._viewerX = options?.viewerX ?? 0;
     this._viewerY = options?.viewerY ?? 0;
     this._viewerIdle = options?.viewerIdle ?? false;
-    this._bulletTypes = options?.bulletTypes ?? [];
+    this._projectileKeys = options?.projectileKeys ?? [];
     this._bulletFactory = options?.bulletFactory ?? null;
 
     // Initialise timer to lifetime so the first bullet spawns on the very first update() tick.
@@ -169,17 +169,17 @@ export class TacticalDossierCard {
     }
 
     // ── Catalog-driven bullet preview cycling (ADR 0017) ────────────────────
-    if (this._bulletTypes.length > 0 && this._bulletFactory) {
+    if (this._projectileKeys.length > 0 && this._bulletFactory) {
       this._bulletTimer += dt;
       if (this._bulletTimer >= BULLET_PREVIEW_LIFETIME) {
         this._bulletTimer = 0;
 
-        // Destroy the current preview and spawn the next type in the list
+        // Destroy the current preview and spawn the next projectile key in the list
         if (this._viewerBullet) {
           this._viewerBullet.destroy();
         }
-        const type = this._bulletTypes[this._bulletIndex % this._bulletTypes.length]!;
-        this._viewerBullet = this._bulletFactory(type);
+        const projectileKey = this._projectileKeys[this._bulletIndex % this._projectileKeys.length]!;
+        this._viewerBullet = this._bulletFactory(projectileKey);
         this._bulletIndex++;
       }
     }
