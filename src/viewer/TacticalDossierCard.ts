@@ -27,6 +27,11 @@ export type ViewerBulletFactory = (projectileKey: ProjectileSourceKey) => Viewer
 
 /** Duration each projectile key is displayed before cycling to the next. */
 const BULLET_PREVIEW_LIFETIME = 5.0;
+const PASSIVE_HOVER_AMPLITUDE = 2.2;
+const PASSIVE_HOVER_SPEED = 1.4;
+const PASSIVE_PITCH_AMPLITUDE = 0.018;
+const PASSIVE_YAW_AMPLITUDE = 0.035;
+const PASSIVE_ROLL_AMPLITUDE = 0.012;
 
 export class TacticalDossierCard {
   private _entity: WrappedEntity | THREE.Object3D;
@@ -137,6 +142,20 @@ export class TacticalDossierCard {
     return this._viewerTime;
   }
 
+  private passiveHoverOffset(): number {
+    return Math.sin(this._viewerTime * PASSIVE_HOVER_SPEED) * PASSIVE_HOVER_AMPLITUDE;
+  }
+
+  private applyPassiveInspectionRotation(mesh: THREE.Object3D): void {
+    if (!this._viewerBaseRotation) return;
+
+    mesh.rotation.set(
+      this._viewerBaseRotation.x + Math.sin(this._viewerTime * 1.1) * PASSIVE_PITCH_AMPLITUDE,
+      this._viewerBaseRotation.y + Math.sin(this._viewerTime * 0.8) * PASSIVE_YAW_AMPLITUDE,
+      this._viewerBaseRotation.z + Math.sin(this._viewerTime * 1.5) * PASSIVE_ROLL_AMPLITUDE,
+    );
+  }
+
   update(dt: number): void {
     const mesh = this.mesh;
     if (!mesh) return;
@@ -146,20 +165,15 @@ export class TacticalDossierCard {
     // ── Idle float animation (player page) ──────────────────────────────────
     if (this._viewerIdle) {
       this._viewerTime += dt;
-      mesh.position.y = this._viewerBaseY + Math.sin(this._viewerTime * 1.4) * 2.2;
-      if (this._viewerBaseRotation) {
-        mesh.rotation.set(
-          this._viewerBaseRotation.x + Math.sin(this._viewerTime * 1.1) * 0.018,
-          this._viewerBaseRotation.y + Math.sin(this._viewerTime * 0.8) * 0.035,
-          this._viewerBaseRotation.z + Math.sin(this._viewerTime * 1.5) * 0.012,
-        );
-      }
+      mesh.position.y = this._viewerBaseY + this.passiveHoverOffset();
+      this.applyPassiveInspectionRotation(mesh);
       return;
     }
 
     if (!isWrapped) return;
 
     const wrapped = this._entity as WrappedEntity;
+    this._viewerTime += dt;
 
     // ── Tick entity for visual animation only; ignore any bullets it emits ──
     if (typeof wrapped.update === 'function') {
@@ -186,7 +200,7 @@ export class TacticalDossierCard {
 
     // ── Position lock ────────────────────────────────────────────────────────
     const isBoss = wrapped.isBoss ?? false;
-    const targetY = this._viewerY + (this._viewerBullet ? (isBoss ? 24 : 22) : (isBoss ? 8 : 6));
+    const targetY = this._viewerY + (this._viewerBullet ? (isBoss ? 24 : 22) : (isBoss ? 8 : 6)) + this.passiveHoverOffset();
     const targetX = this._viewerX + ((wrapped.viewerXOffset as number | undefined) ?? 0);
 
     if (this._viewerCurrentX === undefined) {
@@ -201,8 +215,7 @@ export class TacticalDossierCard {
     mesh.position.y = this._viewerCurrentY;
     mesh.position.z = 0;
 
-    // Slowly rotate to show off 3D shape
-    mesh.rotation.y += dt * 0.45;
+    this.applyPassiveInspectionRotation(mesh);
 
     // ── Bullet preview display ───────────────────────────────────────────────
     if (this._viewerBullet) {

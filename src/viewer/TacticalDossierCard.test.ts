@@ -84,6 +84,26 @@ describe('TacticalDossierCard', () => {
     expect(entity.update).toHaveBeenCalledTimes(2);
   });
 
+  it('applies passive hover and attitude drift to gameplay entity cards', () => {
+    const mesh = new THREE.Mesh();
+    mesh.position.set(0, 0, 0);
+    mesh.rotation.set(0.2, 0.3, 0.4);
+    const entity: WrappedEntity = {
+      _mesh: mesh,
+      update: vi.fn().mockReturnValue([]),
+    };
+    const card = new TacticalDossierCard(entity, makeScene(), { viewerX: 10, viewerY: 20 });
+
+    card.update(0.5);
+
+    expect(card.viewerTime).toBe(0.5);
+    expect(mesh.position.x).toBe(10);
+    expect(mesh.position.y).toBeCloseTo(26 + Math.sin(0.5 * 1.4) * 2.2, 4);
+    expect(mesh.rotation.x).toBeCloseTo(0.2 + Math.sin(0.5 * 1.1) * 0.018, 4);
+    expect(mesh.rotation.y).toBeCloseTo(0.3 + Math.sin(0.5 * 0.8) * 0.035, 4);
+    expect(mesh.rotation.z).toBeCloseTo(0.4 + Math.sin(0.5 * 1.5) * 0.012, 4);
+  });
+
   it('shows first bullet immediately on the first update when projectileKeys are provided', () => {
     const mesh = new THREE.Mesh();
     mesh.position.set(0, 0, 0);
