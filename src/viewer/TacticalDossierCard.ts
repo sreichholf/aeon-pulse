@@ -35,6 +35,7 @@ export class TacticalDossierCard {
   private _viewerBaseY: number = 0;
   private _viewerBaseRotation: THREE.Euler | null = null;
   private _viewerBullet: ViewerBullet | null = null;
+  private _viewerBulletLife: number = 0;  // seconds the current preview bullet has been displayed
 
   constructor(
     entity: WrappedEntity | THREE.Object3D,
@@ -69,6 +70,18 @@ export class TacticalDossierCard {
       this._entity._entered = true;
       if (typeof this._entity._getPlayerPos !== 'function' || this._entity._getPlayerPos === null) {
         this._entity._getPlayerPos = () => ({ x: 0, y: 0 });
+      }
+
+      // Accelerate first shot by zeroing all known fire-cooldown timers so enemies shoot
+      // almost immediately when displayed in the viewer instead of after their random delay.
+      const ent = this._entity as Record<string, unknown>;
+      if (typeof ent['_fireTimer'] === 'number')    ent['_fireTimer'] = 0;
+      if (typeof ent['_circTimer'] === 'number')    ent['_circTimer'] = 0;
+      if (typeof ent['_homingTimer'] === 'number')  ent['_homingTimer'] = 0;
+      if (typeof ent['_lavaTimer'] === 'number')    ent['_lavaTimer'] = 0;
+      if (typeof ent['_patternTimers'] === 'object' && ent['_patternTimers'] !== null) {
+        const pt = ent['_patternTimers'] as Record<string, number>;
+        for (const k of Object.keys(pt)) pt[k] = 0;
       }
     }
   }
@@ -158,9 +171,21 @@ export class TacticalDossierCard {
           this._viewerBullet.destroy();
         }
         this._viewerBullet = firstBullet;
+        this._viewerBulletLife = 0;
       }
       for (let idx = 1; idx < newBullets.length; idx++) {
         (newBullets[idx] as unknown as ViewerBullet | undefined)?.destroy();
+      }
+    }
+
+    // Expire the bullet preview after 1.5 s so the display feels dynamic rather than frozen.
+    const BULLET_PREVIEW_LIFETIME = 1.5;
+    if (this._viewerBullet) {
+      this._viewerBulletLife += dt;
+      if (this._viewerBulletLife >= BULLET_PREVIEW_LIFETIME) {
+        this._viewerBullet.destroy();
+        this._viewerBullet = null;
+        this._viewerBulletLife = 0;
       }
     }
 

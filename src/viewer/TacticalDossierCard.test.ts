@@ -208,4 +208,59 @@ describe('TacticalDossierCard', () => {
     expect(mockGeometryDispose).toHaveBeenCalled();
     expect(mockMaterialDispose).toHaveBeenCalled();
   });
+
+  it('zeros fire-cooldown timers on construction to eliminate viewer delay', () => {
+    const mesh = new THREE.Mesh();
+    const entity: WrappedEntity = {
+      _mesh: mesh,
+      _fireTimer: 2.5,
+      _circTimer: 4.0,
+      _homingTimer: 1.5,
+      _lavaTimer: 3.0,
+      _patternTimers: { p1: 1.0, p2: 0.8 },
+      update: vi.fn().mockReturnValue([]),
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _card = new TacticalDossierCard(entity, mockScene);
+
+    // All timers must have been zeroed so the first shot fires on the very next tick
+    expect(entity._fireTimer).toBe(0);
+    expect(entity._circTimer).toBe(0);
+    expect(entity._homingTimer).toBe(0);
+    expect(entity._lavaTimer).toBe(0);
+    expect((entity._patternTimers as Record<string, number>)['p1']).toBe(0);
+    expect((entity._patternTimers as Record<string, number>)['p2']).toBe(0);
+  });
+
+  it('expires bullet preview after 1.5 s and clears it', () => {
+    const mesh = new THREE.Mesh();
+    mesh.position.set(0, 0, 0);
+
+    const mockBullet = {
+      _mesh: new THREE.Mesh(),
+      update: vi.fn(),
+      destroy: vi.fn(),
+    };
+
+    const mockEntity: WrappedEntity = {
+      _mesh: mesh,
+      update: vi.fn().mockReturnValueOnce([mockBullet]).mockReturnValue([]),
+    };
+
+    const card = new TacticalDossierCard(mockEntity, mockScene);
+
+    // First tick spawns the bullet
+    card.update(0.1);
+    expect(card.viewerBullet).toBe(mockBullet);
+
+    // Advance time to just before expiry — bullet should still be alive
+    card.update(1.3);
+    expect(card.viewerBullet).toBe(mockBullet);
+
+    // One more tick pushes life to ≥ 1.5 s — should destroy and clear
+    card.update(0.11);
+    expect(mockBullet.destroy).toHaveBeenCalledTimes(1);
+    expect(card.viewerBullet).toBeNull();
+  });
 });
