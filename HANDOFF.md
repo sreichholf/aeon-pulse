@@ -1,6 +1,6 @@
 # AEON PULSE Vitest Harness And Next Test Slice Handoff
 
-This handoff captures the current Vitest harness work and the agreed plan for the next module-test slices. It intentionally replaces the older render-optimization handoff, because that render scope was completed and committed earlier.
+This handoff captures the current Vitest harness work and the updated plan for the remaining test slices, following the completion of the Campaign and Wave Timeline compiler unit tests.
 
 ## Current State
 
@@ -8,128 +8,67 @@ This handoff captures the current Vitest harness work and the agreed plan for th
 - npm is visible as `11.13.0`.
 - Vitest is installed on the current line: `vitest@^4.1.8`.
 - `vitest.config.ts` limits collection to `src/**/*.test.ts` and uses the `node` environment, so Chrome profile artifacts under `.tmp/` are ignored.
-- `package.json` now has:
-  - `npm test` -> `vitest run`
-  - `npm run test:watch` -> `vitest`
 - ADR 0013 documents the Vitest module-test harness.
-- `AGENTS.md` now describes `npm test` as part of normal verification.
-- `CONTEXT.md` now includes these terms:
-  - `Module Test Harness`
-  - `Collision Contact`
-  - `Combat Resolution`
-  - `Wave Timeline Compiler`
+- `AGENTS.md` describes `npm test` as part of normal verification.
+- `CONTEXT.md` includes the core testing and gameplay vocabulary.
 
 ## Tests Already Added
 
-The first implemented slice protects the collision/contact and combat-resolution seam:
+The following test slices have been successfully implemented and verified:
 
-- `src/systems/Collisions.test.ts`
-- `src/systems/CombatResolution.test.ts`
+1. **Collision & Combat Seam:**
+   - `src/systems/Collisions.test.ts`
+   - `src/systems/CombatResolution.test.ts`
+   - Tests collision contact order, bullet piercing vs non-piercing, terrain bounds suppression, combat resolution mutations, hit events, and stale contact semantics.
 
-Current coverage:
+2. **Campaign Module:**
+   - `src/campaign/Campaign.test.ts`
+   - Tests `CAMPAIGN_LEVELS` / `IMPLEMENTED_LEVELS` sizing and chapter ordering, finale/non-finale level attributes, non-decreasing soft tier caps, stable chapter metadata, music cue mapping, level traversal wrapping/bounds, and exception handling for invalid LevelIds.
 
-- collision contacts are emitted in gameplay-relevant order
-- piercing and non-piercing player bullet contacts are distinguished
-- terrain contacts are suppressed when the player has no terrain bounds
-- combat resolution mutates bullets/enemies/player/bosses correctly
-- hit events are emitted for kills, boss hits, player hits, and powerup collection
-- stale contact semantics are protected when an earlier contact mutates later resolution
+3. **Wave Timeline Compiler:**
+   - `src/level/waves/Timeline.test.ts`
+   - Tests absolute coordinate compilation, sorting compiled entries, grouping multiple events at the same coordinate, insertion order preservation, support for both raw event arrays and `BeatPattern` objects, float scaling with rounding, and missing anchor errors.
 
-Latest successful verification before this handoff:
-
-- `npm test` passed: 2 files, 11 tests
+Current test status:
+- `npm test` passed: 4 files, 26 tests
 - `npm run build` passed
 - `git diff --check` passed
 
 ## Committed Baseline
 
-This handoff is intended to travel with the Vitest harness baseline. The baseline includes:
-
-- `AGENTS.md` verification guidance
-- `CONTEXT.md` glossary terms
-- `HANDOFF.md` continuation plan
-- `package.json` and `package-lock.json`
-- `docs/adr/0013-vitest-module-test-harness.md`
-- `src/systems/Collisions.test.ts`
-- `src/systems/CombatResolution.test.ts`
-- `vitest.config.ts`
-
-Run `git status --short` before continuing. If these files are still dirty, commit or account for them before adding the next test slice.
-
-## Agreed Next Slice 1: Campaign Module Tests
-
-Add `src/campaign/Campaign.test.ts`.
-
-Agreed testing style:
-
-- Use mostly behavioral invariants.
-- Use exact assertions only for stable identity and cue mappings.
-- Do not snapshot the entire `CAMPAIGN_LEVELS` array.
-
-Recommended coverage:
-
-- `CAMPAIGN_LEVELS` contains 20 levels in chapter/level order.
-- `IMPLEMENTED_LEVELS` contains all 20 current levels.
-- Every chapter has exactly levels `1..5`.
-- Every `x-5` level is a finale.
-- Finale levels have `clearType: 'chapter'`, `endAt: 0`, and a non-null `finaleBossArchetype`.
-- Non-finale levels have `clearType: 'level'`, nonzero `endAt`, and `finaleBossArchetype: null`.
-- Soft tier caps never decrease across the campaign.
-- Exact chapter keys/names/archetypes are stable.
-- `getMusicCueForChapterKey()` maps each `ChapterKey` to the expected `MusicCue`.
-- `getNextImplementedLevel(last)` returns `null`.
-- `getNextTitleLevel(last)` wraps to the first implemented level.
-- `getPreviousImplementedLevel(first)` wraps to the last implemented level.
-- `getCampaignLevel('9-9' as LevelId)` throws `Unknown campaign level`.
-- `getNextImplementedLevel(fakeLevel)` throws when the input is not in `IMPLEMENTED_LEVELS`.
-- `getPreviousImplementedLevel(fakeLevel)` throws for the same reason.
-- `getNextTitleLevel(fakeLevel)` throws for the same reason.
-
-Do not export private helpers just to test the internal monotonic-cap guard. The public nondecreasing-cap invariant is the useful protection.
-
-## Agreed Next Slice 2: Timeline Compiler Tests
-
-Add `src/level/waves/Timeline.test.ts`.
-
-Agreed scope:
-
-- Test the `Timeline` compiler contract first.
-- Do not snapshot authored chapter wave content yet.
-- Leave chapter wave content invariants for a later slice if needed.
-
-Recommended coverage:
-
-- `anchor(name, absoluteAt)` plus `add(anchor, offset, beat)` compiles `at = anchor + offset`.
-- Entries are sorted by `at`, regardless of authoring order.
-- Multiple beats or event arrays at the same compiled `at` are grouped into one `WaveEntry`.
-- Grouped events preserve insertion order within that coordinate.
-- Raw `StageEvent[]` inputs work the same as `BeatPattern`.
-- `scale` multiplies offsets and uses `Math.round`.
-- Include positive fractional rounding: `anchor 100`, `offset 21`, `scale 0.5` -> `at 111`.
-- Include negative scaled offsets: `anchor 100`, `offset -21`, `scale 0.5` -> `at 90`.
-- Missing anchors throw `Timeline: Anchor "x" is not defined.`
-
-Recommended test file location:
-
+The latest baseline is fully committed to git:
+- `src/campaign/Campaign.test.ts`
 - `src/level/waves/Timeline.test.ts`
+- `package-lock.json` (updated dependency tree)
 
-## Deferred Test Ideas
+Run `git status` before starting the next slices to confirm the workspace is clean.
 
-Chapter wave builder tests can come later as invariant tests, not content snapshots:
+## Agreed Next Slice 3: Chapter Wave Builder Invariant Tests
 
-- each valid chapter level builds nonempty waves
-- waves are sorted by `at`
-- event kinds are known `StageEventType` values
-- spawn enemy events use valid `EnemyType` values
-- unknown level IDs throw the existing chapter-specific error
+Add unit tests to verify the wave building pipeline for the actual chapters (e.g., `src/level/waves/Waves.test.ts` or testing the individual chapter wave builders).
 
-`LevelManager` tests should wait until Campaign and Timeline are pinned. It has runtime host callbacks and is better treated as the third slice.
+Recommended coverage:
+- Every valid chapter level builds a non-empty list of wave entries.
+- Wave entries are sorted chronologically by their absolute position (`at`).
+- All stage events have recognized `StageEventType` values.
+- Spawn events use valid, registered `EnemyType` values.
+- Unknown/unsupported level IDs throw appropriate chapter-specific errors.
+
+## Agreed Next Slice 4: LevelManager Tests
+
+Add `src/level/LevelManager.test.ts`.
+
+Recommended coverage:
+- Level scroll updates (`scrollX`) and stage event emission.
+- Finale boss spawning triggers at the correct scroll coordinates.
+- Non-finale levels exit correctly after clear gate resolution.
+- Playfield bounds and level completion triggers.
 
 ## Next Recommended Steps
 
-1. Add `src/campaign/Campaign.test.ts`.
-2. Add `src/level/waves/Timeline.test.ts`.
-3. Run `npm test`.
-4. Run `npm run build`.
-5. Run `git diff --check`.
-6. Commit the Campaign and Timeline test additions once green.
+1. Review wave builder files (`chapter1.ts` to `chapter4.ts`) and `Levels.ts` to see how waves are instantiated.
+2. Implement Slice 3 wave builder invariant tests.
+3. Implement Slice 4 `LevelManager` tests.
+4. Run `npm test` to verify all tests pass.
+5. Run `npm run build` to ensure the production build is clean.
+6. Commit changes when green.
