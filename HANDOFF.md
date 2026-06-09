@@ -1,10 +1,10 @@
 # AEON PULSE Vitest Harness And Next Test Slice Handoff
 
-This handoff captures the current Vitest harness work and outlines future test coverage opportunities now that Slices 1 through 4 have been successfully implemented and verified.
+This handoff captures the current Vitest harness work and outlines future test coverage opportunities now that all core and recommended test slices have been successfully implemented and verified.
 
 ## Current State
 
-- Node has been upgraded and is visible in this shell as `v24.16.0`.
+- Node is visible in this shell as `v24.16.0`.
 - npm is visible as `11.13.0`.
 - Vitest is installed: `vitest@^4.1.8`.
 - `vitest.config.ts` limits collection to `src/**/*.test.ts` and uses the `node` environment, so Chrome profile artifacts under `.tmp/` are ignored.
@@ -14,7 +14,7 @@ This handoff captures the current Vitest harness work and outlines future test c
 
 ## Tests Already Added
 
-The Vitest harness now includes 6 test suites protecting the core game mechanics, campaign configurations, level wave compiling, and stage transitions:
+The Vitest harness now includes 8 test suites protecting the core game mechanics, campaign configurations, level wave compiling, stage transitions, bullet pooling, and game tick resolution:
 
 1. **Collision & Combat Seam:**
    - `src/systems/Collisions.test.ts`
@@ -37,30 +37,36 @@ The Vitest harness now includes 6 test suites protecting the core game mechanics
    - `src/level/LevelManager.test.ts`
    - Tests `scrollX` increments, sequential wave/stage event dispatching, finale boss spawning when wave timeline is exhausted, and level completion gates for non-finale chapters.
 
+6. **Projectile Pool:**
+   - `src/systems/ProjectilePool.test.ts`
+   - Verifies bullet creation, recycling of released bullets, property matching (tint and damage override keys), exclusion of non-poolable bullet types (like HOMING), and memory cleanup on pool clear.
+
+7. **Gameplay Physics and Tick System:**
+   - `src/systems/Gameplay.test.ts`
+   - Tests background and level manager updates, player and enemy terrain boundaries clamp updates, bullet spawning from player/enemy/boss entities, and cleanup rules for dead/offscreen entities.
+
 Current test status:
-- `npm test` passed: 6 files, 39 tests
+- `npm test` passed: 8 files, 53 tests
 - `npm run build` passed
 - `git diff --check` passed
 
 ## Committed Baseline
 
-All 6 test files and updated dependency configurations are committed to git. Run `git status` to confirm.
+All 8 test files and updated dependency configurations are committed to git. Run `git status` to confirm.
 
 ## Recommended Future Test Slices
 
 If further module-level testing is desired, the following targets are recommended:
 
-1. **Projectile Pool and Instancing (`src/systems/ProjectilePool.ts`):**
-   - Test that bullet pooling works correctly: recycling deactivated bullets and instantiating new ones when the pool is depleted.
-   - Verify that pool sizes stay within reasonable memory bounds.
+1. **Projectile Instancer (`src/systems/ProjectileInstancer.ts`):**
+   - Test that bullet meshes are properly batched into `THREE.InstancedMesh` groups.
+   - Verify index tracking and correct transformations (translation and rotation) are written to the instance matrices.
 
-2. **Core Gameplay Tick System (`src/systems/Gameplay.ts`):**
-   - Mock entity states (player, enemies, bullets) and pass them through `tickGameplay()`.
-   - Verify entity movement updates, boundary checks, and pruning of dead or offscreen entities.
-   - Test that player input triggers player repositioning correctly under standard boundaries.
+2. **Score Manager (`src/systems/ScoreManager.ts`):**
+   - Test score calculation, combo multiplier scaling, high-score storage across different `DifficultyMode` values, and top-scores persistence.
 
 ## Next Recommended Steps
 
-1. Run `npm test` to verify all 39 tests pass.
+1. Run `npm test` to verify all 53 tests pass.
 2. Run `npm run build` to verify the production bundle remains green.
-3. Choose one of the recommended future test slices above to build next.
+3. Select any additional systems or UI components for unit testing if needed.
