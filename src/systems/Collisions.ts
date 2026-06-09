@@ -1,38 +1,80 @@
-import type { IPlayer, IEnemy, IBoss, IBullet, IPowerUp } from '../types.ts';
+import type { HitZone, ICollidable, TerrainBounds, IPlayer, IEnemy, IBoss, IBullet, IPowerUp } from '../types.ts';
 
-interface CollisionState {
-  player: IPlayer | null;
-  enemies: IEnemy[];
-  boss: IBoss | null;
-  bullets: IBullet[];
-  powerups: IPowerUp[];
+interface CollisionPlayerBody extends ICollidable {
+  readonly terrainBounds: TerrainBounds | null;
 }
 
-export enum HitEventKind {
-  ENEMY_KILLED = 'enemy-killed',
-  BOSS_HIT = 'boss-hit',
-  PLAYER_HIT = 'player-hit',
-  POWERUP_COLLECTED = 'powerup-collected',
+interface CollisionEnemyBody extends ICollidable {
+  readonly isAlive: boolean;
 }
 
-export enum HitCause {
-  BULLET = 'bullet',
-  TERRAIN = 'terrain',
-  RAM = 'ram',
-  LASER = 'laser',
+interface CollisionBossBody {
+  readonly isDying: boolean;
+  hitZones(): HitZone[];
+  readonly lasers: ReadonlyArray<ICollidable>;
 }
 
-export type HitEvent =
-  | { kind: HitEventKind.ENEMY_KILLED; x: number; y: number; score: number; dropPowerup: boolean }
-  | { kind: HitEventKind.BOSS_HIT; x: number; y: number }
-  | { kind: HitEventKind.PLAYER_HIT; cause: HitCause; x: number; y: number }
-  | { kind: HitEventKind.POWERUP_COLLECTED; powerup: IPowerUp };
+interface CollisionBulletBody extends ICollidable {
+  readonly active: boolean;
+  readonly isPlayerBullet: boolean;
+  readonly isPiercing: boolean;
+}
+
+type CollisionPowerUpBody = ICollidable;
+
+interface CollisionState<
+  TPlayer extends CollisionPlayerBody = IPlayer,
+  TEnemy extends CollisionEnemyBody = IEnemy,
+  TBoss extends CollisionBossBody = IBoss,
+  TBullet extends CollisionBulletBody = IBullet,
+  TPowerUp extends CollisionPowerUpBody = IPowerUp,
+> {
+  player: TPlayer | null;
+  enemies: TEnemy[];
+  boss: TBoss | null;
+  bullets: TBullet[];
+  powerups: TPowerUp[];
+}
+
+export enum CollisionContactKind {
+  PLAYER_BULLET_ENEMY = 'player-bullet-enemy',
+  PLAYER_BULLET_BOSS = 'player-bullet-boss',
+  BOSS_LASER_PLAYER = 'boss-laser-player',
+  PLAYER_TERRAIN = 'player-terrain',
+  ENEMY_BULLET_PLAYER = 'enemy-bullet-player',
+  ENEMY_RAM_PLAYER = 'enemy-ram-player',
+  POWERUP_PLAYER = 'powerup-player',
+}
+
+export type CollisionContact<
+  TPlayer extends CollisionPlayerBody = IPlayer,
+  TEnemy extends CollisionEnemyBody = IEnemy,
+  TBoss extends CollisionBossBody = IBoss,
+  TBullet extends CollisionBulletBody = IBullet,
+  TPowerUp extends CollisionPowerUpBody = IPowerUp,
+> =
+  | { kind: CollisionContactKind.PLAYER_BULLET_ENEMY; bullet: TBullet; enemy: TEnemy }
+  | { kind: CollisionContactKind.PLAYER_BULLET_BOSS; bullet: TBullet; boss: TBoss; zone: HitZone }
+  | { kind: CollisionContactKind.BOSS_LASER_PLAYER; laser: ICollidable; player: TPlayer }
+  | { kind: CollisionContactKind.PLAYER_TERRAIN; player: TPlayer }
+  | { kind: CollisionContactKind.ENEMY_BULLET_PLAYER; bullet: TBullet; player: TPlayer }
+  | { kind: CollisionContactKind.ENEMY_RAM_PLAYER; enemy: TEnemy; player: TPlayer }
+  | { kind: CollisionContactKind.POWERUP_PLAYER; powerup: TPowerUp; player: TPlayer };
 
 function overlap(ax: number, ay: number, ahw: number, ahh: number, bx: number, by: number, bhw: number, bhh: number): boolean {
   return Math.abs(ax - bx) < ahw + bhw && Math.abs(ay - by) < ahh + bhh;
 }
 
-export function checkCollisions(state: CollisionState, onHit: (e: HitEvent) => void): void {
+export function checkCollisions<
+  TPlayer extends CollisionPlayerBody = IPlayer,
+  TEnemy extends CollisionEnemyBody = IEnemy,
+  TBoss extends CollisionBossBody = IBoss,
+  TBullet extends CollisionBulletBody = IBullet,
+  TPowerUp extends CollisionPowerUpBody = IPowerUp,
+>(
+  state: CollisionState<TPlayer, TEnemy, TBoss, TBullet, TPowerUp>,
+  onContact: (contact: CollisionContact<TPlayer, TEnemy, TBoss, TBullet, TPowerUp>) => void,
+): void {
   const { player, enemies, boss, bullets, powerups } = state;
 
   // ── Player bullets vs enemies & boss ───────────────────────────────────────
@@ -45,23 +87,18 @@ export function checkCollisions(state: CollisionState, onHit: (e: HitEvent) => v
       if (!overlap(bullet.x, bullet.y, bullet.hw, bullet.hh,
                    enemy.x,  enemy.y,  enemy.hw,  enemy.hh)) continue;
 
-      const death = enemy.hit(bullet.damage);
-      if (!bullet.isPiercing) bullet.active = false;
+      onContact({ kind: CollisionContactKind.PLAYER_BULLET_ENEMY, bullet, enemy });
 
-      if (death) {
-        onHit({ kind: HitEventKind.ENEMY_KILLED, x: death.x, y: death.y, score: enemy.score, dropPowerup: death.dropPowerup });
+      if (!bullet.isPiercing) {
+        break; // non-piercing: done after first enemy contact
       }
-
-      if (!bullet.active) break; // non-piercing: done after first hit
     }
 
     // vs boss
-    if (bullet.active && boss && !boss.isDying) {
+    if (boss && !boss.isDying) {
       for (const zone of boss.hitZones()) {
         if (!overlap(bullet.x, bullet.y, bullet.hw, bullet.hh, zone.x, zone.y, zone.hw, zone.hh)) continue;
-        boss.hit(bullet.damage, zone.id);
-        if (!bullet.isPiercing) bullet.active = false;
-        onHit({ kind: HitEventKind.BOSS_HIT, x: bullet.x, y: bullet.y });
+        onContact({ kind: CollisionContactKind.PLAYER_BULLET_BOSS, bullet, boss, zone });
         break;
       }
     }
@@ -72,9 +109,7 @@ export function checkCollisions(state: CollisionState, onHit: (e: HitEvent) => v
     for (const laser of boss.lasers) {
       if (!overlap(player.x, player.y, player.hw, player.hh,
                    laser.x,  laser.y,  laser.hw,  laser.hh)) continue;
-      if (player.hit()) {
-        onHit({ kind: HitEventKind.PLAYER_HIT, cause: HitCause.LASER, x: player.x, y: player.y });
-      }
+      onContact({ kind: CollisionContactKind.BOSS_LASER_PLAYER, laser, player });
     }
   }
 
@@ -84,9 +119,7 @@ export function checkCollisions(state: CollisionState, onHit: (e: HitEvent) => v
   if (player.terrainBounds !== null) {
     const { top, bottom } = player.terrainBounds;
     if (player.y + player.hh > top || player.y - player.hh < bottom) {
-      if (player.hit()) {
-        onHit({ kind: HitEventKind.PLAYER_HIT, cause: HitCause.TERRAIN, x: player.x, y: player.y });
-      }
+      onContact({ kind: CollisionContactKind.PLAYER_TERRAIN, player });
     }
   }
 
@@ -96,10 +129,7 @@ export function checkCollisions(state: CollisionState, onHit: (e: HitEvent) => v
     if (!overlap(bullet.x, bullet.y, bullet.hw, bullet.hh,
                  player.x,  player.y,  player.hw,  player.hh)) continue;
 
-    if (player.hit()) {
-      onHit({ kind: HitEventKind.PLAYER_HIT, cause: HitCause.BULLET, x: player.x, y: player.y });
-    }
-    bullet.active = false;
+    onContact({ kind: CollisionContactKind.ENEMY_BULLET_PLAYER, bullet, player });
   }
 
   // ── Enemies ramming player ─────────────────────────────────────────────────
@@ -108,19 +138,12 @@ export function checkCollisions(state: CollisionState, onHit: (e: HitEvent) => v
     if (!overlap(enemy.x, enemy.y, enemy.hw * 0.7, enemy.hh * 0.7,
                  player.x, player.y, player.hw,    player.hh)) continue;
 
-    if (player.hit()) {
-      onHit({ kind: HitEventKind.PLAYER_HIT, cause: HitCause.RAM, x: player.x, y: player.y });
-    }
-    const death = enemy.hit(999);
-    if (death) {
-      // score: 0 — rams are a punishment, no points awarded
-      onHit({ kind: HitEventKind.ENEMY_KILLED, x: death.x, y: death.y, score: 0, dropPowerup: death.dropPowerup });
-    }
+    onContact({ kind: CollisionContactKind.ENEMY_RAM_PLAYER, enemy, player });
   }
 
   // ── PowerUps vs player ─────────────────────────────────────────────────────
   for (const pu of [...powerups]) {
     if (!overlap(pu.x, pu.y, pu.hw, pu.hh, player.x, player.y, player.hw, player.hh)) continue;
-    onHit({ kind: HitEventKind.POWERUP_COLLECTED, powerup: pu });
+    onContact({ kind: CollisionContactKind.POWERUP_PLAYER, powerup: pu, player });
   }
 }

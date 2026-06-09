@@ -3,7 +3,8 @@ import { InputManager } from './InputManager.ts';
 import { AudioManager } from './audio/AudioManager.ts';
 import { ScoreManager } from './ScoreManager.ts';
 import { tickGameplay, type WorldState } from './Gameplay.ts';
-import { checkCollisions, HitCause, HitEventKind, type HitEvent } from './Collisions.ts';
+import { checkCollisions, type CollisionContact } from './Collisions.ts';
+import { HitCause, HitEventKind, resolveCollisionContacts, type HitEvent } from './CombatResolution.ts';
 import { ProjectilePool } from './ProjectilePool.ts';
 import { Player } from '../entities/Player.ts';
 import type { WeaponTierValue } from '../entities/Player.ts';
@@ -167,6 +168,7 @@ export class GameplayRun implements LevelGameHost {
       return;
     }
 
+    const contacts: CollisionContact[] = [];
     checkCollisions(
       {
         player: this._player,
@@ -175,8 +177,9 @@ export class GameplayRun implements LevelGameHost {
         bullets: this._bullets,
         powerups: this._powerups,
       },
-      (event) => this._handleHit(event),
+      (contact) => contacts.push(contact),
     );
+    resolveCollisionContacts(contacts, (event) => this._handleHit(event));
   }
 
   getHUDSnapshot(): HUDSnapshot {

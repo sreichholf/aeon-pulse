@@ -1,6 +1,8 @@
-# AEON PULSE — Enemy & Boss Render Optimization Handoff
+# AEON PULSE — Enemy & Boss Render Optimization Completion Handoff
 
-This document details the architecture, design choices, verified benchmarks, and precise step-by-step blueprints for continuing the geometry-merging draw-call collapse optimizations across the remaining standard enemy types.
+This document records the completed geometry-merging draw-call collapse optimizations across projectiles, selected terrain, standard enemies, and all four chapter bosses.
+
+**Current status:** there is no remaining implementation work from this render-optimization handoff. Future work should be ordinary visual QA, regression testing, and any new optimizations discovered after profiling.
 
 ---
 
@@ -15,12 +17,30 @@ We have successfully implemented and committed the following render optimization
   - `7de2ead Collapse industrial titan geometry` — [Boss2.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss2.ts) collapsed static plated body, spinning drill, and exhaust flames.
   - `89e2134 Collapse titan one geometry` — [Boss.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss.ts) collapsed static hull, energy lights, transparent conduits, and exhaust flames.
   - `46e6f13 Collapse hive heart teeth geometry` — [Boss3.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss3.ts) collapsed each armored tooth pivot into one vertex-colored mesh.
+- **Phase 6 (Remaining Standard Enemy Geometry Collapse)**: Implemented and committed in `35ccad9 Collapse remaining enemy geometry`:
+  - [EnemySine.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/EnemySine.ts) collapsed the static core into one vertex-colored mesh and collapsed each animated claw internally while keeping lens, iris, pupil, vectoring nozzles, and flames independently animated.
+  - [EnemyDiver.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/EnemyDiver.ts) collapsed fuselage, fins, cockpit, and nozzles into one vertex-colored hull mesh plus one merged flame mesh.
+  - [EnemyTurret.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/EnemyTurret.ts) collapsed the sliding recoil barrel/sleeve assembly into one vertex-colored mesh while keeping vents, muzzle, rings, and sequential coils separate.
+  - [EnemyCharger.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/EnemyCharger.ts) collapsed fuselage core and each scissor wing's static structure while keeping energy spine, energy channels, plumes, trails, steering jets, and laser separate.
+- **Playtesting Documentation**: `35ccad9` also added a practical manual playtesting checklist to [AGENTS.md](file:///e:/Develop/GitHub/aeon-pulse/AGENTS.md).
 
-### Final Benchmark Results (Working Tree Clean & Committed)
+### Historical Benchmark Results
 *Headless browser profiling CDP stats capture (1eeda27):*
 - **Level 1: Tier 5 Tap-Fire**: Collapsed peak draw calls from **319 to 93 (-71% Peak Reduction)**.
 - **Level 4: Tier 5 Tap-Fire**: Collapsed peak draw calls from **644 to 95 (-85% Peak Reduction)**.
 - **Level 4: No-Fire**: Collapsed peak draw calls from **729 to 192 (-74% Peak Reduction)**.
+
+### Latest Verification Results
+*After `35ccad9`, with Vite running at `http://127.0.0.1:5173` and the authorized CDP profiler orchestrator:*
+
+| Scenario | Samples | Draw Calls Min | Draw Calls Max | Draw Calls Avg | Notes |
+|---|---:|---:|---:|---:|---|
+| `L1-1 no-fire` | 25 | 38 | 84 | 64 | completed |
+| `L1-1 tier5 tap-fire` | 35 | 42 | 88 | 73 | completed |
+| `L4-4 no-fire` | 30 | 34 | 139 | 81 | completed; one raw sample showed 51 FPS |
+| `L4-4 tier5 tap-fire` | 45 | 36 | 95 | 69 | completed |
+
+`npm run build` passed. `git diff --check` passed before commit. The in-app browser plugin failed with a Windows sandbox startup error, so manual visual inspection through that plugin was not completed during this pass.
 
 ---
 
@@ -34,29 +54,29 @@ When refactoring models in this repository, always preserve **100% visual replic
 
 ---
 
-## 🛠️ 3. Optimization Blueprints for Standard Enemy Types
+## 🛠️ 3. Completed Standard Enemy Optimization Passes
 
 ### 1. `EnemySine.ts` (Sine Interceptors)
-*A high-density Level 1 bio-mechanical interceptor. Current draw calls: 14+ per active instance.*
+*Completed in `35ccad9 Collapse remaining enemy geometry`.*
 - **Static Core Group (3 -> 1 draw calls)**: Merge `coreMesh` (dark metal), carapace `panelsMesh` (green), and `rearPanel` (bright green) into a single vertex-colored Mesh at `(0, 0, 0)`.
 - **Procedural Claws (8 -> 4 draw calls)**: Sine interceptors have four banking/flexing claws (`_clawTF`, `_clawTB`, `_clawBF`, `_clawBB`) rotating on Z. Do not merge claws with the core. Instead, **merge the components of each claw internally** (green claw shield + dark metal spikes/hinges) into a **single vertex-colored Mesh per claw**.
 - **Apterous Optic Eye (3 -> 3 draw calls)**: Keep the glass outer lens (transparent cockpitMat), glowing iris (dynamic emissive pulsing warning flare), and pupil (dynamic scaling pupilScale) as separate meshes.
 - **Thrust Vectoring**: Keep the top/bottom vectoring nozzles and exhaust flames as separate groups/meshes to allow procedurally animated banking.
 
 ### 2. `EnemyDiver.ts` (Diver Heavy Bombers)
-*A heavy Level 1/4 bomber spawned in V-formations. Current draw calls: 6 per active instance.*
+*Completed in `35ccad9 Collapse remaining enemy geometry`.*
 - **Static Fuselage Assembly (4 -> 1 draw calls)**: The fatter fuselage belly, outer wing tips, swept dorsal/ventral fins, and cockpit dome rotate as a single unit in Z. Since the cockpit dome has no warning pulses or firing flares, **merge the fuselage, wing tips, fins, cockpit, and engine nozzles into a single vertex-colored Mesh**.
 - **Dual Exhaust Flames (2 -> 1 draw calls)**: Translate the two exhaust cone geometries to `(20, 5, 0)` and `(20, -5, 0)`, and merge them into a **single merged engine flame Mesh** positioned at `(0, 0, 0)`. Scaling this merged mesh dynamically in `_tick` will scale both flames uniformly with zero translation offset.
 - **Outcome**: Collapses Diver bomber overhead down to **exactly 2 draw calls** (Hull Mesh + merged Flames).
 
 ### 3. `EnemyTurret.ts` (Heavy Railgun Turrets)
-*A stationary railgun with sequential charging coils. Current draw calls: ~11 per active instance.*
+*Completed in `35ccad9 Collapse remaining enemy geometry`.*
 - **Axle Mounting (2 -> 2 draw calls)**: The axle cylinder (base steel) and axle rings (pulsing ringMat) are static, but since the axle rings have a dynamic emissive pulse, keep them as 2 separate meshes.
 - **Cannon Recoil Assembly (2 -> 1 draw calls)**: Inside `_cannonGroup` (which slides along X during firing recoil), the central barrel (base steel) and outer `sleeveMesh` (slate steel) are static. **Merge them into a single vertex-colored Mesh**.
 - **Granular Chasing Elements**: The warning heat vents, muzzle tip, and 4 copper coils must remain separate because the muzzle flashes dynamically and the 4 coils chase sequentially (lighting up one-by-one in emissive scale).
 
 ### 4. `EnemyCharger.ts` (Glaive-Class Interceptors)
-*Level 4 plasma interceptors with overcharged vertical scissor wings. Current draw calls: 14+ per active instance.*
+*Completed in `35ccad9 Collapse remaining enemy geometry`.*
 - **Static Fuselage Core (3 -> 1 draw calls)**: The dark matte body and reactor vent ring are static relative to `_shipGroup`. **Merge them into a single vertex-colored fuselage Mesh**. Keep the energy spine (`energyMesh` with `neonMat`) separate, as it pulses emissively like a heartbeat during locking.
 - **Scissor Wings (6 -> 2 draw calls)**: The top and bottom wings rotate independently on Z (opening up to 36 degrees during lock-on/charging). Merge the elements of each wing group (metal blade + wingtip thruster housing) into a **single vertex-colored Mesh per wing** (1 for top wing, 1 for bottom wing). Keep neon energy channels and thruster plumes separate to allow lock-on pulse and charging flares.
 
@@ -96,35 +116,44 @@ When refactoring models in this repository, always preserve **100% visual replic
 
 ---
 
-## 📊 5. Estimated Draw Call Savings (Remaining Work)
+## 📊 5. Completion Status
 
 ### Standard Enemies
 
-| Target | Current Draw Calls | After Merge | Savings |
+| Target | Previous Draw Calls | After Merge | Status |
 |---|---|---|---|
-| `EnemySine.ts` | 14+ | ~7 | ~50% |
-| `EnemyDiver.ts` | 6 | **2** | **-67%** |
-| `EnemyTurret.ts` | ~11 | ~8 | ~27% |
-| `EnemyCharger.ts` | 14+ | ~6 | ~57% |
+| `EnemySine.ts` | 14+ | ~7 | complete in `35ccad9` |
+| `EnemyDiver.ts` | 6 | **2** | complete in `35ccad9` |
+| `EnemyTurret.ts` | ~11 | ~8 | complete in `35ccad9` |
+| `EnemyCharger.ts` | 14+ | ~6 | complete in `35ccad9` |
 
 ### Bosses
 
-| Target | Current Draw Calls | After Merge | Savings |
+| Target | Previous Draw Calls | After Merge | Status |
 |---|---|---|---|
-| `Boss.ts` (Chapter 1) | 24 | **6** | **-75%** — complete in `89e2134` |
-| `Boss2.ts` (Chapter 2) | 27 | **3** | **-88%** — complete in `7de2ead` |
-| `Boss3.ts` (Chapter 3) | ~92 | ~68 | -26% — complete in `46e6f13` |
-| `Boss4.ts` (Chapter 4) | ~55 | **15** | **-73%** — complete in `4b63ae4` |
+| `Boss.ts` (Chapter 1) | 24 | **6** | complete in `89e2134` |
+| `Boss2.ts` (Chapter 2) | 27 | **3** | complete in `7de2ead` |
+| `Boss3.ts` (Chapter 3) | ~92 | ~68 | complete in `46e6f13` |
+| `Boss4.ts` (Chapter 4) | ~55 | **15** | complete in `4b63ae4` |
+
+### Is Anything Left?
+
+No implementation work remains from this handoff. The render-optimization scope is complete and committed.
+
+Recommended follow-up before treating a future release as fully signed off:
+- Manual browser playtest using the [AGENTS.md](file:///e:/Develop/GitHub/aeon-pulse/AGENTS.md) checklist, because the in-app browser plugin could not complete visual inspection during `35ccad9`.
+- Keep monitoring `L4-4 no-fire` in future profiler runs because one latest raw sample reported 51 FPS despite the profiler completing successfully.
+- If new enemies, bosses, projectiles, or terrain hazards are added later, apply the same vertex-color merge rules and profiler workflow.
 
 ---
 
-## 🚀 6. Workflow for Next Agent / Developer
+## 🚀 6. Workflow for Future Render Work
 1. **Develop/Run Server**: Start the local development server at `http://localhost:5173` via `npm run dev`.
-2. **Execute Remaining Refactoring**: Continue with the remaining standard enemy blueprints in Section 3. The boss blueprints in Section 4 are already implemented and should be used as reference patterns only. Ensure all temporary/cloned geometries are disposed to prevent GPU memory leaks.
+2. **Use Completed Passes As Reference**: The standard enemy and boss blueprints are implemented. Use them as patterns for future entities, especially local pivot-preserving merges and separate dynamic emissive/transparent/scaling parts.
 3. **Verify Build**: Always run `npm run build` to verify there are no TypeScript or bundler errors.
 4. **Gather Performance Stats**: Trigger the pre-authorized Windows headless Chrome profiler orchestrator:
    ```powershell
    & "C:\Users\Stephan\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" "C:\Users\Stephan\.gemini\antigravity-ide\scratch\run-profiler.js"
    ```
    Verify that average/peak draw calls remain low and average FPS remains locked at `60+`.
-5. **Playtest**: Open `http://localhost:5173` to verify visually that claws bank, nozzles vector, wings scissors, and engines flare correctly with 100% visual fidelity.
+5. **Playtest**: Open `http://localhost:5173` and use the manual playtesting checklist in `AGENTS.md` to verify visually that claws bank, nozzles vector, wings scissor, recoil groups move, transparent pieces blend, and engines flare correctly.
