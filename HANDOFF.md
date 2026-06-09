@@ -1,159 +1,135 @@
-# AEON PULSE — Enemy & Boss Render Optimization Completion Handoff
+# AEON PULSE Vitest Harness And Next Test Slice Handoff
 
-This document records the completed geometry-merging draw-call collapse optimizations across projectiles, selected terrain, standard enemies, and all four chapter bosses.
+This handoff captures the current Vitest harness work and the agreed plan for the next module-test slices. It intentionally replaces the older render-optimization handoff, because that render scope was completed and committed earlier.
 
-**Current status:** there is no remaining implementation work from this render-optimization handoff. Future work should be ordinary visual QA, regression testing, and any new optimizations discovered after profiling.
+## Current State
 
----
+- Node has been upgraded and is visible in this shell as `v24.16.0`.
+- npm is visible as `11.13.0`.
+- Vitest is installed on the current line: `vitest@^4.1.8`.
+- `vitest.config.ts` limits collection to `src/**/*.test.ts` and uses the `node` environment, so Chrome profile artifacts under `.tmp/` are ignored.
+- `package.json` now has:
+  - `npm test` -> `vitest run`
+  - `npm run test:watch` -> `vitest`
+- ADR 0013 documents the Vitest module-test harness.
+- `AGENTS.md` now describes `npm test` as part of normal verification.
+- `CONTEXT.md` now includes these terms:
+  - `Module Test Harness`
+  - `Collision Contact`
+  - `Combat Resolution`
+  - `Wave Timeline Compiler`
 
-## 🏁 1. Current Progress & Optimizations Completed
-We have successfully implemented and committed the following render optimization passes:
-- **Phase 1 (Central Projectile Instancer)**: Transparent rendering interception in [Scene.ts](file:///e:/Develop/GitHub/aeon-pulse/src/Scene.ts) via [ProjectileInstancer.ts](file:///e:/Develop/GitHub/aeon-pulse/src/systems/ProjectileInstancer.ts), routing all `RenderCategory.BULLET` objects into centralized `THREE.InstancedMesh` batches.
-- **Phase 2 (Rock Drake Merge)**: Removed splayed leg duplicates and merged geometry inside [RockDrake.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/RockDrake.ts), collapsing draw calls from **21 to 5 per instance** with zero z-fighting.
-- **Phase 3 (Terrain4 Debris Instancing)**: Converted 30 falling rock meshes in [Terrain4.ts](file:///e:/Develop/GitHub/aeon-pulse/src/level/Terrain4.ts) to a single `THREE.InstancedMesh`.
-- **Phase 4 (EnemyStraight Collapse & Subtle Recoil)**: Collapsed [EnemyStraight.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/EnemyStraight.ts) from 8 draw calls to **exactly 3** (Hull Mesh, Visor Canopy Mesh, and merged Exhaust Flames). Fixed a visual double-rotation bug on the cockpit canopy, and implemented a 75%-scaled underdamped spring visual recoil (`2.0` displacement, `-21.25` velocity) matched with a physical lunge speed recovery (`SPEED * 0.79` pause compensated by `SPEED * 1.21` lunge).
-- **Phase 5 (Boss Geometry Collapse)**: Implemented and committed all four chapter boss merge passes:
-  - `4b63ae4 Collapse volcanic titan geometry` — [Boss4.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss4.ts) collapsed legs, armor plates, slithering segments, tail, and head segment internals.
-  - `7de2ead Collapse industrial titan geometry` — [Boss2.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss2.ts) collapsed static plated body, spinning drill, and exhaust flames.
-  - `89e2134 Collapse titan one geometry` — [Boss.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss.ts) collapsed static hull, energy lights, transparent conduits, and exhaust flames.
-  - `46e6f13 Collapse hive heart teeth geometry` — [Boss3.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Boss3.ts) collapsed each armored tooth pivot into one vertex-colored mesh.
-- **Phase 6 (Remaining Standard Enemy Geometry Collapse)**: Implemented and committed in `35ccad9 Collapse remaining enemy geometry`:
-  - [EnemySine.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/EnemySine.ts) collapsed the static core into one vertex-colored mesh and collapsed each animated claw internally while keeping lens, iris, pupil, vectoring nozzles, and flames independently animated.
-  - [EnemyDiver.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/EnemyDiver.ts) collapsed fuselage, fins, cockpit, and nozzles into one vertex-colored hull mesh plus one merged flame mesh.
-  - [EnemyTurret.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/EnemyTurret.ts) collapsed the sliding recoil barrel/sleeve assembly into one vertex-colored mesh while keeping vents, muzzle, rings, and sequential coils separate.
-  - [EnemyCharger.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/EnemyCharger.ts) collapsed fuselage core and each scissor wing's static structure while keeping energy spine, energy channels, plumes, trails, steering jets, and laser separate.
-- **Playtesting Documentation**: `35ccad9` also added a practical manual playtesting checklist to [AGENTS.md](file:///e:/Develop/GitHub/aeon-pulse/AGENTS.md).
+## Tests Already Added
 
-### Historical Benchmark Results
-*Headless browser profiling CDP stats capture (1eeda27):*
-- **Level 1: Tier 5 Tap-Fire**: Collapsed peak draw calls from **319 to 93 (-71% Peak Reduction)**.
-- **Level 4: Tier 5 Tap-Fire**: Collapsed peak draw calls from **644 to 95 (-85% Peak Reduction)**.
-- **Level 4: No-Fire**: Collapsed peak draw calls from **729 to 192 (-74% Peak Reduction)**.
+The first implemented slice protects the collision/contact and combat-resolution seam:
 
-### Latest Verification Results
-*After `35ccad9`, with Vite running at `http://127.0.0.1:5173` and the authorized CDP profiler orchestrator:*
+- `src/systems/Collisions.test.ts`
+- `src/systems/CombatResolution.test.ts`
 
-| Scenario | Samples | Draw Calls Min | Draw Calls Max | Draw Calls Avg | Notes |
-|---|---:|---:|---:|---:|---|
-| `L1-1 no-fire` | 25 | 38 | 84 | 64 | completed |
-| `L1-1 tier5 tap-fire` | 35 | 42 | 88 | 73 | completed |
-| `L4-4 no-fire` | 30 | 34 | 139 | 81 | completed; one raw sample showed 51 FPS |
-| `L4-4 tier5 tap-fire` | 45 | 36 | 95 | 69 | completed |
+Current coverage:
 
-`npm run build` passed. `git diff --check` passed before commit. The in-app browser plugin failed with a Windows sandbox startup error, so manual visual inspection through that plugin was not completed during this pass.
+- collision contacts are emitted in gameplay-relevant order
+- piercing and non-piercing player bullet contacts are distinguished
+- terrain contacts are suppressed when the player has no terrain bounds
+- combat resolution mutates bullets/enemies/player/bosses correctly
+- hit events are emitted for kills, boss hits, player hits, and powerup collection
+- stale contact semantics are protected when an earlier contact mutates later resolution
 
----
+Latest successful verification before this handoff:
 
-## 📐 2. Architecture & Design Rules for Geometry Merging
-When refactoring models in this repository, always preserve **100% visual replication** and **fluid dynamic animations** by adhering to these strict boundaries:
+- `npm test` passed: 2 files, 11 tests
+- `npm run build` passed
+- `git diff --check` passed
 
-1. **Static Parts (Share Opaque Materials)**: Merge structural elements (matte steel, gunmetal plating, copper gear rims) into a **single static vertex-colored Mesh** using `mergeGeometries()`. Use `ensureNonIndexed()` to index-align geometries and `addVertexColor(geo, hex)` to encode native specular/emissive values directly into vertices.
-2. **Transparent Elements**: Keep transparent parts (glass lens domes, glowing windshield shields) separate to ensure correct rendering order and transparency blending.
-3. **Dynamic Emissive/Flash Animations**: Any part that pulses emissively upon taking damage, charging up, or firing (such as tactical visors, laser eyes, or railgun muzzle tips) **must remain as a separate mesh** so it can change materials/emissive values individually without lighting up the entire ship frame.
-4. **Procedurally Animated / Scaling Elements**: Keep wings that flap, nozzles that tilt (thrust vectoring), claws that rotate, and flames that scale on X/Y/Z as **separate meshes or sub-groups** to prevent scaling or rotational distortion.
+## Committed Baseline
 
----
+This handoff is intended to travel with the Vitest harness baseline. The baseline includes:
 
-## 🛠️ 3. Completed Standard Enemy Optimization Passes
+- `AGENTS.md` verification guidance
+- `CONTEXT.md` glossary terms
+- `HANDOFF.md` continuation plan
+- `package.json` and `package-lock.json`
+- `docs/adr/0013-vitest-module-test-harness.md`
+- `src/systems/Collisions.test.ts`
+- `src/systems/CombatResolution.test.ts`
+- `vitest.config.ts`
 
-### 1. `EnemySine.ts` (Sine Interceptors)
-*Completed in `35ccad9 Collapse remaining enemy geometry`.*
-- **Static Core Group (3 -> 1 draw calls)**: Merge `coreMesh` (dark metal), carapace `panelsMesh` (green), and `rearPanel` (bright green) into a single vertex-colored Mesh at `(0, 0, 0)`.
-- **Procedural Claws (8 -> 4 draw calls)**: Sine interceptors have four banking/flexing claws (`_clawTF`, `_clawTB`, `_clawBF`, `_clawBB`) rotating on Z. Do not merge claws with the core. Instead, **merge the components of each claw internally** (green claw shield + dark metal spikes/hinges) into a **single vertex-colored Mesh per claw**.
-- **Apterous Optic Eye (3 -> 3 draw calls)**: Keep the glass outer lens (transparent cockpitMat), glowing iris (dynamic emissive pulsing warning flare), and pupil (dynamic scaling pupilScale) as separate meshes.
-- **Thrust Vectoring**: Keep the top/bottom vectoring nozzles and exhaust flames as separate groups/meshes to allow procedurally animated banking.
+Run `git status --short` before continuing. If these files are still dirty, commit or account for them before adding the next test slice.
 
-### 2. `EnemyDiver.ts` (Diver Heavy Bombers)
-*Completed in `35ccad9 Collapse remaining enemy geometry`.*
-- **Static Fuselage Assembly (4 -> 1 draw calls)**: The fatter fuselage belly, outer wing tips, swept dorsal/ventral fins, and cockpit dome rotate as a single unit in Z. Since the cockpit dome has no warning pulses or firing flares, **merge the fuselage, wing tips, fins, cockpit, and engine nozzles into a single vertex-colored Mesh**.
-- **Dual Exhaust Flames (2 -> 1 draw calls)**: Translate the two exhaust cone geometries to `(20, 5, 0)` and `(20, -5, 0)`, and merge them into a **single merged engine flame Mesh** positioned at `(0, 0, 0)`. Scaling this merged mesh dynamically in `_tick` will scale both flames uniformly with zero translation offset.
-- **Outcome**: Collapses Diver bomber overhead down to **exactly 2 draw calls** (Hull Mesh + merged Flames).
+## Agreed Next Slice 1: Campaign Module Tests
 
-### 3. `EnemyTurret.ts` (Heavy Railgun Turrets)
-*Completed in `35ccad9 Collapse remaining enemy geometry`.*
-- **Axle Mounting (2 -> 2 draw calls)**: The axle cylinder (base steel) and axle rings (pulsing ringMat) are static, but since the axle rings have a dynamic emissive pulse, keep them as 2 separate meshes.
-- **Cannon Recoil Assembly (2 -> 1 draw calls)**: Inside `_cannonGroup` (which slides along X during firing recoil), the central barrel (base steel) and outer `sleeveMesh` (slate steel) are static. **Merge them into a single vertex-colored Mesh**.
-- **Granular Chasing Elements**: The warning heat vents, muzzle tip, and 4 copper coils must remain separate because the muzzle flashes dynamically and the 4 coils chase sequentially (lighting up one-by-one in emissive scale).
+Add `src/campaign/Campaign.test.ts`.
 
-### 4. `EnemyCharger.ts` (Glaive-Class Interceptors)
-*Completed in `35ccad9 Collapse remaining enemy geometry`.*
-- **Static Fuselage Core (3 -> 1 draw calls)**: The dark matte body and reactor vent ring are static relative to `_shipGroup`. **Merge them into a single vertex-colored fuselage Mesh**. Keep the energy spine (`energyMesh` with `neonMat`) separate, as it pulses emissively like a heartbeat during locking.
-- **Scissor Wings (6 -> 2 draw calls)**: The top and bottom wings rotate independently on Z (opening up to 36 degrees during lock-on/charging). Merge the elements of each wing group (metal blade + wingtip thruster housing) into a **single vertex-colored Mesh per wing** (1 for top wing, 1 for bottom wing). Keep neon energy channels and thruster plumes separate to allow lock-on pulse and charging flares.
+Agreed testing style:
 
----
+- Use mostly behavioral invariants.
+- Use exact assertions only for stable identity and cue mappings.
+- Do not snapshot the entire `CAMPAIGN_LEVELS` array.
 
-## 👹 4. Completed Boss Optimization Passes
+Recommended coverage:
 
-### 1. `Boss.ts` (Titan I - Chapter 1 Boss)
-*Completed in `89e2134 Collapse titan one geometry`.*
-- **Static Opaque Hull (12 -> 1 draw calls)**: Merge the main fuselage lathe, side ridges, wings, canards, front prongs, engine nacelles, and central engine port into a **single, static vertex-colored Mesh** at `(0, 0, 0)`.
-- **Static Energy Lights (4 -> 1 draw calls)**: Merge the static wing tips and front prong rings (which share the pulsing `_energyMat`) into a **single static energy-light Mesh**. When the emissive warn-flash triggers, all parts will flash together cleanly!
-- **Transparent Conduits (4 -> 1 draw calls)**: Merge the conduit stripes and exhaust nacelle rings (which both share `conduitMat` with `opacity: 0.9`) into a **single transparent Mesh**.
-- **Exhaust Flames (3 -> 1 draw calls)**: Merge the two nacelle flames and the central exhaust flame into a **single exhaust-flames Mesh** (using `coreGlowMat` at `opacity: 0.5`).
-- **Dynamic Core Group (2 -> 2 draw calls)**: Keep the rotating core group `_coreGroup` separate. It will continue to hold the Octahedron and the outer Glow Sphere, rotating dynamically as a sub-group.
-- **Outcome**: Collapses the L1 Boss from **24 down to exactly 6 draw calls** (a **75% reduction**).
+- `CAMPAIGN_LEVELS` contains 20 levels in chapter/level order.
+- `IMPLEMENTED_LEVELS` contains all 20 current levels.
+- Every chapter has exactly levels `1..5`.
+- Every `x-5` level is a finale.
+- Finale levels have `clearType: 'chapter'`, `endAt: 0`, and a non-null `finaleBossArchetype`.
+- Non-finale levels have `clearType: 'level'`, nonzero `endAt`, and `finaleBossArchetype: null`.
+- Soft tier caps never decrease across the campaign.
+- Exact chapter keys/names/archetypes are stable.
+- `getMusicCueForChapterKey()` maps each `ChapterKey` to the expected `MusicCue`.
+- `getNextImplementedLevel(last)` returns `null`.
+- `getNextTitleLevel(last)` wraps to the first implemented level.
+- `getPreviousImplementedLevel(first)` wraps to the last implemented level.
+- `getCampaignLevel('9-9' as LevelId)` throws `Unknown campaign level`.
+- `getNextImplementedLevel(fakeLevel)` throws when the input is not in `IMPLEMENTED_LEVELS`.
+- `getPreviousImplementedLevel(fakeLevel)` throws for the same reason.
+- `getNextTitleLevel(fakeLevel)` throws for the same reason.
 
-### 2. `Boss2.ts` (Industrial Titan - Chapter 2 Boss)
-*Completed in `7de2ead Collapse industrial titan geometry`.*
-- **Static Plated Body (18 -> 1 draw calls)**: Fuselage cylinder, backing plates, panels, horizontal pods, hazard orange bands, weapon ports, arms, lenses, and engine vents are static relative to the ship frame. **Merge them into a single, vertex-colored Mesh**. The color flashes dynamically inside `_setMeshColor` via child traversal, which remains 100% compatible.
-- **Spinning Nose Drill (5 -> 1 draw calls)**: The nose drill cone and its 4 spiral blades spin as a single unit in `_tickBoss`. **Merge them into a single vertex-colored Drill Mesh** inside the spinning group.
-- **Exhaust Flames (3 -> 1 draw calls)**: Merge the 3 exhaust flame spheres into a **single flame Mesh**.
-- **Outcome**: Collapses the L2 Boss from **27 down to exactly 3 draw calls** (an **88% reduction**).
+Do not export private helpers just to test the internal monotonic-cap guard. The public nondecreasing-cap invariant is the useful protection.
 
-### 3. `Boss3.ts` (Hive Heart - Chapter 3 Boss)
-*Completed in `46e6f13 Collapse hive heart teeth geometry`.*
-- **Armored Claw Teeth (32 -> 8 draw calls)**: 8 armored claws pivot individually to open/close. Each claw group contains a claw shaft, base joint, mid joint, and yellow stinger. These 4 elements are static relative to the claw pivot. **Merge the 4 parts of each claw into a single vertex-colored tooth Mesh** (8 meshes total). Saves **24 draw calls**.
-- **Organic Animate Parts (Keep Separate)**: Keep the 4 wiggling tentacles (7 joints each, total 28 meshes), 20 base lobes, and 12 pustules separate. They wiggle and pulsate individually with distinct phase offsets to represent a realistic beating bio-organism.
-- **Pulsing Central Eye**: Keep the sclera and pupil separate as they dilate and scale during charging warnings.
+## Agreed Next Slice 2: Timeline Compiler Tests
 
-### 4. `Boss4.ts` (Volcanic Titan - Chapter 4 Boss)
-*Completed in `4b63ae4 Collapse volcanic titan geometry`.*
-- **Crawling Legs (16 -> 4 draw calls)**: 4 crawling legs. Each leg has a thigh, shin, and 2 claws. **Merge the 4 parts of each leg into a single vertex-colored leg Mesh** (1 per leg). Saves **12 draw calls**.
-- **Destructible Armor Plates (10 -> 2 draw calls)**: 2 back carapace plates can be shot and destroyed independently. Each plate has a box plate, lava seam, and 3 volcanic spires. **Merge the 5 parts of each armor plate into a single vertex-colored plate Mesh** (1 for Left, 1 for Right). Saves **8 draw calls**.
-- **Slithering Segments (10 body/tail meshes -> 6 draw calls)**: 5 body segments and 1 tail segment wiggle on Y with distinct phases. For each body segment, merge its core sphere and scale cone into a **single vertex-colored segment Mesh**. For the tail, merge the tail cone and 2 spikes. Saves **6 draw calls**.
-- **Head Segments (13 meshes -> 3 draw calls)**: The head is made of 3 sub-groups (`_headSeg1`, `_headSeg2`, `_headSeg3`) that wiggle and shake. **Merge each head segment internally** into a single vertex-colored Mesh. Saves **10 draw calls**.
-- **Outcome**: Collapses the final boss's structural elements from **55 meshes down to just 15 draw calls** (saving **40 draw calls**).
+Add `src/level/waves/Timeline.test.ts`.
 
----
+Agreed scope:
 
-## 📊 5. Completion Status
+- Test the `Timeline` compiler contract first.
+- Do not snapshot authored chapter wave content yet.
+- Leave chapter wave content invariants for a later slice if needed.
 
-### Standard Enemies
+Recommended coverage:
 
-| Target | Previous Draw Calls | After Merge | Status |
-|---|---|---|---|
-| `EnemySine.ts` | 14+ | ~7 | complete in `35ccad9` |
-| `EnemyDiver.ts` | 6 | **2** | complete in `35ccad9` |
-| `EnemyTurret.ts` | ~11 | ~8 | complete in `35ccad9` |
-| `EnemyCharger.ts` | 14+ | ~6 | complete in `35ccad9` |
+- `anchor(name, absoluteAt)` plus `add(anchor, offset, beat)` compiles `at = anchor + offset`.
+- Entries are sorted by `at`, regardless of authoring order.
+- Multiple beats or event arrays at the same compiled `at` are grouped into one `WaveEntry`.
+- Grouped events preserve insertion order within that coordinate.
+- Raw `StageEvent[]` inputs work the same as `BeatPattern`.
+- `scale` multiplies offsets and uses `Math.round`.
+- Include positive fractional rounding: `anchor 100`, `offset 21`, `scale 0.5` -> `at 111`.
+- Include negative scaled offsets: `anchor 100`, `offset -21`, `scale 0.5` -> `at 90`.
+- Missing anchors throw `Timeline: Anchor "x" is not defined.`
 
-### Bosses
+Recommended test file location:
 
-| Target | Previous Draw Calls | After Merge | Status |
-|---|---|---|---|
-| `Boss.ts` (Chapter 1) | 24 | **6** | complete in `89e2134` |
-| `Boss2.ts` (Chapter 2) | 27 | **3** | complete in `7de2ead` |
-| `Boss3.ts` (Chapter 3) | ~92 | ~68 | complete in `46e6f13` |
-| `Boss4.ts` (Chapter 4) | ~55 | **15** | complete in `4b63ae4` |
+- `src/level/waves/Timeline.test.ts`
 
-### Is Anything Left?
+## Deferred Test Ideas
 
-No implementation work remains from this handoff. The render-optimization scope is complete and committed.
+Chapter wave builder tests can come later as invariant tests, not content snapshots:
 
-Recommended follow-up before treating a future release as fully signed off:
-- Manual browser playtest using the [AGENTS.md](file:///e:/Develop/GitHub/aeon-pulse/AGENTS.md) checklist, because the in-app browser plugin could not complete visual inspection during `35ccad9`.
-- Keep monitoring `L4-4 no-fire` in future profiler runs because one latest raw sample reported 51 FPS despite the profiler completing successfully.
-- If new enemies, bosses, projectiles, or terrain hazards are added later, apply the same vertex-color merge rules and profiler workflow.
+- each valid chapter level builds nonempty waves
+- waves are sorted by `at`
+- event kinds are known `StageEventType` values
+- spawn enemy events use valid `EnemyType` values
+- unknown level IDs throw the existing chapter-specific error
 
----
+`LevelManager` tests should wait until Campaign and Timeline are pinned. It has runtime host callbacks and is better treated as the third slice.
 
-## 🚀 6. Workflow for Future Render Work
-1. **Develop/Run Server**: Start the local development server at `http://localhost:5173` via `npm run dev`.
-2. **Use Completed Passes As Reference**: The standard enemy and boss blueprints are implemented. Use them as patterns for future entities, especially local pivot-preserving merges and separate dynamic emissive/transparent/scaling parts.
-3. **Verify Build**: Always run `npm run build` to verify there are no TypeScript or bundler errors.
-4. **Gather Performance Stats**: Trigger the pre-authorized Windows headless Chrome profiler orchestrator:
-   ```powershell
-   & "C:\Users\Stephan\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" "C:\Users\Stephan\.gemini\antigravity-ide\scratch\run-profiler.js"
-   ```
-   Verify that average/peak draw calls remain low and average FPS remains locked at `60+`.
-5. **Playtest**: Open `http://localhost:5173` and use the manual playtesting checklist in `AGENTS.md` to verify visually that claws bank, nozzles vector, wings scissor, recoil groups move, transparent pieces blend, and engines flare correctly.
+## Next Recommended Steps
+
+1. Add `src/campaign/Campaign.test.ts`.
+2. Add `src/level/waves/Timeline.test.ts`.
+3. Run `npm test`.
+4. Run `npm run build`.
+5. Run `git diff --check`.
+6. Commit the Campaign and Timeline test additions once green.

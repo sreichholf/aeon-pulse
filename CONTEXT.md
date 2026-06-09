@@ -184,6 +184,10 @@ _Avoid_: Permanent one-to-one content lock-in
 The pacing and event vocabulary used to build levels within a chapter. Wave grammars are chapter-specific rather than globally shared.
 _Avoid_: Universal wave set
 
+**Wave Timeline Compiler**:
+The utility that compiles anchored beat placements into sorted `WaveEntry` schedules for a chapter wave grammar.
+_Avoid_: Wave grammar, authored chapter pacing, level manager
+
 **Pattern Literacy Level**:
 An early level whose purpose is to teach the player a chapter's basic enemy patterns and movement asks without major pressure spikes.
 _Avoid_: Tutorial level, easy filler
@@ -231,6 +235,18 @@ _Avoid_: Screen-wide piercing coverage, passive spawn deletion
 **Player Model**:
 The 3D model asset (`player.glb`) used to render the player's aerospace fighter. It is loaded asynchronously at boot time and cloned when instantiating the Player entity, with a robust fallback to procedural geometry if the asset fails to load.
 _Avoid_: Procedural mesh, player sprite, static mesh
+
+**Module Test Harness**:
+The Vitest-based automated test layer for deterministic module seams. It protects pure or near-pure code such as collision contact detection, combat resolution, campaign helpers, and wave timeline compilation.
+_Avoid_: Browser playtest replacement, render profiler
+
+**Collision Contact**:
+A pure overlap fact emitted by `checkCollisions()` before gameplay effects are applied.
+_Avoid_: Hit event, score event, explosion trigger
+
+**Combat Resolution**:
+The step that converts collision contacts into typed hit events and mutates directly involved gameplay objects such as bullets, enemies, bosses, and the player.
+_Avoid_: Collision detection, scene/audio side effects
 
 ## Example Dialogue
 

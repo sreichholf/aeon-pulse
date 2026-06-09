@@ -6,14 +6,19 @@ This file provides guidance to agents working in this repository.
 
 ```bash
 npm run dev      # start dev server at http://localhost:5173 (HMR enabled)
+npm test         # run Vitest module tests
+npm run test:watch # run Vitest in watch mode
 npm run build    # production build to dist/
 npm run preview  # serve the production build locally
 ```
 
-There is no automated test suite. Verification is:
+Automated module tests use Vitest. Verification is:
 
-1. `npm run build`
-2. Browser-based playtesting at `http://localhost:5173`
+1. `npm test`
+2. `npm run build`
+3. Browser-based playtesting at `http://localhost:5173`
+
+Vitest tests are co-located with the modules they protect as `src/**/*.test.ts`, run in the `node` environment, and are limited by `vitest.config.ts` to source tests so browser profile artifacts under `.tmp/` are not collected. Use plain object fakes for deterministic module seams instead of constructing full Three.js entities unless the integration itself is under test.
 
 For render-performance work, see `docs/render-optimization-notes.md` and `scripts/collect-render-stats.mjs`.
 
@@ -94,6 +99,7 @@ Key design decisions live in `docs/adr/`. Read the relevant ADR before modifying
 - `0009-non-finale-level-exit-window.md` — non-finale levels use a clear gate plus an authored exit flyout.
 - `0010-music-cues-and-chapter-themes.md` — music is cue-based and chapter-themed, not one global track.
 - `0011-projectile-instanced-rendering.md` — projectile rendering uses centralized instancing, not one scene mesh per bullet.
+- `0013-vitest-module-test-harness.md` — Vitest protects deterministic module seams and does not replace browser playtesting or CDP render profiling.
 
 ## High-Level Architecture
 
@@ -123,12 +129,13 @@ Key design decisions live in `docs/adr/`. Read the relevant ADR before modifying
 - `levelManager`
 - `ProjectilePool`
 
-`GameplayRun.tick()` builds a `WorldState`, calls `tickGameplay()` from `src/systems/Gameplay.ts`, then calls `checkCollisions()` from `src/systems/Collisions.ts` and handles the resulting hit events.
+`GameplayRun.tick()` builds a `WorldState`, calls `tickGameplay()` from `src/systems/Gameplay.ts`, calls `checkCollisions()` from `src/systems/Collisions.ts` to collect collision contacts, then calls `resolveCollisionContacts()` from `src/systems/CombatResolution.ts` before handling the resulting hit events.
 
 **Gameplay seam:** Keep these responsibilities separated:
 
 - `src/systems/Gameplay.ts` updates entities and filters dead/offscreen objects.
-- `src/systems/Collisions.ts` detects overlaps and emits typed hit events.
+- `src/systems/Collisions.ts` detects overlaps and emits typed collision contacts.
+- `src/systems/CombatResolution.ts` resolves collision contacts into typed hit events.
 - `src/systems/GameplayRun.ts` owns side effects such as score changes, explosions, audio, powerup resolution, and level transitions.
 
 Do not push score/audio/scene side effects back down into `Collisions.ts`.
@@ -303,7 +310,7 @@ Repository-local skills are installed under `.agents/skills/`. Use the relevant 
 
 - Prefer updating TypeScript contracts first, then implementation sites.
 - When changing progression or level identity, update `src/campaign/Campaign.ts` first and keep `src/level/Levels.ts` focused on chapter archetype implementation.
-- When changing hit behavior, keep collision detection pure and handle side effects in `GameplayRun`.
+- When changing hit behavior, keep collision detection pure, put contact-to-hit-event logic in `CombatResolution`, and handle score/audio/scene side effects in `GameplayRun`.
 - When adding enemies or bosses, update the entity catalog and tactical database metadata, not just the constructor file.
 - When changing projectile behavior, verify both pooling/instancing and gameplay collision behavior.
-- Always verify major gameplay changes in the browser, since there is no automated test suite.
+- Always run `npm test` and `npm run build` before browser verification. Major gameplay changes still require browser playtesting because module tests do not prove visual fidelity, game feel, or render performance.
