@@ -14,7 +14,7 @@ This handoff captures the current Vitest harness work and outlines future test c
 
 ## Tests Already Added
 
-The Vitest harness now includes 10 test suites protecting the core game mechanics, campaign configurations, level wave compiling, stage transitions, bullet pooling, game tick resolution, campaign clear resolution, and database card presentation:
+The Vitest harness now includes 12 test suites protecting the core game mechanics, campaign configurations, level wave compiling, stage transitions, bullet pooling, game tick resolution, campaign clear resolution, database card presentation, terrain collision boundaries, and procedural construction helpers:
 
 1. **Collision & Combat Seam:**
    - `src/systems/Collisions.test.ts`
@@ -26,38 +26,40 @@ The Vitest harness now includes 10 test suites protecting the core game mechanic
    - `src/campaign/CampaignAttempt.test.ts`
    - Tests campaign level structure, wrapping navigation, and isolated progression logic (score bonus math, lives/chapter rewards, next level and transition state calculation).
 
-3. **Wave Timeline Compiler:**
+3. **Wave Timeline Compiler & Builders:**
    - `src/level/waves/Timeline.test.ts`
-   - Tests absolute coordinate compilation, sorting compiled entries, grouping multiple events at the same coordinate, insertion order preservation, support for both raw event arrays and `BeatPattern` objects, float scaling with rounding, and missing anchor errors.
-
-4. **Chapter Wave Builders:**
    - `src/level/waves/Waves.test.ts`
-   - Verifies all 20 campaign levels compile non-empty, chronologically sorted wave entries, utilizing valid and registered `EnemyType` and `StageEventType` properties, and that invalid LevelIds throw chapter-specific errors.
+   - Tests wave timeline compiled sorting and grouping logic, and verifies that all 20 campaign levels build valid, non-empty, chronologically sorted wave entries referencing valid EnemyTypes and StageEventTypes.
 
-5. **Level Manager:**
+4. **Level & Terrain Managers:**
    - `src/level/LevelManager.test.ts`
-   - Tests `scrollX` increments, sequential wave/stage event dispatching, finale boss spawning when wave timeline is exhausted, and level completion gates for non-finale chapters.
+   - `src/level/Terrain.test.ts`
+   - Tests `scrollX` updates, stage event spawning, boss triggers, and linear wall boundary calculations (including volcanic lava pulse and Terrain4 column-clamps).
 
-6. **Projectile Pool:**
+5. **Projectile Pool & Instancer:**
    - `src/systems/ProjectilePool.test.ts`
    - Verifies bullet creation, recycling of released bullets, property matching (tint and damage override keys), exclusion of non-poolable bullet types (like HOMING), and memory cleanup on pool clear.
 
-7. **Gameplay Physics and Tick System:**
+6. **Gameplay Physics and Tick System:**
    - `src/systems/Gameplay.test.ts`
    - Tests background and level manager updates, player and enemy terrain boundaries clamp updates, bullet spawning from player/enemy/boss entities, and cleanup rules for dead/offscreen entities.
 
-8. **Tactical Database Presentation Adapter:**
+7. **Tactical Database Presentation Adapter:**
    - `src/viewer/TacticalDossierCard.test.ts`
    - Tests database card wrapper behavior, including mesh/metadata properties extraction, float/idle hover animation math, bullet preview triggering and disposal, position locking/lerping, and proper component disposal.
 
+8. **Procedural Geometry Utilities:**
+   - `src/utils/ProceduralToolkit.test.ts`
+   - Tests shared BufferGeometry utilities (like ensureNonIndexed and addVertexColor) to ensure correctness across multiple geometry classes and colors.
+
 Current test status:
-- `npm test` passed: 10 files, 71 tests
+- `npm test` passed: 12 files, 79 tests
 - `npm run build` passed
 - `git diff --check` passed
 
 ## Committed Baseline
 
-All 10 test files and refactored gameplay classes are committed to git. Run `git status` to confirm.
+All 12 test files and refactored gameplay classes are committed to git. Run `git status` to confirm.
 
 ## Recommended Future Test Slices
 
@@ -72,6 +74,6 @@ If further module-level testing is desired, the following targets are recommende
 
 ## Next Recommended Steps
 
-1. Run `npm test` to verify all 71 tests pass.
+1. Run `npm test` to verify all 79 tests pass.
 2. Run `npm run build` to verify the production bundle remains green.
 3. Select any additional systems or UI components for unit testing if needed.
