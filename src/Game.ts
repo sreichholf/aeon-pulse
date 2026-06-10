@@ -25,6 +25,7 @@ import { CampaignAttempt } from './campaign/CampaignAttempt.ts';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import playerGlbUrl from './models/player.glb';
 import { EnemyDiver } from './entities/EnemyDiver.ts';
+import { EnemyStraight } from './entities/EnemyStraight.ts';
 import {
   beginPerfFrame,
   endPerfFrame,
@@ -192,7 +193,13 @@ export class Game {
         console.error('Failed to preload diver GLB model:', error);
       });
 
-    await Promise.all([playerModelPromise, diverModelPromise]);
+    const straightModelPromise = EnemyStraight.preloadModel()
+      .then(() => undefined)
+      .catch((error) => {
+        console.error('Failed to preload straight GLB model:', error);
+      });
+
+    await Promise.all([playerModelPromise, diverModelPromise, straightModelPromise]);
   }
 
 

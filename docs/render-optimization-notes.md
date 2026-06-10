@@ -19,9 +19,10 @@ The FPS/debug HUD in [src/Game.ts](/E:/Develop/GitHub/aeon-pulse/src/Game.ts) re
 
 - draw calls
 - total visible object render units
-- category ownership via `cats`
-- top detail ownership via `details`
+- category ownership
 - bullet ownership and bullet render units
+
+The scripted collector samples the runtime render APIs directly, including detail ownership and bullet source ownership.
 
 The supporting plumbing for this lives in:
 
@@ -146,6 +147,11 @@ This table tracks the overall rendering gains starting from the **unoptimized ba
 #### 3. Terrain4 Falling Debris Instancing (Phase 3)
 - **Debris Draw Call Collapse**: Converted the pool of 30 individual rock meshes inside [Terrain4.ts](file:///e:/Develop/GitHub/aeon-pulse/src/level/Terrain4.ts) into a single `THREE.InstancedMesh`.
 - **Details Peak Elimination**: Active falling volcanic debris now renders in **exactly 1 draw call** instead of up to 30. When tectonic events are inactive, the mesh count is set to `0`, contributing **0 draw calls**, completely erasing `terrain.debris` from the `MaxDetails` overhead list.
+
+#### 4. Diver Standard Enemy Model Preparation
+- **Runtime Bucket Collapse**: The Diver GLB now prepares into 3 runtime render buckets (`body`, `glass`, `glow`) instead of preserving 9 authored GLB materials as 9 runtime render units per active Diver.
+- **Hit Flash Isolation**: Diver hit feedback uses a per-instance overlay shell instead of mutating model materials, allowing prepared geometry and materials to stay shared across active Diver instances.
+- **Measured Result**: `enemy.diver` dropped from **27 to 9** max detail units in `L1-1 no-fire` with 3 active Divers, and from **54 to 18** in `L4-4 no-fire` with 6 active Divers.
 
 ## Scenario Guidance
 

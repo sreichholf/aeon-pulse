@@ -3,31 +3,36 @@ import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import { ProjectileSourceKey, type GetPositionFn, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import diverGlbUrl from '../models/diver.glb';
+import {
+  createStandardEnemyModelInstance,
+  prepareStandardEnemyModel,
+  type PreparedStandardEnemyModel,
+} from '../systems/StandardEnemyModel.ts';
+import {
+  DIVER_MODEL_BUCKET_CONFIG,
+  DIVER_MODEL_OFFSET,
+  DIVER_MODEL_ROTATION,
+  DIVER_TARGET_VISUAL_HEIGHT,
+} from './EnemyDiverModel.ts';
 
 
 const SPEED         = 150;
 const VERT_SPEED    = 210;
 const FIRE_INTERVAL = 1.4;
 const PAUSE_DUR     = 0.20;
-const TARGET_VISUAL_HEIGHT = 44;
-const GLB_ROT_X = Math.PI / 2;
-const GLB_ROT_Y = -Math.PI / 2;
-const GLB_ROT_Z = Math.PI / 2;
-const GLB_OFFSET_X = 0;
-const GLB_OFFSET_Y = 0;
-const GLB_OFFSET_Z = 0;
 const DIVE_TILT_FACTOR = -0.3;
 const HW = 25, HH = 22;
 
 export class EnemyDiver extends Enemy {
-  private static _model: THREE.Group | null = null;
-  private static _loadPromise: Promise<THREE.Group> | null = null;
+  private static _model: PreparedStandardEnemyModel | null = null;
+  private static _loadPromise: Promise<PreparedStandardEnemyModel> | null = null;
 
   private _fireTimer: number;
   private _pausing: boolean;
   private _pauseTimer: number;
   private _spreadY: number;
   private _modelWrapper: THREE.Group | null = null;
+  private _flashOverlay: THREE.Mesh<THREE.BufferGeometry, THREE.Material> | null = null;
 
   constructor(
     scene: IScene,
@@ -104,10 +109,16 @@ export class EnemyDiver extends Enemy {
     const group = new THREE.Group();
     group.position.set(this._mesh!.position.x, this._mesh!.position.y, 0);
 
-    const attachModel = (source: THREE.Group): void => {
+    const attachModel = (source: PreparedStandardEnemyModel): void => {
       if (!this._alive || this._mesh === null) return;
-      this._modelWrapper = this._createModelWrapper(source);
-      group.add(this._modelWrapper);
+      const instance = createStandardEnemyModelInstance(source, {
+        targetVisualHeight: DIVER_TARGET_VISUAL_HEIGHT,
+        rotation: DIVER_MODEL_ROTATION,
+        offset: DIVER_MODEL_OFFSET,
+      });
+      this._modelWrapper = instance.root;
+      this._flashOverlay = instance.flashOverlay;
+      group.add(instance.root);
     };
 
     if (EnemyDiver._model) {
@@ -121,11 +132,11 @@ export class EnemyDiver extends Enemy {
     return group;
   }
 
-  static preloadModel(): Promise<THREE.Group> {
+  static preloadModel(): Promise<PreparedStandardEnemyModel> {
     return EnemyDiver._loadModel();
   }
 
-  private static _loadModel(): Promise<THREE.Group> {
+  private static _loadModel(): Promise<PreparedStandardEnemyModel> {
     if (EnemyDiver._model) return Promise.resolve(EnemyDiver._model);
     if (EnemyDiver._loadPromise) return EnemyDiver._loadPromise;
 
@@ -134,8 +145,8 @@ export class EnemyDiver extends Enemy {
       loader.load(
         diverGlbUrl,
         (gltf) => {
-          EnemyDiver._model = gltf.scene;
-          resolve(gltf.scene);
+          EnemyDiver._model = prepareStandardEnemyModel(gltf.scene, DIVER_MODEL_BUCKET_CONFIG);
+          resolve(EnemyDiver._model);
         },
         undefined,
         reject,
@@ -144,58 +155,25 @@ export class EnemyDiver extends Enemy {
     return EnemyDiver._loadPromise;
   }
 
-  private _createModelWrapper(source: THREE.Group): THREE.Group {
-    const shipModel = source.clone(true);
-    shipModel.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.geometry = child.geometry.clone();
-        if (Array.isArray(child.material)) {
-          child.material = child.material.map((material) => material.clone());
-        } else {
-          child.material = child.material.clone();
-        }
-        this._tuneModelMaterial(child.material);
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-
-    const box = new THREE.Box3().setFromObject(shipModel);
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
-
-    shipModel.position.set(-center.x, -center.y, -center.z);
-
-    const wrapper = new THREE.Group();
-    wrapper.add(shipModel);
-    wrapper.rotation.set(GLB_ROT_X, GLB_ROT_Y, GLB_ROT_Z);
-    const scaleFactor = TARGET_VISUAL_HEIGHT / (size.y || 1);
-    wrapper.scale.set(scaleFactor, scaleFactor, scaleFactor);
-    wrapper.position.set(GLB_OFFSET_X, GLB_OFFSET_Y, GLB_OFFSET_Z);
-
-    return wrapper;
+  _flash(): void {
+    if (this._flashOverlay) {
+      this._flashOverlay.visible = true;
+    }
+    this._hitFlashTimer = 0.08;
   }
 
-  private _tuneModelMaterial(material: THREE.Material | THREE.Material[]): void {
-    const materials = Array.isArray(material) ? material : [material];
-    for (const mat of materials) {
-      mat.side = THREE.DoubleSide;
-      mat.depthTest = true;
-      mat.visible = true;
-      if ('opacity' in mat && typeof mat.opacity === 'number' && mat.opacity < 1) {
-        mat.transparent = true;
-        mat.depthWrite = false;
-      }
-      if (mat instanceof THREE.MeshStandardMaterial) {
-        mat.envMapIntensity = 0.9;
-        if (mat.emissiveMap) {
-          mat.emissiveIntensity = Math.max(mat.emissiveIntensity, 0.8);
-        }
-      }
-      mat.needsUpdate = true;
+  _restoreFlash(): void {
+    if (this._flashOverlay) {
+      this._flashOverlay.visible = false;
     }
+  }
+
+  destroy(): void {
+    if (!this._mesh) return;
+    this._scene.remove(this._mesh);
+    this._mesh = null;
+    this._modelWrapper = null;
+    this._flashOverlay = null;
   }
 
 }
