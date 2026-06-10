@@ -3,6 +3,11 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: './',
   assetsInclude: ['**/*.glb'],
+  server: {
+    watch: {
+      ignored: ['**/.tmp/**'],
+    },
+  },
   build: {
 
     chunkSizeWarningLimit: 800, // Silences warnings for larger cacheable third-party chunks

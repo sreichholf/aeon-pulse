@@ -24,10 +24,16 @@ export class EnemySine extends Enemy {
   private _clawTB: THREE.Group | null = null;
   private _clawBF: THREE.Group | null = null;
   private _clawBB: THREE.Group | null = null;
-  private _nozzleTGroup: THREE.Group | null = null;
-  private _nozzleBGroup: THREE.Group | null = null;
-  private _flameT: THREE.Mesh | null = null;
-  private _flameB: THREE.Mesh | null = null;
+  private _nozzleMesh: THREE.InstancedMesh | null = null;
+  private _flameMesh: THREE.InstancedMesh | null = null;
+  private _nozzleTAngle = 0;
+  private _nozzleBAngle = 0;
+  private _flameTScale = new THREE.Vector3(1, 1, 1);
+  private _flameBScale = new THREE.Vector3(1, 1, 1);
+  private _thrusterUnitScale = new THREE.Vector3(1, 1, 1);
+  private _thrusterPivot = new THREE.Object3D();
+  private _thrusterPart = new THREE.Object3D();
+  private _thrusterMatrix = new THREE.Matrix4();
   private _irisMat: THREE.MeshPhongMaterial | null = null;
   private _pupil: THREE.Mesh | null = null;
   private _visualsGroup: THREE.Group | null = null;
@@ -109,12 +115,8 @@ export class EnemySine extends Enemy {
 
     // 2. Active Vectoring Steering (dual nozzles pivot dynamically opposite to banking)
     const targetVectorAngle = (slopeY / speedX) * 0.9;
-    if (this._nozzleTGroup) {
-      this._nozzleTGroup.rotation.z = THREE.MathUtils.lerp(this._nozzleTGroup.rotation.z, targetVectorAngle, dt * 10);
-    }
-    if (this._nozzleBGroup) {
-      this._nozzleBGroup.rotation.z = THREE.MathUtils.lerp(this._nozzleBGroup.rotation.z, targetVectorAngle, dt * 10);
-    }
+    this._nozzleTAngle = THREE.MathUtils.lerp(this._nozzleTAngle, targetVectorAngle, dt * 10);
+    this._nozzleBAngle = THREE.MathUtils.lerp(this._nozzleBAngle, targetVectorAngle, dt * 10);
 
     // 3. Firing Recoil Kickback Interpolation
     this._kickback = THREE.MathUtils.lerp(this._kickback, 0, dt * 10);
@@ -126,14 +128,17 @@ export class EnemySine extends Enemy {
     const jitterT = 1.0 + Math.sin(this._time * 50) * 0.25;
     const jitterB = 1.0 + Math.cos(this._time * 45) * 0.25;
     const throttleScale = this._pausing ? 0.3 : 1.0;
-    if (this._flameT) {
-      this._flameT.scale.set(throttleScale * jitterT, throttleScale * (1.0 + Math.sin(this._time * 20) * 0.1), throttleScale);
-      this._flameT.visible = throttleScale > 0.05;
-    }
-    if (this._flameB) {
-      this._flameB.scale.set(throttleScale * jitterB, throttleScale * (1.0 + Math.cos(this._time * 20) * 0.1), throttleScale);
-      this._flameB.visible = throttleScale > 0.05;
-    }
+    this._flameTScale.set(
+      throttleScale * jitterT,
+      throttleScale * (1.0 + Math.sin(this._time * 20) * 0.1),
+      throttleScale,
+    );
+    this._flameBScale.set(
+      throttleScale * jitterB,
+      throttleScale * (1.0 + Math.cos(this._time * 20) * 0.1),
+      throttleScale,
+    );
+    this._updateThrusterInstances();
 
     // 5. Charging/discharge eye iris glow & pupil dilation pulse
     let pupilScale = 1.0;
@@ -166,6 +171,41 @@ export class EnemySine extends Enemy {
 
     // Ship Z banking rotation matching original logic
     this._mesh!.rotation.z = -(slopeY / speedX) * 0.85;
+  }
+
+  private _setThrusterInstance(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    mountY: number,
+    angle: number,
+    localX: number,
+    scale: THREE.Vector3,
+  ): void {
+    this._thrusterPivot.position.set(9.0, mountY, 0);
+    this._thrusterPivot.rotation.set(0, 0, angle);
+    this._thrusterPivot.scale.set(1, 1, 1);
+    this._thrusterPivot.updateMatrix();
+
+    this._thrusterPart.position.set(localX, 0, 0);
+    this._thrusterPart.rotation.set(0, 0, 0);
+    this._thrusterPart.scale.copy(scale);
+    this._thrusterPart.updateMatrix();
+
+    this._thrusterMatrix.multiplyMatrices(this._thrusterPivot.matrix, this._thrusterPart.matrix);
+    mesh.setMatrixAt(index, this._thrusterMatrix);
+  }
+
+  private _updateThrusterInstances(): void {
+    if (this._nozzleMesh) {
+      this._setThrusterInstance(this._nozzleMesh, 0, 7.0, this._nozzleTAngle, 3.0, this._thrusterUnitScale);
+      this._setThrusterInstance(this._nozzleMesh, 1, -7.0, this._nozzleBAngle, 3.0, this._thrusterUnitScale);
+      this._nozzleMesh.instanceMatrix.needsUpdate = true;
+    }
+    if (this._flameMesh) {
+      this._setThrusterInstance(this._flameMesh, 0, 7.0, this._nozzleTAngle, 10.0, this._flameTScale);
+      this._setThrusterInstance(this._flameMesh, 1, -7.0, this._nozzleBAngle, 10.0, this._flameBScale);
+      this._flameMesh.instanceMatrix.needsUpdate = true;
+    }
   }
 
   private _build3DModel(): THREE.Group {
@@ -391,29 +431,16 @@ export class EnemySine extends Enemy {
     const flameGeo = new THREE.ConeGeometry(2.4, 12.0, 12);
     flameGeo.rotateZ(-Math.PI / 2);
 
-    // Top-Rear Thruster Mount (Socket centered at x=9.0, y=7.0)
-    this._nozzleTGroup = new THREE.Group();
-    this._nozzleTGroup.position.set(9.0, 7.0, 0);
-    const nozzleT = new THREE.Mesh(nozzleGeo, engineMetalMat);
-    nozzleT.position.set(3.0, 0, 0);
-    const flameT = new THREE.Mesh(flameGeo, flameMat);
-    flameT.position.set(10.0, 0, 0);
-    this._nozzleTGroup.add(nozzleT);
-    this._nozzleTGroup.add(flameT);
-    this._flameT = flameT;
-    visuals.add(this._nozzleTGroup);
+    this._nozzleMesh = new THREE.InstancedMesh(nozzleGeo, engineMetalMat, 2);
+    this._nozzleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    visuals.add(this._nozzleMesh);
 
-    // Bottom-Rear Thruster Mount (Socket centered at x=9.0, y=-7.0)
-    this._nozzleBGroup = new THREE.Group();
-    this._nozzleBGroup.position.set(9.0, -7.0, 0);
-    const nozzleB = new THREE.Mesh(nozzleGeo, engineMetalMat);
-    nozzleB.position.set(3.0, 0, 0);
-    const flameB = new THREE.Mesh(flameGeo, flameMat);
-    flameB.position.set(10.0, 0, 0);
-    this._nozzleBGroup.add(nozzleB);
-    this._nozzleBGroup.add(flameB);
-    this._flameB = flameB;
-    visuals.add(this._nozzleBGroup);
+    this._flameMesh = new THREE.InstancedMesh(flameGeo, flameMat, 2);
+    this._flameMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    visuals.add(this._flameMesh);
+    this._updateThrusterInstances();
+    this._nozzleMesh.computeBoundingSphere();
+    this._flameMesh.computeBoundingSphere();
 
     return group;
   }

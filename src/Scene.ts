@@ -9,6 +9,7 @@ import { RenderCategory, UserDataKey } from './types.ts';
 
 
 import { ProjectileInstancer } from './systems/ProjectileInstancer.ts';
+import { isPerfProbeEnabled, measurePerfPhase, setPerfCount } from './systems/PerfProbe.ts';
 
 const ChromaShader = {
   uniforms: {
@@ -168,28 +169,45 @@ export class Scene {
     this.renderer.info.reset();
 
     // 1. Process active bullets through ProjectileInstancer
-    this._projectileInstancer.beginFrame();
-    this._activeBullets.forEach((bullet) => {
-      this._projectileInstancer.addBullet(bullet);
+    measurePerfPhase('scene.projectiles', () => {
+      this._projectileInstancer.beginFrame();
+      this._activeBullets.forEach((bullet) => {
+        this._projectileInstancer.addBullet(bullet);
+      });
+      this._projectileInstancer.endFrame();
     });
-    this._projectileInstancer.endFrame();
+    setPerfCount('render.activeBullets', this._activeBullets.size);
 
     // 2. Main render logic
-    if (this._flashMesh.visible) {
-      this._flashTimer += dt;
-      const t = Math.min(this._flashTimer / this._flashDur, 1);
-      if (t >= 1) {
-        this._flashMesh.visible = false;
-        this._flashMesh.material.opacity = 0;
-      } else {
-        this._flashMesh.material.opacity = 0.85 * (1 - t);
+    measurePerfPhase('scene.flash', () => {
+      if (this._flashMesh.visible) {
+        this._flashTimer += dt;
+        const t = Math.min(this._flashTimer / this._flashDur, 1);
+        if (t >= 1) {
+          this._flashMesh.visible = false;
+          this._flashMesh.material.opacity = 0;
+        } else {
+          this._flashMesh.material.opacity = 0.85 * (1 - t);
+        }
       }
-    }
+    });
     
     if (this._tilted) {
-      this._composer.render();
+      measurePerfPhase('scene.composer', () => this._composer.render());
     } else {
-      this.renderer.render(this.scene, this.camera);
+      measurePerfPhase('scene.renderer', () => this.renderer.render(this.scene, this.camera));
+    }
+    setPerfCount('render.calls', this.renderer.info.render.calls);
+    setPerfCount('render.triangles', this.renderer.info.render.triangles);
+    if (isPerfProbeEnabled()) {
+      const stats = this.getSceneObjectStats();
+      setPerfCount('render.objects', stats.total);
+      for (const [category, units] of Object.entries(stats.byCategory)) {
+        setPerfCount(`category.${category}`, units);
+      }
+      for (const [detail, units] of Object.entries(stats.byDetail)) {
+        setPerfCount(`detail.${detail}`, units);
+      }
     }
   }
 

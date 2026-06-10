@@ -11,6 +11,7 @@ import { RockDrake } from './RockDrake.ts';
 import { Stalactite } from './Stalactite.ts';
 import { LEVELS } from '../level/Levels.ts';
 import { EnemyType, ProjectileSourceKey, type BossConstructorParams, type GetPositionFn, type IAudio, type IBoss, type IEnemy, type IScene, type ITerrain, type SpawnEnemyFn, type ProjectileFactoryFn } from '../types.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
 
 export interface SpawnEnemyParams {
   scene: IScene;
@@ -149,7 +150,12 @@ export function getStageEnemyCatalogEntries(): EnemyCatalogEntry[] {
 }
 
 export function spawnCatalogEnemy(type: EnemyType, params: SpawnEnemyParams): IEnemy | null {
-  return getEnemyCatalogEntry(type)?.spawn(params) ?? null;
+  const enemy = getEnemyCatalogEntry(type)?.spawn(params) ?? null;
+  const mesh = (enemy as any)?._mesh;
+  if (mesh instanceof THREE.Object3D) {
+    markRenderCategory(mesh, RenderCategory.ENEMY, `enemy.${type}`);
+  }
+  return enemy;
 }
 
 export function getBossCatalogEntries(): BossCatalogEntry[] {

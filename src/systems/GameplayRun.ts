@@ -16,6 +16,7 @@ import { LEVELS } from '../level/Levels.ts';
 import { StageEventType, type StageEvent } from '../level/StageEvents.ts';
 import type { CampaignLevelRecord } from '../campaign/Campaign.ts';
 import { CampaignAttempt } from '../campaign/CampaignAttempt.ts';
+import { measurePerfPhase, setPerfCount } from './PerfProbe.ts';
 
 import {
   DifficultyMode,
@@ -164,11 +165,15 @@ export class GameplayRun implements LevelGameHost {
       destroyOrReleaseBullet: (bullet) => this._projectilePool.destroyOrRelease(bullet),
     };
 
-    tickGameplay(world, dt);
+    measurePerfPhase('run.tickGameplay', () => tickGameplay(world, dt));
     this._enemies = world.enemies;
     this._bullets = world.bullets;
     this._powerups = world.powerups;
     this._effects = world.effects;
+    setPerfCount('enemies', this._enemies.length);
+    setPerfCount('bullets', this._bullets.length);
+    setPerfCount('powerups', this._powerups.length);
+    setPerfCount('effects', this._effects.length);
 
     if (this._isExitingLevel) {
       this._clearHostileBullets();
@@ -176,17 +181,22 @@ export class GameplayRun implements LevelGameHost {
     }
 
     const contacts: CollisionContact[] = [];
-    checkCollisions(
-      {
-        player: this._player,
-        enemies: this._enemies,
-        boss: this._boss,
-        bullets: this._bullets,
-        powerups: this._powerups,
-      },
-      (contact) => contacts.push(contact),
-    );
-    resolveCollisionContacts(contacts, (event) => this._handleHit(event));
+    measurePerfPhase('run.collisions', () => {
+      checkCollisions(
+        {
+          player: this._player,
+          enemies: this._enemies,
+          boss: this._boss,
+          bullets: this._bullets,
+          powerups: this._powerups,
+        },
+        (contact) => contacts.push(contact),
+      );
+    });
+    setPerfCount('contacts', contacts.length);
+    measurePerfPhase('run.resolveContacts', () => {
+      resolveCollisionContacts(contacts, (event) => this._handleHit(event));
+    });
   }
 
   getHUDSnapshot(): HUDSnapshot {

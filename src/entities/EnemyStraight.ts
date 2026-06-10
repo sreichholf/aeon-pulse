@@ -94,7 +94,7 @@ export class EnemyStraight extends Enemy {
   private _engineScale: number;
   private _visorFlash: number;
   private _visorPulseTime: number;
-  private _visorMat: THREE.MeshPhongMaterial | null = null;
+  private _visorEmissiveUniform: { value: THREE.Color } | null = null;
   private _visualsGroup: THREE.Group | null = null;
   private _mainFlame: THREE.Mesh | null = null;
   private _leftGunPoint: THREE.Object3D | null = null;
@@ -188,10 +188,10 @@ export class EnemyStraight extends Enemy {
     }
 
     // 2. Visor Emissive Pulse Animation
-    if (this._visorMat) {
+    if (this._visorEmissiveUniform) {
       const pulse = 1.0 + Math.sin(this._visorPulseTime * 25) * 0.35;
       const intensity = this._visorFlash * (this._pausing ? pulse : 1.0);
-      this._visorMat.emissive.setRGB(0.9 * intensity, 0.08 * intensity, 0.08 * intensity);
+      this._visorEmissiveUniform.value.setRGB(0.9 * intensity, 0.08 * intensity, 0.08 * intensity);
     }
 
     // 3. Firing Spring Recoil Backlash (Underdamped Harmonic Oscillation)
@@ -261,9 +261,9 @@ export class EnemyStraight extends Enemy {
     this._kickback = 7.0;    // Brutal recoil slam to the right (+X)
     this._kickbackVel = -75.0; // Violent forward counter-lunge to the left (-X)
     this._visorPulseTime = 0;
-    if (this._visorMat) {
+    if (this._visorEmissiveUniform) {
       // Visor turns pure white-hot briefly upon firing
-      this._visorMat.emissive.setRGB(3.0, 3.0, 3.0);
+      this._visorEmissiveUniform.value.setRGB(3.0, 3.0, 3.0);
     }
   }
 
@@ -285,8 +285,12 @@ export class EnemyStraight extends Enemy {
       flatShading: true,
     });
 
-    shipMat.customProgramCacheKey = () => 'EnemyStraightDecalsV1';
+    shipMat.customProgramCacheKey = () => 'EnemyStraightDecalsV2';
     shipMat.onBeforeCompile = (shader) => {
+      const visorEmissiveUniform = { value: new THREE.Color(0.36, 0.032, 0.032) };
+      shader.uniforms['uStraightVisorEmissive'] = visorEmissiveUniform;
+      this._visorEmissiveUniform = visorEmissiveUniform;
+
       // 1. Vertex Shader Injection: Pass local positions
       shader.vertexShader = 'varying vec3 vLocalPosition;\n' + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace(
@@ -296,7 +300,8 @@ export class EnemyStraight extends Enemy {
       );
 
       // 2. Fragment Shader Injection: Add procedural decal drawing helpers at the GLOBAL scope
-      shader.fragmentShader = `varying vec3 vLocalPosition;
+      shader.fragmentShader = `uniform vec3 uStraightVisorEmissive;
+      varying vec3 vLocalPosition;
 
       float getLine(float val, float target, float thickness) {
         return smoothstep(thickness, thickness * 0.4, abs(val - target));
@@ -314,6 +319,17 @@ export class EnemyStraight extends Enemy {
         float diag = step(abs(uv.x + uv.y * 0.6 - 0.1), 0.15) * step(abs(uv.y), 0.7);
         return max(0.0, max(top, diag));
       }\n` + shader.fragmentShader;
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        'vec3 totalEmissiveRadiance = emissive;',
+        `vec3 totalEmissiveRadiance = emissive;
+
+        #ifdef USE_COLOR
+        float straightVisorMask = step(0.9, vColor.r) * step(vColor.g, 0.18) * step(vColor.b, 0.25);
+        straightVisorMask *= step(-15.0, vLocalPosition.x) * step(vLocalPosition.x, -12.0);
+        totalEmissiveRadiance += uStraightVisorEmissive * straightVisorMask;
+        #endif`
+      );
 
       // 3. Fragment Shader Injection: Draw panel lines, rivets, bird decals, and serial numbers (branchless!)
       shader.fragmentShader = shader.fragmentShader.replace(
@@ -417,16 +433,9 @@ export class EnemyStraight extends Enemy {
       flatShading: true,
     });
 
-    const visorMat = new THREE.MeshPhongMaterial({
-      color: 0xff1a2c, // Glowing red tactical sensor visor under nose
-      emissive: 0xaa0005,
-      shininess: 100,
-      specular: 0xff8899,
-    });
-    this._visorMat = visorMat;
-
     const flameMat = new THREE.MeshBasicMaterial({
-      color: 0xff5500, // Vibrant twin ion thruster orange-red flames
+      color: 0xffffff, // Flame color comes from merged outer/core vertex colors.
+      vertexColors: true,
       transparent: true,
       opacity: 0.85,
       blending: THREE.AdditiveBlending,
@@ -782,6 +791,13 @@ export class EnemyStraight extends Enemy {
     lightRCloned.translate(-4.5, 0.2, -5.0);
     addVertexColor(lightRCloned, 0xffaa00);
 
+    // Glowing red warning sensor strip (the visor), merged into the hull.
+    const sensorGeo = new THREE.BoxGeometry(2.0, 0.6, 2.5);
+    const sensorCloned = ensureNonIndexed(sensorGeo);
+    sensorCloned.rotateZ(0.1);
+    sensorCloned.translate(-13.5, 1.3, 0);
+    addVertexColor(sensorCloned, 0xff1a2c);
+
     const gunmetalGeos = [
       nozzleLCloned, nozzleRCloned,
       hubLCloned, hubRCloned,
@@ -795,7 +811,8 @@ export class EnemyStraight extends Enemy {
     const hullGeos = [
       ...carbonGeos,
       ...crimsonGeos,
-      ...gunmetalGeos
+      ...gunmetalGeos,
+      sensorCloned
     ];
     const mergedHullGeo = mergeGeometries(hullGeos);
     const shipMesh = new THREE.Mesh(mergedHullGeo, shipMat);
@@ -847,8 +864,9 @@ export class EnemyStraight extends Enemy {
     gunNoseMountGeo.dispose();
     gunNoseLeftGeo.dispose();
     gunNoseRightGeo.dispose();
+    sensorGeo.dispose();
 
-    // --- 9. Glowing independent visor warning sensor & Faceted Cockpit canopy ---
+    // --- 9. Faceted Cockpit canopy ---
     // Faceted Cockpit canopy (repositioned to pop proud of flat fuselage deck)
     const canopyGeo = new THREE.CylinderGeometry(1.4, 1.8, 8, 6);
     canopyGeo.rotateZ(Math.PI / 2);
@@ -858,19 +876,9 @@ export class EnemyStraight extends Enemy {
     const canopyMesh = new THREE.Mesh(canopyCloned, cockpitMat);
     visuals.add(canopyMesh);
 
-    // Glowing red warning sensor strip (the visor)
-    const sensorGeo = new THREE.BoxGeometry(2.0, 0.6, 2.5);
-    const sensorCloned = ensureNonIndexed(sensorGeo);
-    sensorCloned.rotateZ(0.1);
-    sensorCloned.translate(-13.5, 1.3, 0);
-    const visorMesh = new THREE.Mesh(sensorCloned, visorMat);
-    visuals.add(visorMesh);
-
-    // Clean up canopy & visor temporary geometries
+    // Clean up canopy temporary geometries
     canopyGeo.dispose();
     canopyCloned.dispose();
-    sensorGeo.dispose();
-    sensorCloned.dispose();
 
     // --- 10. Merged engine flames (Twin orange-red exhaust cones with yellow inner cores) ---
     // Outer Flames
@@ -881,17 +889,13 @@ export class EnemyStraight extends Enemy {
 
     const flameLCloned = ensureNonIndexed(flameLeftGeo);
     flameLCloned.translate(0.5, 2.2, 2.8);
+    addVertexColor(flameLCloned, 0xff5500);
 
     const flameRCloned = ensureNonIndexed(flameRightGeo);
     flameRCloned.translate(0.5, 2.2, -2.8);
+    addVertexColor(flameRCloned, 0xff5500);
 
     // Inner Hot Cores (Hot yellow-white supersonic flame center)
-    const flameCoreMat = new THREE.MeshBasicMaterial({
-      color: 0xffe600, // Vibrant hot yellow core flame
-      transparent: true,
-      opacity: 0.95,
-      blending: THREE.AdditiveBlending,
-    });
     const flameCoreLGeo = new THREE.ConeGeometry(0.6, 6, 8);
     flameCoreLGeo.rotateZ(-Math.PI / 2);
     const flameCoreRGeo = new THREE.ConeGeometry(0.6, 6, 8);
@@ -899,23 +903,19 @@ export class EnemyStraight extends Enemy {
 
     const flameCoreLCloned = ensureNonIndexed(flameCoreLGeo);
     flameCoreLCloned.translate(2.5, 2.2, 2.8);
+    addVertexColor(flameCoreLCloned, 0xffe600);
 
     const flameCoreRCloned = ensureNonIndexed(flameCoreRGeo);
     flameCoreRCloned.translate(2.5, 2.2, -2.8);
+    addVertexColor(flameCoreRCloned, 0xffe600);
 
-    // Merge outer flames
-    const flameGeos = [flameLCloned, flameRCloned];
+    // Merge outer flames and inner cores; they share the same animated scale.
+    const flameGeos = [flameLCloned, flameRCloned, flameCoreLCloned, flameCoreRCloned];
     const mergedFlameGeo = mergeGeometries(flameGeos);
     const flameMesh = new THREE.Mesh(mergedFlameGeo, flameMat);
     flameMesh.position.set(13.0, 0, 0); // Position at nozzle exits to scale perfectly
     visuals.add(flameMesh);
     this._mainFlame = flameMesh;
-
-    // Merge inner cores and add directly as a child of the outer flame so it scales perfectly in unison!
-    const coreGeos = [flameCoreLCloned, flameCoreRCloned];
-    const mergedCoreGeo = mergeGeometries(coreGeos);
-    const coreMesh = new THREE.Mesh(mergedCoreGeo, flameCoreMat);
-    flameMesh.add(coreMesh); // Nest under outer flame!
 
     const leftGun = new THREE.Object3D();
     leftGun.position.set(10.5, -0.4, 23.0);
@@ -929,7 +929,6 @@ export class EnemyStraight extends Enemy {
 
     // Clean up flame temporary geometries
     flameGeos.forEach(g => g.dispose());
-    coreGeos.forEach(g => g.dispose());
     flameLeftGeo.dispose();
     flameRightGeo.dispose();
     flameCoreLGeo.dispose();

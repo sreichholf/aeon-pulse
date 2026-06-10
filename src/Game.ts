@@ -24,6 +24,13 @@ import {
 import { CampaignAttempt } from './campaign/CampaignAttempt.ts';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import playerGlbUrl from './models/player.glb';
+import {
+  beginPerfFrame,
+  endPerfFrame,
+  initPerfProbe,
+  measurePerfPhase,
+  setPerfCount,
+} from './systems/PerfProbe.ts';
 
 
 
@@ -56,6 +63,8 @@ export class Game {
   private _lastHeapBytes: number;
   private _allocDeltaKb: number;
   private _peakAllocKb: number;
+  private _lastPanelUpdateTime: number;
+  private _panelHtml: string;
   // Cached once/sec to avoid per-frame scene traversal
   private _cachedRenderCalls: number;
   private _cachedObjectStats: { total: number; byCategory: Record<string, number> } | null;
@@ -101,9 +110,12 @@ export class Game {
     this._lastHeapBytes     = 0;
     this._allocDeltaKb      = 0;
     this._peakAllocKb       = 0;
+    this._lastPanelUpdateTime = 0;
+    this._panelHtml = '';
     this._cachedRenderCalls = 0;
     this._cachedObjectStats = null;
     this._cachedBulletStats = null;
+    initPerfProbe();
 
     // Upgrade the fps-counter element to a styled panel when any perf flag is active
     if (this._panelMode && this._fpsElement) {
@@ -172,6 +184,7 @@ export class Game {
     if (!this._running) return;
     const dt = Math.min((timestamp - this._lastTime) / 1000, 0.05);
     this._lastTime = timestamp;
+    beginPerfFrame(timestamp, dt);
 
     this._frameCount++;
 
@@ -207,14 +220,22 @@ export class Game {
       this._lastFpsTime = timestamp;
     }
 
-    // Panel mode: rebuild HTML every frame (alloc delta must be live)
-    if (this._panelMode && this._fpsElement) {
-      this._fpsElement.innerHTML = this._buildPanelHtml();
+    // Panel mode: update DOM at a fixed cadence. Heap is still sampled every
+    // frame above, but rebuilding/inserting HTML every RAF creates avoidable
+    // allocation and style work while profiling.
+    if (this._panelMode && this._fpsElement && timestamp - this._lastPanelUpdateTime >= 250) {
+      measurePerfPhase('game.panel', () => {
+        this._panelHtml = this._buildPanelHtml();
+        this._fpsElement!.innerHTML = this._panelHtml;
+      });
+      this._lastPanelUpdateTime = timestamp;
     }
 
-    this._update(dt);
-    this.input.update();
-    this.scene.render(dt);
+    measurePerfPhase('game.update', () => this._update(dt));
+    measurePerfPhase('game.input', () => this.input.update());
+    measurePerfPhase('game.render', () => this.scene.render(dt));
+    setPerfCount('state.playing', this._state === GameState.PLAYING ? 1 : 0);
+    endPerfFrame();
 
     requestAnimationFrame((t) => this._loop(t));
   }

@@ -1,94 +1,141 @@
-# AEON PULSE Game Action & Balance Overhaul Handoff
+# AEON PULSE Chapter 4 Stutter Investigation Handoff
 
-This handoff outlines the design decisions and implementation plan for the Game Action and Balance Overhaul. The design has been fully aligned and grilled using the `/grill-with-docs` process.
+Updated: 2026-06-10
 
-## Summary of Grilled Decisions
+## Current State
 
-### 1. Weapon Progression & Recovery Balance
-*   **Tier 1 (Rapid) Buff:** Firing cooldown reduced from `0.14s` to `0.08s` (12.5 shots/sec) to make it a fast, narrow laser stream. This prevents the "recovery slog" where dying and returning to Tier 1 feels unplayable.
-*   **Differentiated Cooldowns:**
-    *   Tier 1 (Rapid): `0.08s`
-    *   Tier 2 (Twin): `0.10s`
-    *   Tier 3 (Spread): `0.12s`
-    *   Tier 4 (Wave) & Tier 5 (Focused Plasma): `0.14s`
-*   **Tap-Fire Piercing Limit:** Basic tap-fired Wave and Plasma bullets will no longer have infinite piercing. Instead, they will be **Semi-Piercing Projectiles** (piercing exactly `1` enemy, disappearing on the second).
-*   **Charge Shot Pierce:** Infinite piercing remains exclusive to **Charge Shots**, giving players a strategic choice to hold charge for sweeping lanes.
+Chapter 4 stutter investigation has moved from diagnosis into a first render-cost reduction pass. Keep the probe for now; it is still useful and query-gated behind `?perfProbe=1`.
 
-### 2. Pacing & Level Action Density
-*   **Timeline Compression:** Wave timeline absolute offsets in all chapters (`chapter1.ts` to `chapter4.ts`) will be scaled down by **35%** (a timeline scale factor of `0.65`).
-*   **Level Duration Snapping:** Shorten standard levels to match compressed timelines. `bossAt` scroll distance across all chapters will be reduced from `11200` to `7300` units.
-*   **Terrain Alignment:** Terrain control points (`terrainPoints` in `Levels.ts`) will have their `at` coordinates scaled inline by `0.65` during instantiation (e.g., inside `Levels.ts` factory methods) to preserve spatial layout.
-*   **Ambient Popcorn Spawner:** To remove "nothing happens" dead periods on screen, `LevelManager.ts` will implement a timer-based spawner that trickles minor enemies into the game at random Y heights every `2.5s to 4.0s` (randomized).
-    *   **Chapter 1 Pool:** `Straight` (70%), `Sine` (30%)
-    *   **Chapter 2 Pool:** `Straight` (40%), `Sine` (40%), `Charger` (20%)
-    *   **Chapter 3 Pool:** `Straight` (30%), `Sine` (30%), `Swarm` (40%)
-    *   **Chapter 4 Pool:** `Straight` (30%), `Sine` (30%), `Charger` (20%), `Swarm` (20%)
+The strongest finding remains: the stutter is render/compositor-side, not Terrain4, Background4, collision, or general gameplay update work. The worst spikes now appear lower after batching selected enemy visuals, but they are not fully eliminated.
 
----
+## Files Changed
 
-## Proposed Codebase Changes
+- `src/Game.ts`
+- `src/Scene.ts`
+- `src/entities/EntityCatalog.ts`
+- `src/entities/EnemySine.ts`
+- `src/entities/EnemyStraight.ts`
+- `src/systems/Gameplay.ts`
+- `src/systems/GameplayRun.ts`
+- `src/systems/PerfProbe.ts` new
+- `vite.config.js`
 
-### [MODIFY] [types.ts](file:///e:/Develop/GitHub/aeon-pulse/src/types.ts)
-*   Add `remainingPierce?: number` to `IBullet` interface to track finite penetrations.
+## Implemented
 
-### [MODIFY] [BulletsPlayer.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/BulletsPlayer.ts)
-*   Add `pierceCount?: number` option to `BulletDef`.
-*   Set `piercing: true` and `pierceCount: 1` on `ProjectileSourceKey.PLAYER_WAVE` and `ProjectileSourceKey.PLAYER_PLASMA`.
-*   Verify that `PLAYER_CHARGE` (and other heavy charge bullets) keep `piercing: true` with `pierceCount: undefined` (infinite).
+1. Perf overlay/probe
 
-### [MODIFY] [BulletsEnemy.ts] / [ProjectileDefinitions.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/ProjectileDefinitions.ts)
-*   Extend `ProjectileDamage` and `deepenDefinition` to carry and pass `pierceCount` through to `Bullet` instantiation.
+- `Game.ts` now updates the visible allocation/perf panel DOM every 250 ms instead of every RAF.
+- Heap sampling still happens per frame.
+- `PerfProbe.ts` adds hidden JSON output in `#aeon-perf-probe` when `?perfProbe=1`.
+- Probe records frame gaps, previous-frame timing, phase maxima, heap deltas, entity counts, render counts, and render ownership.
 
-### [MODIFY] [Bullet.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Bullet.ts)
-*   Store `remainingPierce` mutable variable on bullet construction, reading from the projectile definition.
+2. Render ownership instrumentation
 
-### [MODIFY] [CombatResolution.ts](file:///e:/Develop/GitHub/aeon-pulse/src/systems/CombatResolution.ts)
-*   In `PLAYER_BULLET_ENEMY` resolution:
-    *   If `bullet.isPiercing` is true:
-        *   If `bullet.remainingPierce` is defined, decrement it. If it reaches `0`, set `bullet.active = false`.
-        *   Otherwise (infinite pierce), keep it active.
-    *   If `bullet.isPiercing` is false, set `bullet.active = false`.
+- `Scene.ts` records projectile, flash, and composer/render timings.
+- `Scene.ts` records render calls, triangles, active bullets, and category/detail render ownership when probe is enabled.
+- `Gameplay.ts` / `GameplayRun.ts` record update-side timings and active object counts.
+- `EntityCatalog.ts` marks spawned enemies with detail labels like `enemy.sine` and `enemy.straight`.
 
-### [MODIFY] [Player.ts](file:///e:/Develop/GitHub/aeon-pulse/src/entities/Player.ts)
-*   Modify `_fireTap()` and `_fireCharged()` to use the appropriate bullet source keys:
-    *   Use new `PLAYER_WAVE_TAP` (semi-piercing) for basic tap fires, or construct them with a damage/pierce override.
-*   Update `RAPID_COOLDOWN` dynamically depending on `this.weaponTier` (0.08s for Tier 1, 0.10s for Tier 2, 0.12s for Tier 3, 0.14s for Tiers 4/5).
+3. Vite dev-server stability
 
-### [MODIFY] [chapter1.ts] / [chapter2.ts] / [chapter3.ts] / [chapter4.ts]
-*   Pass `0.65` into the `Timeline` constructors in each chapter file:
-    ```typescript
-    new Timeline<ChapterXAnchor>(0.65)
-    ```
+- `vite.config.js` ignores `.tmp/**` in the file watcher.
+- This prevents Chrome/CDP profile files under `.tmp` from crashing Vite with locked cookie/cache files.
 
-### [MODIFY] [Levels.ts](file:///e:/Develop/GitHub/aeon-pulse/src/level/Levels.ts)
-*   Change `bossAt: 11200` to `7300` across all chapters.
-*   Update `createTerrain` definitions to scale `pts` inline:
-    ```typescript
-    createTerrain: (scene, pts) => new Terrain(scene, pts.map(pt => ({ ...pt, at: pt.at * 0.65 })))
-    ```
+4. `EnemySine` render reduction
 
-### [MODIFY] [LevelManager.ts](file:///e:/Develop/GitHub/aeon-pulse/src/level/LevelManager.ts)
-*   Implement `_popcornTimer` in `update()`.
-*   Define chapter popcorn lists and spawn a random popcorn enemy at a random Y location when the timer fires, resetting to `2.5s + Math.random() * 1.5s`.
+- Top/bottom nozzle meshes are now one 2-instance `InstancedMesh`.
+- Top/bottom flame meshes are now one 2-instance `InstancedMesh`.
+- Existing vectoring and flame jitter behavior is preserved through per-frame instance matrix updates.
+- Claws, iris, pupil, recoil, and banking remain independent.
 
----
+5. `EnemyStraight` render reduction
 
-## Suggested Skills
+- A worker subagent was assigned `EnemyStraight`; it did not return a final message before shutdown, but visible local edits were reviewed and verified.
+- The kept changes merge the red visor strip into the hull geometry and drive its glow through the hull shader uniform.
+- Flame outer cones and hot cores are merged into one animated flame mesh using vertex colors.
+- Recoil, flame scaling, visor pulse, gun-point world positions, projectile semantics, and cockpit transparency are preserved.
+- A local experiment to remove the full procedural decal shader was reverted because it did not improve measured spikes and downgraded visible detail.
 
-*   **diagnose**: Use this skill if any of the three-point lighting, bullet instancing, or collision event mutations throw runtime errors.
-*   **prototype**: Useful if you want to test the feel of `0.08s` fire rate or the popcorn trickle before committing the full timeline compression.
+## Measurements
 
----
+In-app browser was used first. It loads the app and probe with no console errors, but keyboard automation still does not advance the game past the title screen. CDP fallback was used only for automated gameplay timing.
 
-## Verification Plan
+Final CDP run against `http://127.0.0.1:5174/?renderStats=1&perfProbe=1&invincible=1`:
 
-1.  **Compiler & Test Verification:**
-    *   Run `npm run build` to verify clean build bundles.
-    *   Run `npm test` to ensure Vitest suites pass.
-2.  **Tactical Database Check:**
-    *   Press `V` on the Title screen to check that the Aeon Pulse Craft and enemies render correctly and previews cycle without issue.
-3.  **Manual Playtesting Smoke Checklist:**
-    *   Verify Tier 1 Rapid fire rate feels fast and handles single targets cleanly.
-    *   Confirm Timeline Compression has removed empty scroll stretches in early levels.
-    *   Verify that basic Wave and Focused Plasma bullets only pierce one enemy and vanish on the second, but Charge Shots still clear columns infinitely.
-    *   Check that random popcorn enemies spawn in gaps to keep the screen active.
+- `4-4` no-fire, 35 s:
+  - long frames: 6
+  - long-frame rate: 0.0021
+  - worst gap: 58.1 ms
+  - max render/composer: 59.1 / 59.0 ms
+  - max render calls: 156
+  - max render objects: 157
+  - max enemy units: 133
+  - max `enemy.sine`: 90
+  - max `enemy.straight`: 24
+
+- `4-4` tier-5 tap-fire, 45 s:
+  - long frames: 8
+  - long-frame rate: 0.0023
+  - worst gap: 43.5 ms
+  - max render/composer: 39.6 / 39.4 ms
+  - max render calls: 135
+  - max render objects: 123
+  - max enemy units: 70
+  - max bullets: 42 active render units
+
+Earlier CDP runs before these enemy reductions had render/composer spikes in the 90 ms to 500 ms range depending on run variance. The current result is better, but still has occasional >25 ms frames.
+
+## Verification
+
+Passing after the latest changes:
+
+```bash
+npm test
+npm run build
+```
+
+`npm test` passed with 160/160 tests.
+
+In-app browser smoke:
+
+- Loaded `http://127.0.0.1:5174/?perfProbe=1&invincible=1`.
+- Canvas present.
+- Hidden probe present.
+- No browser console errors.
+- Automated in-app keyboard input still did not reach gameplay, so CDP was used for play/probe automation.
+
+## Important Failed Experiments
+
+Do not repeat these without a new reason:
+
+- `Scene.precompile()` / level-start warm-up: tried and removed; did not reduce active-play stalls.
+- `noPost=1` render bypass: tried and removed; direct `renderer.render()` still exhibited stalls.
+- Removing `EnemyStraight` procedural decals: tried and reverted; no measured benefit, visible detail loss.
+
+## Recommended Next Steps
+
+1. Keep `PerfProbe.ts` for now.
+
+It is query-gated, low overhead when off, and gives useful phase/render ownership data.
+
+2. Manually inspect visuals.
+
+Use the in-app browser visually or a controlled Chrome session:
+
+- `EnemySine` in gameplay scale and tactical database
+- `EnemyStraight` in gameplay scale and tactical database
+- Check Sine nozzles/flames still vector and pulse
+- Check Straight visor pulse, flame scale, recoil, and gun firing positions
+
+3. If stutter remains visible, optimize the next shared render offenders.
+
+The final probe still shows high enemy render ownership during dense Chapter 4 windows. Next likely targets:
+
+- `EnemyTurret` at up to 20 render units
+- `Stalactite` at up to 20 render units
+- `RockDrake` at 16 render units
+- remaining `EnemySine` claws if visual fidelity allows a per-enemy claw instancing pass
+
+4. Consider a shared enemy visual batching strategy only after one more targeted pass.
+
+Several enemies repeat small static meshes with independent animation. A shared helper for per-entity 2-instance or 4-instance mesh parts may be worth it, but only if another concrete entity optimization repeats the same pattern.
