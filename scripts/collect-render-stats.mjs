@@ -1,5 +1,12 @@
-const BASE_URL = process.env.BASE_URL ?? 'http://127.0.0.1:5173/?renderStats=1&invincible=1';
-const CDP_BASE = process.env.CDP_BASE ?? 'http://127.0.0.1:9222';
+const BASE_URL = process.env.BASE_URL ?? 'http://localhost:5173/?renderStats=1&invincible=1';
+const CDP_BASE = process.env.CDP_BASE ?? 'http://localhost:9222';
+const DURATION_SCALE = Number.parseFloat(process.env.DURATION_SCALE ?? '1');
+const SELECTED_SCENARIOS = new Set(
+  (process.env.SCENARIOS ?? '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean),
+);
 
 class Cdp {
   constructor(wsUrl) {
@@ -80,6 +87,27 @@ async function readFpsText(cdp) {
   return result.result.value ?? '';
 }
 
+async function evaluate(cdp, expression) {
+  const result = await cdp.send('Runtime.evaluate', {
+    expression,
+    returnByValue: true,
+    awaitPromise: true,
+  });
+  if (result.exceptionDetails) {
+    throw new Error(result.exceptionDetails.text ?? 'Runtime.evaluate failed');
+  }
+  return result.result.value;
+}
+
+async function waitUntil(cdp, expression, timeoutMs, label) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (await evaluate(cdp, expression).catch(() => false)) return;
+    await sleep(100);
+  }
+  throw new Error(`Timed out waiting for ${label}`);
+}
+
 function parseStats(text) {
   const [head, ...sections] = text.split(' | ');
   const headMatch = head.match(/(?<fps>\d+) FPS/);
@@ -144,15 +172,61 @@ function parseStats(text) {
   return data;
 }
 
+async function readStats(cdp) {
+  const runtimeStats = await evaluate(cdp, `(() => {
+    const game = window.game;
+    const scene = game?.scene;
+    const objectStats = scene?.getSceneObjectStats?.();
+    const renderInfo = scene?.getRenderInfo?.();
+    if (!game || !scene || !objectStats || !renderInfo) return null;
+
+    const bulletStats = game?._run?.getBulletStatsSnapshot?.() ?? {
+      total: 0,
+      renderUnits: 0,
+      bySourceKey: {},
+      renderUnitsBySourceKey: {},
+    };
+
+    return {
+      fps: game?._currentFps ?? 0,
+      calls: renderInfo.calls ?? 0,
+      triangles: renderInfo.triangles ?? 0,
+      objectUnits: objectStats.total ?? 0,
+      bullets: bulletStats.total ?? 0,
+      renderUnits: bulletStats.renderUnits ?? 0,
+      categories: objectStats.byCategory ?? {},
+      details: objectStats.byDetail ?? {},
+      sources: bulletStats.bySourceKey ?? {},
+      sourceRenderUnits: bulletStats.renderUnitsBySourceKey ?? {},
+      state: game?._state ?? null,
+      level: game?.currentLevel?.id ?? null,
+      raw: document.getElementById('fps-counter')?.innerText ?? '',
+    };
+  })()`);
+
+  if (runtimeStats) return runtimeStats;
+
+  // Legacy fallback for older builds that still expose all profiler data as a
+  // single text line in the HUD.
+  return parseStats(await readFpsText(cdp));
+}
+
 async function startScenario(cdp, { levelAdvance = 0, tierAdvance = 0 }) {
   await cdp.send('Page.navigate', { url: BASE_URL });
-  await sleep(2500);
+  await waitUntil(cdp, 'document.readyState === "complete" && !!window.game', 15000, 'game boot');
+  await waitUntil(cdp, 'window.game?._state === "TITLE"', 15000, 'title screen');
+  await sleep(500);
   for (let i = 0; i < levelAdvance; i++) await key(cdp, 'ArrowUp', 'ArrowUp');
   for (let i = 0; i < tierAdvance; i++) await key(cdp, 'ArrowRight', 'ArrowRight');
   await key(cdp, ' ', 'Space', ' ');
   await sleep(1300);
   await key(cdp, ' ', 'Space', ' ');
-  await sleep(500);
+  await waitUntil(
+    cdp,
+    '["PLAYING","LEVEL_COMPLETE","GAME_OVER"].includes(window.game?._state)',
+    10000,
+    'gameplay start',
+  );
 }
 
 async function runScenario(config) {
@@ -170,7 +244,7 @@ async function runScenario(config) {
         nextFire += config.fireEveryMs;
       }
       if (elapsed >= nextSample) {
-        const parsed = parseStats(await readFpsText(cdp));
+        const parsed = await readStats(cdp);
         if (parsed) samples.push({ t: Math.round(elapsed / 1000), ...parsed });
         nextSample += 1000;
       }
@@ -180,11 +254,16 @@ async function runScenario(config) {
     cdp.close();
     await fetch(`${CDP_BASE}/json/close/${targetId}`).catch(() => {});
   }
+  if (samples.length === 0) {
+    throw new Error(`No render stats samples captured for ${config.name}`);
+  }
   return { name: config.name, samples };
 }
 
 function summarize({ name, samples }) {
   const calls = samples.map((sample) => sample.calls);
+  const fps = samples.map((sample) => sample.fps);
+  const triangles = samples.map((sample) => sample.triangles).filter((value) => typeof value === 'number');
   const bullets = samples.map((sample) => sample.bullets);
   const renderUnits = samples.map((sample) => sample.renderUnits);
   const objectUnits = samples.map((sample) => sample.objectUnits);
@@ -212,6 +291,8 @@ function summarize({ name, samples }) {
     name,
     sampleCount: samples.length,
     calls: summarizeNumbers(calls),
+    fps: summarizeNumbers(fps),
+    triangles: summarizeNumbers(triangles),
     bullets: summarizeNumbers(bullets),
     renderUnits: summarizeNumbers(renderUnits),
     objectUnits: summarizeNumbers(objectUnits),
@@ -224,6 +305,9 @@ function summarize({ name, samples }) {
 }
 
 function summarizeNumbers(values) {
+  if (values.length === 0) {
+    return { min: null, max: null, avg: 0 };
+  }
   return {
     min: Math.min(...values),
     max: Math.max(...values),
@@ -240,7 +324,16 @@ const scenarios = [
   { name: 'L1-1 tier5 tap-fire', levelAdvance: 0, tierAdvance: 4, durationMs: 35000, fireEveryMs: 190 },
   { name: 'L4-4 no-fire', levelAdvance: 18, tierAdvance: 0, durationMs: 30000, fireEveryMs: null },
   { name: 'L4-4 tier5 tap-fire', levelAdvance: 18, tierAdvance: 4, durationMs: 45000, fireEveryMs: 190 },
-];
+]
+  .filter((scenario) => SELECTED_SCENARIOS.size === 0 || SELECTED_SCENARIOS.has(scenario.name))
+  .map((scenario) => ({
+    ...scenario,
+    durationMs: Math.max(1000, Math.round(scenario.durationMs * (Number.isFinite(DURATION_SCALE) ? DURATION_SCALE : 1))),
+  }));
+
+if (scenarios.length === 0) {
+  throw new Error('No scenarios selected');
+}
 
 const results = [];
 for (const scenario of scenarios) {
@@ -251,4 +344,3 @@ for (const scenario of scenarios) {
   console.log(JSON.stringify(summary, null, 2));
   results.push({ ...result, summary });
 }
-
