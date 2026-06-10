@@ -20,8 +20,8 @@ export const STRAIGHT_MODEL_BUCKET_CONFIG: StandardEnemyModelBucketConfig = {
     StraightCrimson: { bucket: 'body', color: 0xff2d55 },
     StraightGunmetal: { bucket: 'body', color: 0x6b778c },
     StraightCopper: { bucket: 'body', color: 0xd4af37 },
-    StraightAmberGlow: { bucket: 'glow', color: 0xffaa00 },
-    StraightSensorGlow: { bucket: 'glow', color: 0xff1a2c },
+    StraightAmberGlow: { bucket: 'body', color: 0xffaa00 },
+    StraightSensorGlow: { bucket: 'body', color: 0xff1a2c },
     StraightCanopyGlass: { bucket: 'glass', color: 0x00d2ff },
   },
   bodyMaterial: {
@@ -42,17 +42,14 @@ export const STRAIGHT_MODEL_BUCKET_CONFIG: StandardEnemyModelBucketConfig = {
     opacity: 0.85,
     side: THREE.DoubleSide,
   }),
-  glowMaterial: new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    vertexColors: true,
-    side: THREE.DoubleSide,
-    toneMapped: false,
-  }),
 };
 
 export function applyStraightDecalShader(material: THREE.MeshStandardMaterial): void {
+  const visorEmissiveUniform = { value: new THREE.Color(0.36, 0.032, 0.032) };
+  material.userData['straightVisorEmissiveUniform'] = visorEmissiveUniform;
   material.customProgramCacheKey = () => 'EnemyStraightDecalsV3';
   material.onBeforeCompile = (shader) => {
+    shader.uniforms['uStraightVisorEmissive'] = visorEmissiveUniform;
     shader.vertexShader = 'varying vec3 vStraightLocalPosition;\n' + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
@@ -60,7 +57,8 @@ export function applyStraightDecalShader(material: THREE.MeshStandardMaterial): 
       vStraightLocalPosition = position.xyz + vec3(${STRAIGHT_MODEL_SOURCE_CENTER.x.toFixed(1)}, ${STRAIGHT_MODEL_SOURCE_CENTER.y.toFixed(1)}, ${STRAIGHT_MODEL_SOURCE_CENTER.z.toFixed(1)});`
     );
 
-    shader.fragmentShader = `varying vec3 vStraightLocalPosition;
+    shader.fragmentShader = `uniform vec3 uStraightVisorEmissive;
+    varying vec3 vStraightLocalPosition;
 
     float getStraightLine(float val, float target, float thickness) {
       return smoothstep(thickness, thickness * 0.4, abs(val - target));
@@ -139,6 +137,20 @@ export function applyStraightDecalShader(material: THREE.MeshStandardMaterial): 
       vec2 straightP7 = (straightUvDecal - vec2(1.2, 0.0)) * 1.5;
       straightStencil = (drawStraightZero(straightP0) + drawStraightSeven(straightP7)) * straightInEngineX * straightInEngineZ;
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95, 0.92, 0.55), straightStencil * 0.95);`
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      'vec3 totalEmissiveRadiance = emissive;',
+      `vec3 totalEmissiveRadiance = emissive;
+
+      #ifdef USE_COLOR
+      float straightVisorMask = step(0.9, vColor.r) * step(vColor.g, 0.18) * step(vColor.b, 0.25);
+      straightVisorMask *= step(-15.0, vStraightLocalPosition.x) * step(vStraightLocalPosition.x, -12.0);
+      totalEmissiveRadiance += uStraightVisorEmissive * straightVisorMask;
+
+      float straightAmberGlowMask = step(0.9, vColor.r) * step(0.45, vColor.g) * step(vColor.g, 0.78) * step(vColor.b, 0.12);
+      totalEmissiveRadiance += vec3(1.0, 0.42, 0.0) * straightAmberGlowMask * 0.9;
+      #endif`
     );
   };
 }

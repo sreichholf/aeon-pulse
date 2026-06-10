@@ -64,8 +64,10 @@ describe('StandardEnemyModel', () => {
     const buckets = new Set(materialNames.map((name) => STRAIGHT_MODEL_BUCKET_CONFIG.materialRules[name]?.bucket));
 
     expect(missingRules).toEqual([]);
-    expect([...buckets].sort()).toEqual(['body', 'glass', 'glow']);
+    expect([...buckets].sort()).toEqual(['body', 'glass']);
     expect(buckets.size).toBeLessThanOrEqual(3);
+    expect(STRAIGHT_MODEL_BUCKET_CONFIG.materialRules.StraightAmberGlow?.bucket).toBe('body');
+    expect(STRAIGHT_MODEL_BUCKET_CONFIG.materialRules.StraightSensorGlow?.bucket).toBe('body');
   });
 
   it('restores straight shader detail hooks after GLB preparation', () => {
@@ -76,20 +78,23 @@ describe('StandardEnemyModel', () => {
 
     const bodyMaterial = bodyBucket!.material as THREE.MeshStandardMaterial;
     expect(bodyMaterial.customProgramCacheKey()).toBe('EnemyStraightDecalsV3');
+    expect(bodyMaterial.userData['straightVisorEmissiveUniform']).toBeDefined();
 
     const shader = {
       uniforms: {},
       vertexShader: 'void main() { #include <begin_vertex> }',
-      fragmentShader: 'void main() { vec4 diffuseColor = vec4(1.0); #include <color_fragment> }',
+      fragmentShader: 'void main() { vec4 diffuseColor = vec4(1.0); #include <color_fragment> vec3 totalEmissiveRadiance = emissive; }',
     };
     bodyMaterial.onBeforeCompile(shader as any, {} as any);
 
+    expect(shader.uniforms).toHaveProperty('uStraightVisorEmissive');
     expect(shader.vertexShader).toContain('vStraightLocalPosition');
     expect(shader.vertexShader).toContain('position.xyz + vec3(-3.0, 1.3, 0.0)');
     expect(shader.fragmentShader).toContain('straightPanelLine');
     expect(shader.fragmentShader).toContain('straightRivetVal');
     expect(shader.fragmentShader).toContain('straightDecalBird');
     expect(shader.fragmentShader).toContain('straightStencil');
+    expect(shader.fragmentShader).toContain('straightAmberGlowMask');
   });
 });
 

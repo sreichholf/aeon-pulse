@@ -30,6 +30,7 @@ export interface PreparedStandardEnemyModel {
 
 export interface StandardEnemyModelInstance {
   root: THREE.Group;
+  bucketMeshes: Partial<Record<ModelRenderBucketName, THREE.Mesh>>;
   flashOverlay: THREE.Mesh<THREE.BufferGeometry, THREE.Material> | null;
 }
 
@@ -116,11 +117,15 @@ export function createStandardEnemyModelInstance(
   root.scale.setScalar(scale);
   if (options.offset) root.position.copy(options.offset);
 
+  const bucketMeshes: Partial<Record<ModelRenderBucketName, THREE.Mesh>> = {};
   for (const bucket of prepared.buckets) {
     const mesh = new THREE.Mesh(bucket.geometry, bucket.material);
+    mesh.name = bucket.name;
+    mesh.userData['modelBucket'] = bucket.name;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     root.add(mesh);
+    bucketMeshes[bucket.name] = mesh;
   }
 
   let flashOverlay: THREE.Mesh<THREE.BufferGeometry, THREE.Material> | null = null;
@@ -131,7 +136,7 @@ export function createStandardEnemyModelInstance(
     root.add(flashOverlay);
   }
 
-  return { root, flashOverlay };
+  return { root, bucketMeshes, flashOverlay };
 }
 
 export function getPreparedModelBucketNames(prepared: PreparedStandardEnemyModel): ModelRenderBucketName[] {

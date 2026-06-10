@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import { BulletType, type GetPositionFn, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import straightGlbUrl from '../models/straight.glb';
 import {
   createStandardEnemyModelInstance,
   prepareStandardEnemyModel,
   type PreparedStandardEnemyModel,
 } from '../systems/StandardEnemyModel.ts';
+import { addVertexColor, ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
 import {
   STRAIGHT_MODEL_BUCKET_CONFIG,
   STRAIGHT_MODEL_OFFSET,
@@ -37,7 +39,7 @@ export class EnemyStraight extends Enemy {
   private _engineScale: number;
   private _visorFlash: number;
   private _visorPulseTime: number;
-  private _visorMaterial: THREE.MeshBasicMaterial | null = null;
+  private _visorEmissiveColor: THREE.Color;
   private _visualsGroup: THREE.Group | null = null;
   private _mainFlame: THREE.Object3D | null = null;
   private _leftGunPoint: THREE.Object3D | null = null;
@@ -70,6 +72,7 @@ export class EnemyStraight extends Enemy {
     this._engineScale    = 1.0;
     this._visorFlash     = 0.4;
     this._visorPulseTime = 0;
+    this._visorEmissiveColor = new THREE.Color(0.36, 0.032, 0.032);
 
     this._displayName = 'Straight';
     this._mesh = this._build3DModel();
@@ -124,11 +127,9 @@ export class EnemyStraight extends Enemy {
       pos.y = Math.max(-HALF_H + HH, Math.min(HALF_H - HH, pos.y));
     }
 
-    if (this._visorMaterial) {
-      const pulse = 1.0 + Math.sin(this._visorPulseTime * 25) * 0.35;
-      const intensity = this._visorFlash * (this._pausing ? pulse : 1.0);
-      this._visorMaterial.color.setRGB(0.9 * intensity, 0.08 * intensity, 0.08 * intensity);
-    }
+    const pulse = 1.0 + Math.sin(this._visorPulseTime * 25) * 0.35;
+    const intensity = this._visorFlash * (this._pausing ? pulse : 1.0);
+    this._visorEmissiveColor.setRGB(0.9 * intensity, 0.08 * intensity, 0.08 * intensity);
 
     const k = 440;
     const c = 28;
@@ -185,9 +186,7 @@ export class EnemyStraight extends Enemy {
     this._kickback = 7.0;
     this._kickbackVel = -75.0;
     this._visorPulseTime = 0;
-    if (this._visorMaterial) {
-      this._visorMaterial.color.setRGB(3.0, 3.0, 3.0);
-    }
+    this._visorEmissiveColor.setRGB(3.0, 3.0, 3.0);
   }
 
   private _build3DModel(): THREE.Group {
@@ -208,6 +207,7 @@ export class EnemyStraight extends Enemy {
         offset: STRAIGHT_MODEL_OFFSET,
       });
       this._flashOverlay = instance.flashOverlay;
+      this._bindBodyPulseMaterial(instance.bucketMeshes.body);
       visuals.add(instance.root);
     };
 
@@ -246,32 +246,19 @@ export class EnemyStraight extends Enemy {
     return EnemyStraight._loadPromise;
   }
 
-  private _addLocalEffects(visuals: THREE.Group): void {
-    this._visorMaterial = new THREE.MeshBasicMaterial({
-      color: 0x5c0808,
-      transparent: true,
-      opacity: 0.72,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      toneMapped: false,
-    });
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.74, 2.9), this._visorMaterial);
-    visor.position.set(-13.5, 1.32, 0);
-    visor.rotation.z = 0.1;
-    visor.renderOrder = 25;
-    visor.userData['uniqueEffect'] = true;
-    visuals.add(visor);
+  private _bindBodyPulseMaterial(bodyMesh: THREE.Mesh | undefined): void {
+    if (!bodyMesh || !(bodyMesh.material instanceof THREE.MeshStandardMaterial)) return;
+    bodyMesh.onBeforeRender = () => {
+      const uniform = (bodyMesh.material as THREE.MeshStandardMaterial)
+        .userData['straightVisorEmissiveUniform'] as { value: THREE.Color } | undefined;
+      uniform?.value.copy(this._visorEmissiveColor);
+    };
+  }
 
-    const flameGroup = new THREE.Group();
-    flameGroup.position.set(13.0, 0, 0);
-    flameGroup.add(
-      this._createFlameCone(1.2, 10, [0.5, 2.2, 2.8], 0xff5500, 0.78),
-      this._createFlameCone(1.2, 10, [0.5, 2.2, -2.8], 0xff5500, 0.78),
-      this._createFlameCone(0.6, 6, [2.5, 2.2, 2.8], 0xffe600, 0.92),
-      this._createFlameCone(0.6, 6, [2.5, 2.2, -2.8], 0xffe600, 0.92),
-    );
-    visuals.add(flameGroup);
-    this._mainFlame = flameGroup;
+  private _addLocalEffects(visuals: THREE.Group): void {
+    const flameMesh = this._createMergedFlameMesh();
+    visuals.add(flameMesh);
+    this._mainFlame = flameMesh;
 
     const leftGun = new THREE.Object3D();
     leftGun.position.set(10.5, -0.4, 23.0);
@@ -284,27 +271,43 @@ export class EnemyStraight extends Enemy {
     this._rightGunPoint = rightGun;
   }
 
-  private _createFlameCone(
-    radius: number,
-    height: number,
-    position: [number, number, number],
-    color: THREE.ColorRepresentation,
-    opacity: number,
-  ): THREE.Mesh {
-    const geometry = new THREE.ConeGeometry(radius, height, 8);
-    geometry.rotateZ(-Math.PI / 2);
+  private _createMergedFlameMesh(): THREE.Mesh {
+    const geometries = [
+      this._createFlameConeGeometry(1.2, 10, [0.5, 2.2, 2.8], 0xff5500),
+      this._createFlameConeGeometry(1.2, 10, [0.5, 2.2, -2.8], 0xff5500),
+      this._createFlameConeGeometry(0.6, 6, [2.5, 2.2, 2.8], 0xffe600),
+      this._createFlameConeGeometry(0.6, 6, [2.5, 2.2, -2.8], 0xffe600),
+    ];
+    const geometry = mergeGeometries(geometries, false);
+    geometries.forEach((source) => source.dispose());
+    if (!geometry) throw new Error('Failed to merge Straight flame geometry');
+    geometry.computeVertexNormals();
     const material = new THREE.MeshBasicMaterial({
-      color,
+      color: 0xffffff,
+      vertexColors: true,
       transparent: true,
-      opacity,
+      opacity: 0.85,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       toneMapped: false,
     });
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(...position);
+    mesh.position.set(13.0, 0, 0);
     mesh.userData['uniqueEffect'] = true;
     return mesh;
+  }
+
+  private _createFlameConeGeometry(
+    radius: number,
+    height: number,
+    position: [number, number, number],
+    color: THREE.ColorRepresentation,
+  ): THREE.BufferGeometry {
+    const geometry = ensureNonIndexed(new THREE.ConeGeometry(radius, height, 8));
+    geometry.rotateZ(-Math.PI / 2);
+    geometry.translate(...position);
+    addVertexColor(geometry, new THREE.Color(color).getHex());
+    return geometry;
   }
 
   _flash(): void {
@@ -339,6 +342,5 @@ export class EnemyStraight extends Enemy {
     this._leftGunPoint = null;
     this._rightGunPoint = null;
     this._flashOverlay = null;
-    this._visorMaterial = null;
   }
 }
