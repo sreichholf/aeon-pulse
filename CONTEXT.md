@@ -240,6 +240,18 @@ _Avoid_: Screen-wide piercing coverage, passive spawn deletion
 The 3D model asset (`player.glb`) used to render the player's aerospace fighter. It is loaded asynchronously at boot time and cloned when instantiating the Player entity, with a robust fallback to procedural geometry if the asset fails to load.
 _Avoid_: Procedural mesh, player sprite, static mesh
 
+**Standard Enemy Model**:
+A 3D model asset used as the presentation identity for a standard non-boss enemy. Standard Enemy Models are expected to become the normal presentation path for standard enemies over time, while each enemy still keeps its authored gameplay role and wave identity.
+_Avoid_: Diver-only model, enemy sprite, boss model, enemy gameplay object
+
+**Hit Flash Presentation**:
+The brief visual feedback shown when an enemy takes damage. Hit Flash Presentation belongs to the enemy's runtime presentation layer rather than to the immutable Standard Enemy Model asset.
+_Avoid_: Mutating model materials, baking damage feedback into model identity
+
+**Model Render Bucket**:
+A runtime grouping of Standard Enemy Model surfaces that share rendering rules, such as opaque body, transparent glass, or emissive glow. Model Render Buckets may collapse multiple authored GLB materials when that preserves enemy readability while reducing draw impact.
+_Avoid_: Authored material name, one material per color, gameplay part
+
 **Module Test Harness**:
 The Vitest-based automated test layer for deterministic module seams. It protects pure or near-pure code such as collision contact detection, combat resolution, campaign helpers, and wave timeline compilation.
 _Avoid_: Browser playtest replacement, render profiler
