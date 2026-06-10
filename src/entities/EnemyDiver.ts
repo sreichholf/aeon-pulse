@@ -16,7 +16,7 @@ const GLB_ROT_Z = Math.PI / 2;
 const GLB_OFFSET_X = 0;
 const GLB_OFFSET_Y = 0;
 const GLB_OFFSET_Z = 0;
-const DIVE_TILT_FACTOR = 0.3;
+const DIVE_TILT_FACTOR = -0.3;
 const HW = 25, HH = 22;
 
 export class EnemyDiver extends Enemy {
