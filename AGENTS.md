@@ -76,6 +76,8 @@ Use manual browser playtesting to verify gameplay feel, visuals, progression, an
 
 For render-performance profiling, a headless browser run using the Chrome DevTools Protocol (CDP) is the authorized way to capture automated gameplay render metrics.
 
+On Linux Wayland, use a headed Chrome window for CDP render-stat runs. Headless Chrome may fail to create a usable WebGL context or report misleading render behavior under Wayland.
+
 **Authorized Windows Workflow**:
 1. Ensure the development server is active at `http://localhost:5173` (start manually via `npm run dev`).
 2. Run the pre-authorized profiling orchestrator using the absolute path to the primary runtime Node executable. This bypasses system sandbox permission restrictions
