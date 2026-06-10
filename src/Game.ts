@@ -24,6 +24,7 @@ import {
 import { CampaignAttempt } from './campaign/CampaignAttempt.ts';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import playerGlbUrl from './models/player.glb';
+import { EnemyDiver } from './entities/EnemyDiver.ts';
 import {
   beginPerfFrame,
   endPerfFrame,
@@ -157,24 +158,41 @@ export class Game {
 
   start() {
     this._running = true;
-    this._preloadAssets();
-    this._setState(GameState.TITLE);
-    requestAnimationFrame((t) => this._loop(t));
+    this._preloadAssets()
+      .catch((error) => {
+        console.error('Failed to preload startup assets:', error);
+      })
+      .finally(() => {
+        this._setState(GameState.TITLE);
+        requestAnimationFrame((t) => this._loop(t));
+      });
   }
 
-  private _preloadAssets(): void {
+  private async _preloadAssets(): Promise<void> {
     const loader = new GLTFLoader();
-    loader.load(
-      playerGlbUrl,
-      (gltf) => {
-        this.playerModel = gltf.scene;
-        console.log('Player GLB model preloaded successfully');
-      },
-      undefined,
-      (error) => {
-        console.error('Failed to preload player GLB model:', error);
-      }
-    );
+    const playerModelPromise = new Promise<void>((resolve) => {
+      loader.load(
+        playerGlbUrl,
+        (gltf) => {
+          this.playerModel = gltf.scene;
+          console.log('Player GLB model preloaded successfully');
+          resolve();
+        },
+        undefined,
+        (error) => {
+          console.error('Failed to preload player GLB model:', error);
+          resolve();
+        }
+      );
+    });
+
+    const diverModelPromise = EnemyDiver.preloadModel()
+      .then(() => undefined)
+      .catch((error) => {
+        console.error('Failed to preload diver GLB model:', error);
+      });
+
+    await Promise.all([playerModelPromise, diverModelPromise]);
   }
 
 

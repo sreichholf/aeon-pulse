@@ -79,7 +79,7 @@ export const ENEMY_CATALOG: readonly EnemyCatalogEntry[] = [
   },
   {
     type: EnemyType.DIVER,
-    viewer: { page: 'stage-enemies', order: 30, scale: 0.85, centering: 'bounds' },
+    viewer: { page: 'stage-enemies', order: 30, scale: 1.0, centering: 'bounds' },
     viewerProjectileKeys: [ProjectileSourceKey.ENEMY_DIVER],
     spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemyDiver(scene, sprites, x, y, getPos, projectileFactory, audio),
   },

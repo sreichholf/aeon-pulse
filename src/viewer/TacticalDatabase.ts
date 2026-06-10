@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { spawnEnemy, spawnBoss } from '../entities/EntityRegistry.ts';
+import { EnemyDiver } from '../entities/EnemyDiver.ts';
 import { Bullet } from '../entities/Bullet.ts';
 import { getBossCatalogEntries, getStageEnemyCatalogEntries, type EnemyViewerPresentation } from '../entities/EntityCatalog.ts';
 import type { UI } from '../ui/UI.ts';
@@ -25,6 +26,7 @@ export class TacticalDatabase {
   private _page: number;
   private _entities: TacticalDossierCard[];
   private _clonedMaterials: THREE.Material[];
+  private _renderGeneration: number;
 
   constructor(scene: SceneRef, sprites: Record<string, THREE.Texture>, ui: UI, audio: IAudio, getPlayerModel: PlayerModelProvider) {
     this._scene   = scene;
@@ -36,6 +38,7 @@ export class TacticalDatabase {
     this._page              = 1;
     this._entities          = [];
     this._clonedMaterials   = [];
+    this._renderGeneration  = 0;
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -44,7 +47,7 @@ export class TacticalDatabase {
     this._page = 1;
     this._entities = [];
     this._clonedMaterials = [];
-    this._renderPage();
+    void this._renderPage();
   }
 
   exit() {
@@ -70,7 +73,7 @@ export class TacticalDatabase {
     this._audio.play('menuSelect');
     const pageCount = 3;
     this._page = ((this._page - 1 + dir + pageCount) % pageCount) + 1;
-    this._renderPage();
+    void this._renderPage();
   }
 
   // ── Bullet factory helper (ADR 0017) ─────────────────────────────────────
@@ -98,14 +101,15 @@ export class TacticalDatabase {
 
   // ── Rendering ────────────────────────────────────────────────────────────
 
-  private _renderPage(): void {
+  private async _renderPage(): Promise<void> {
+    const renderGeneration = ++this._renderGeneration;
     this._clear();
     const getPos = () => ({ x: 0, y: 0 });
 
     if (this._page === 1) {
       this._renderPlayerPage();
     } else if (this._page === 2) {
-      this._renderEnemyPage(getPos);
+      await this._renderEnemyPage(getPos, renderGeneration);
     } else {
       this._renderBossPage(getPos);
     }
@@ -146,7 +150,10 @@ export class TacticalDatabase {
     this._ui.showViewer(this._page, []);
   }
 
-  private _renderEnemyPage(getPos: GetPositionFn): void {
+  private async _renderEnemyPage(getPos: GetPositionFn, renderGeneration: number): Promise<void> {
+    await EnemyDiver.preloadModel();
+    if (renderGeneration !== this._renderGeneration || this._page !== 2) return;
+
     const enemyEntries = getStageEnemyCatalogEntries();
     const entitiesData = [];
 
