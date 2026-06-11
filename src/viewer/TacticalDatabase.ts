@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { spawnEnemy, spawnBoss } from '../entities/EntityRegistry.ts';
 import { EnemyDiver } from '../entities/EnemyDiver.ts';
+import { EnemySine } from '../entities/EnemySine.ts';
+import { EnemySwarm } from '../entities/EnemySwarm.ts';
 import { Bullet } from '../entities/Bullet.ts';
 import { getBossCatalogEntries, getStageEnemyCatalogEntries, type EnemyViewerPresentation } from '../entities/EntityCatalog.ts';
 import type { UI } from '../ui/UI.ts';
@@ -151,7 +153,15 @@ export class TacticalDatabase {
   }
 
   private async _renderEnemyPage(getPos: GetPositionFn, renderGeneration: number): Promise<void> {
-    await EnemyDiver.preloadModel();
+    try {
+      await Promise.all([
+        EnemyDiver.preloadModel(),
+        EnemySine.preloadModel(),
+        EnemySwarm.preloadModel(),
+      ]);
+    } catch (error) {
+      console.error('Failed to preload models in TacticalDatabase:', error);
+    }
     if (renderGeneration !== this._renderGeneration || this._page !== 2) return;
 
     const enemyEntries = getStageEnemyCatalogEntries();
@@ -165,43 +175,47 @@ export class TacticalDatabase {
       const x = (col - 2) * 165;
       const y = (0.5 - row) * 180 - 10;
 
-      const spawnedEnemy = spawnEnemy(entry.type, {
-        scene: this._scene,
-        sprites: this._sprites,
-        x,
-        y,
-        getPos,
-        audio: { play: () => { } },
-        getScrollX: () => 0,
-        terrain: null,
-        // No-op: entity fires into the void; bullet previews are catalog-driven (ADR 0017)
-        projectileFactory: () => null as never,
-      });
-      if (spawnedEnemy && spawnedEnemy._mesh) {
-        this._applyEnemyViewerPresentation(spawnedEnemy._mesh, entry.viewer, x, y);
-
-        const card = new TacticalDossierCard(spawnedEnemy, this._scene, {
-          projectileKeys: entry.viewerProjectileKeys,
-          bulletFactory: this._makeBulletFactory(x, y),
-        });
-        this._entities.push(card);
-
-        // Setup holographic clipping planes to restrict enemy meshes to their card boundaries (with premium inside padding)
-        const halfW = 67; // 73 - 6 units padding
-        const halfH = 72; // 80 - 8 units padding to clear margins and text cleanly
-        const cardCenterX = x;
-        const cardCenterY = y - 20;
-
-        this._applyClippingPlanes(spawnedEnemy._mesh, cardCenterX, cardCenterY, halfW, halfH);
-
-        const meta = spawnedEnemy.metadata;
-        entitiesData.push({
-          name: meta?.displayName,
-          hp: meta?.hp ?? 0,
-          score: meta?.score ?? 0,
+      try {
+        const spawnedEnemy = spawnEnemy(entry.type, {
+          scene: this._scene,
+          sprites: this._sprites,
           x,
           y,
+          getPos,
+          audio: { play: () => { } },
+          getScrollX: () => 0,
+          terrain: null,
+          // No-op: entity fires into the void; bullet previews are catalog-driven (ADR 0017)
+          projectileFactory: () => null as never,
         });
+        if (spawnedEnemy && spawnedEnemy._mesh) {
+          this._applyEnemyViewerPresentation(spawnedEnemy._mesh, entry.viewer, x, y);
+
+          const card = new TacticalDossierCard(spawnedEnemy, this._scene, {
+            projectileKeys: entry.viewerProjectileKeys,
+            bulletFactory: this._makeBulletFactory(x, y),
+          });
+          this._entities.push(card);
+
+          // Setup holographic clipping planes to restrict enemy meshes to their card boundaries (with premium inside padding)
+          const halfW = 67; // 73 - 6 units padding
+          const halfH = 72; // 80 - 8 units padding to clear margins and text cleanly
+          const cardCenterX = x;
+          const cardCenterY = y - 20;
+
+          this._applyClippingPlanes(spawnedEnemy._mesh, cardCenterX, cardCenterY, halfW, halfH);
+
+          const meta = spawnedEnemy.metadata;
+          entitiesData.push({
+            name: meta?.displayName,
+            hp: meta?.hp ?? 0,
+            score: meta?.score ?? 0,
+            x,
+            y,
+          });
+        }
+      } catch (error) {
+        console.error(`Failed to spawn enemy type ${entry.type} in TacticalDatabase:`, error);
       }
     }
 

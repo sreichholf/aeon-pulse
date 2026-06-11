@@ -26,6 +26,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import playerGlbUrl from './models/player.glb';
 import { EnemyDiver } from './entities/EnemyDiver.ts';
 import { EnemyStraight } from './entities/EnemyStraight.ts';
+import { EnemySine } from './entities/EnemySine.ts';
+import { EnemySwarm } from './entities/EnemySwarm.ts';
 import {
   beginPerfFrame,
   endPerfFrame,
@@ -199,7 +201,25 @@ export class Game {
         console.error('Failed to preload straight GLB model:', error);
       });
 
-    await Promise.all([playerModelPromise, diverModelPromise, straightModelPromise]);
+    const sineModelPromise = EnemySine.preloadModel()
+      .then(() => undefined)
+      .catch((error) => {
+        console.error('Failed to preload sine GLB model:', error);
+      });
+
+    const swarmModelPromise = EnemySwarm.preloadModel()
+      .then(() => undefined)
+      .catch((error) => {
+        console.error('Failed to preload swarm GLB model:', error);
+      });
+
+    await Promise.all([
+      playerModelPromise,
+      diverModelPromise,
+      straightModelPromise,
+      sineModelPromise,
+      swarmModelPromise,
+    ]);
   }
 
 

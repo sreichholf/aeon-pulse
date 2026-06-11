@@ -73,7 +73,7 @@ export const ENEMY_CATALOG: readonly EnemyCatalogEntry[] = [
   },
   {
     type: EnemyType.SINE,
-    viewer: { page: 'stage-enemies', order: 20, scale: 0.85, centering: 'bounds' },
+    viewer: { page: 'stage-enemies', order: 20, scale: 1.22, centering: 'bounds' },
     viewerProjectileKeys: [ProjectileSourceKey.ENEMY_SINE],
     spawn: ({ scene, sprites, x, y, getPos, audio, projectileFactory }) => new EnemySine(scene, sprites, x, y, getPos, projectileFactory, audio),
   },

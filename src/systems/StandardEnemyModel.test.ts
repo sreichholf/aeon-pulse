@@ -12,6 +12,8 @@ import {
   DIVER_TARGET_VISUAL_HEIGHT,
 } from '../entities/EnemyDiverModel.ts';
 import { STRAIGHT_MODEL_BUCKET_CONFIG } from '../entities/EnemyStraightModel.ts';
+import { SINE_MODEL_BUCKET_CONFIG } from '../entities/EnemySineModel.ts';
+import { SWARM_MODEL_BUCKET_CONFIG } from '../entities/EnemySwarmModel.ts';
 
 describe('StandardEnemyModel', () => {
   it('prepares a diver-shaped static model into shared runtime buckets', () => {
@@ -68,6 +70,28 @@ describe('StandardEnemyModel', () => {
     expect(buckets.size).toBeLessThanOrEqual(3);
     expect(STRAIGHT_MODEL_BUCKET_CONFIG.materialRules.StraightAmberGlow?.bucket).toBe('body');
     expect(STRAIGHT_MODEL_BUCKET_CONFIG.materialRules.StraightSensorGlow?.bucket).toBe('body');
+  });
+
+  it('keeps the current sine GLB within the agreed render bucket vocabulary', () => {
+    const json = readGlbJson(new URL('../models/sine.glb', import.meta.url));
+    const materialNames = (json.materials ?? []).map((material) => material.name);
+    const missingRules = materialNames.filter((name) => !SINE_MODEL_BUCKET_CONFIG.materialRules[name]);
+    const buckets = new Set(materialNames.map((name) => SINE_MODEL_BUCKET_CONFIG.materialRules[name]?.bucket));
+
+    expect(missingRules).toEqual([]);
+    expect([...buckets].sort()).toEqual(['body', 'glass', 'glow']);
+    expect(buckets.size).toBeLessThanOrEqual(3);
+  });
+
+  it('keeps the current swarm GLB within the agreed render bucket vocabulary', () => {
+    const json = readGlbJson(new URL('../models/swarm.glb', import.meta.url));
+    const materialNames = (json.materials ?? []).map((material) => material.name);
+    const missingRules = materialNames.filter((name) => !SWARM_MODEL_BUCKET_CONFIG.materialRules[name]);
+    const buckets = new Set(materialNames.map((name) => SWARM_MODEL_BUCKET_CONFIG.materialRules[name]?.bucket));
+
+    expect(missingRules).toEqual([]);
+    expect([...buckets].sort()).toEqual(['body', 'glow']);
+    expect(buckets.size).toBeLessThanOrEqual(3);
   });
 
   it('restores straight shader detail hooks after GLB preparation', () => {

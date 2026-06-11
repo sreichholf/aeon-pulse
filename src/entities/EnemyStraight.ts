@@ -250,8 +250,14 @@ export class EnemyStraight extends Enemy {
     if (!bodyMesh || !(bodyMesh.material instanceof THREE.MeshStandardMaterial)) return;
     bodyMesh.onBeforeRender = () => {
       const uniform = (bodyMesh.material as THREE.MeshStandardMaterial)
-        .userData['straightVisorEmissiveUniform'] as { value: THREE.Color } | undefined;
-      uniform?.value.copy(this._visorEmissiveColor);
+        .userData['straightVisorEmissiveUniform'] as { value: THREE.Color | number } | undefined;
+      if (uniform) {
+        if (uniform.value && typeof (uniform.value as any).copy === 'function') {
+          (uniform.value as THREE.Color).copy(this._visorEmissiveColor);
+        } else {
+          uniform.value = new THREE.Color(this._visorEmissiveColor);
+        }
+      }
     };
   }
 

@@ -48,11 +48,11 @@ describe('GameplayRun', () => {
     // Clamped top should be: top (100) - hh (34) = 66
     expect(enemy1!.y).toBe(66);
 
-    // 2. Spawn EnemySine (hh = 20) at Y = -180 (outside bottom wall)
+    // 2. Spawn EnemySine (hh = 17) at Y = -180 (outside bottom wall)
     run.spawnEnemy(EnemyType.SINE, 550, -180);
     const enemy2 = run['_enemies'][1];
     expect(enemy2).toBeDefined();
-    // Clamped bottom should be: bottom (-100) + hh (20) = -80
-    expect(enemy2!.y).toBe(-80);
+    // Clamped bottom should be: bottom (-100) + hh (17) = -83
+    expect(enemy2!.y).toBe(-83);
   });
 });
