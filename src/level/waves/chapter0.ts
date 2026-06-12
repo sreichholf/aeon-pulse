@@ -11,16 +11,16 @@ export function buildChapter0Waves(levelId: string): WaveEntry[] {
 
   const events: StageEvent[] = [];
   
-  const startX = 500;
+  const startX = 1000;
   const cols = 32;
   const rows = 16;
-  const dx = 25;
-  const dy = 20;
+  const dx = 60;
+  const dy = 30;
 
   for (let col = 0; col < cols; col++) {
     for (let r = 0; r < rows; r++) {
       const x = startX + col * dx;
-      const y = -150 + r * dy;
+      const y = -225 + r * dy;
       
       events.push(spawnEnemyEvent(EnemyType.SWARM, x, y));
     }
