@@ -1,4 +1,5 @@
 import { MusicCue } from '../types.ts';
+import { ENABLE_ADVANCED_TITLE_OPTIONS } from '../constants.ts';
 
 export type ChapterKey = 'Megastructure' | 'Industrial' | 'Hive' | 'Volcanic';
 export type ClearType = 'level' | 'chapter';
@@ -31,7 +32,11 @@ export interface LevelLabel {
   chapterName: string;
 }
 
+const isTesting = typeof process !== 'undefined' && process.env.VITEST === 'true';
+const showDevHell = ENABLE_ADVANCED_TITLE_OPTIONS && !isTesting;
+
 const IMPLEMENTED_LEVEL_IDS = new Set<LevelId>([
+  ...(showDevHell ? ['0-1'] as const : []),
   '1-1',
   '1-2',
   '1-3',
@@ -55,11 +60,14 @@ const IMPLEMENTED_LEVEL_IDS = new Set<LevelId>([
 ]);
 
 export const CHAPTERS: readonly ChapterRecord[] = [
+  ...(showDevHell
+    ? [{ number: 0, key: 'Megastructure' as const, name: "Developer's Hell", archetype: 0 }]
+    : []),
   { number: 1, key: 'Megastructure', name: 'The Outer Array', archetype: 1 },
   { number: 2, key: 'Industrial', name: 'Iron Vein', archetype: 2 },
   { number: 3, key: 'Hive', name: 'Hive Womb', archetype: 3 },
   { number: 4, key: 'Volcanic', name: 'Cinder Core', archetype: 4 },
-] as const;
+];
 
 const SOFT_TIER_CAPS: Record<number, readonly number[]> = {
   1: [1, 1, 1, 1, 2],
@@ -102,6 +110,7 @@ function buildCampaignLevels(): CampaignLevelRecord[] {
   // Programmatic verification: assert that the campaign soft tier cap progression is strictly monotonic
   let prevCap = 0;
   for (const level of levels) {
+    if (level.chapterNumber === 0) continue; // Skip dev-only levels in progression check
     if (level.softTierCap < prevCap) {
       throw new Error(`Campaign progression regression: Level ${level.id} softTierCap (${level.softTierCap}) is lower than preceding level's cap (${prevCap}).`);
     }

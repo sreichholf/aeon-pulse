@@ -9,6 +9,7 @@ import { Boss } from '../entities/Boss.ts';
 import { Boss2 } from '../entities/Boss2.ts';
 import { Boss3 } from '../entities/Boss3.ts';
 import { Boss4 } from '../entities/Boss4.ts';
+import { buildChapter0Waves } from './waves/chapter0.ts';
 import { buildChapter1Waves } from './waves/chapter1.ts';
 import { buildChapter2Waves } from './waves/chapter2.ts';
 import { buildChapter3Waves } from './waves/chapter3.ts';
@@ -130,5 +131,15 @@ export const LEVELS: Record<number, LevelConfig> = {
     createBackground: (scene) => new Background4(scene),
     createTerrain: (scene, pts) => new Terrain4(scene, pts.map(pt => ({ ...pt, at: pt.at * 0.65 }))),
     createBoss: (params) => new Boss4(params),
+  },
+  0: {
+    scrollSpeed: 100,
+    bossAt: 8000,
+    terrainPoints: [],
+    playfieldBounds: CHAPTER_1_PLAYFIELD_BOUNDS,
+    buildWaves: (level) => buildChapter0Waves(level.id),
+    createBackground: (scene) => new Background(scene),
+    createTerrain: null,
+    createBoss: (params) => new Boss(params),
   },
 };
