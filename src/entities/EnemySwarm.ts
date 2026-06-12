@@ -87,6 +87,7 @@ export class EnemySwarm extends Enemy {
   private _build3DModel(): THREE.Group {
     const group = new THREE.Group();
     group.position.set(this._mesh!.position.x, this._mesh!.position.y, 0);
+    group.userData.isInstanced = true;
 
     const attachModel = (source: PreparedStandardEnemyModel): void => {
       if (!this._alive || this._mesh === null) return;
@@ -138,12 +139,18 @@ export class EnemySwarm extends Enemy {
     if (this._flashOverlay) {
       this._flashOverlay.visible = true;
     }
+    if (this._mesh) {
+      this._mesh.userData.isFlashing = true;
+    }
     this._hitFlashTimer = 0.08;
   }
 
   _restoreFlash(): void {
     if (this._flashOverlay) {
       this._flashOverlay.visible = false;
+    }
+    if (this._mesh) {
+      this._mesh.userData.isFlashing = false;
     }
   }
 

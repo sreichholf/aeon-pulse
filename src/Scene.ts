@@ -5,10 +5,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GAME_WIDTH, GAME_HEIGHT, isRuntimeFlagEnabled } from './constants.ts';
-import { RenderCategory, UserDataKey } from './types.ts';
+import { RenderCategory, UserDataKey, GameState } from './types.ts';
 
 
 import { ProjectileInstancer } from './systems/ProjectileInstancer.ts';
+import { EnemyInstancer } from './systems/EnemyInstancer.ts';
 import { isPerfProbeEnabled, measurePerfPhase, setPerfCount } from './systems/PerfProbe.ts';
 
 const ChromaShader = {
@@ -48,6 +49,8 @@ export class Scene {
   private _composer!: EffectComposer;
   private _projectileInstancer: ProjectileInstancer;
   private _activeBullets: Set<THREE.Object3D>;
+  private _enemyInstancer: EnemyInstancer;
+  private _activeInstancedEnemies: Set<THREE.Object3D>;
   private _bypassPostprocessing: boolean;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -112,6 +115,8 @@ export class Scene {
 
     this._projectileInstancer = new ProjectileInstancer(this.scene);
     this._activeBullets = new Set();
+    this._enemyInstancer = new EnemyInstancer(this.scene);
+    this._activeInstancedEnemies = new Set();
 
     window.addEventListener('resize', () => this._resize());
   }
@@ -131,6 +136,8 @@ export class Scene {
   add(object: THREE.Object3D): void {
     if (object.userData[UserDataKey.RENDER_CATEGORY] === RenderCategory.BULLET) {
       this._activeBullets.add(object);
+    } else if (object.userData.isInstanced === true && window.game?._state !== GameState.VIEWER) {
+      this._activeInstancedEnemies.add(object);
     } else {
       this.scene.add(object);
     }
@@ -139,6 +146,8 @@ export class Scene {
   remove(object: THREE.Object3D): void {
     if (object.userData[UserDataKey.RENDER_CATEGORY] === RenderCategory.BULLET) {
       this._activeBullets.delete(object);
+    } else if (object.userData.isInstanced === true) {
+      this._activeInstancedEnemies.delete(object);
     } else {
       this.scene.remove(object);
     }
@@ -179,6 +188,16 @@ export class Scene {
       this._projectileInstancer.endFrame();
     });
     setPerfCount('render.activeBullets', this._activeBullets.size);
+
+    // 1b. Process active instanced enemies through EnemyInstancer
+    measurePerfPhase('scene.instancedEnemies', () => {
+      this._enemyInstancer.beginFrame();
+      this._activeInstancedEnemies.forEach((enemy) => {
+        this._enemyInstancer.addEnemy(enemy);
+      });
+      this._enemyInstancer.endFrame();
+    });
+    setPerfCount('render.activeInstancedEnemies', this._activeInstancedEnemies.size);
 
     // 2. Main render logic
     measurePerfPhase('scene.flash', () => {
