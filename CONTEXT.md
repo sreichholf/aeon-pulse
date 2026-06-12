@@ -296,6 +296,14 @@ _Avoid_: Random hazard spawner, filler generator
 Shortening level scroll distances (e.g. from 11,200 to 8,000 units) to match compressed timelines.
 _Avoid_: Level shrinking, scroll capping
 
+**Popcorn Enemy**:
+A simple, rigid, high-density standard enemy (e.g. Swarms or Straights) that is spawned in large groups.
+_Avoid_: Complex animated enemies, bosses
+
+**Enemy Instancer**:
+The batching coordinator that merges the geometries of active Popcorn Enemies into instanced rendering pools during gameplay.
+_Avoid_: Projectile instancer, manual mesh cloning
+
 ## Example Dialogue
 
 Dev: "Should `3-2` use the organic corridor?"
