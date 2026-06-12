@@ -11,7 +11,7 @@ The game currently has a single difficulty: any hit causes an instant life loss 
 
 ### 1. Three named difficulty modes: Rookie / Pilot / Ace
 
-Modes are chosen on the title screen via a MODE selector in the existing selector row (alongside Stage and Weapon Tier). Three modes rather than two gives a clear gradient; thematic names avoid the "Easy = embarrassing" framing of plain-language labels.
+Modes are chosen on the title screen as a dedicated front-end control, independent from the development-only starting level and weapon-tier selectors. Three modes rather than two gives a clear gradient; thematic names avoid the "Easy = embarrassing" framing of plain-language labels.
 
 - **Rookie** — shield + no weapon-tier penalty ever. For players who want to focus on learning movement and patterns.
 - **Pilot** — single-pip shield + tier drop on unshielded hits. Safety net for one mistake; still punishes sustained sloppiness.

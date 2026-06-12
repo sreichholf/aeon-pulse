@@ -15,7 +15,7 @@ import { isPerfProbeEnabled, measurePerfPhase, setPerfCount } from './systems/Pe
 const ChromaShader = {
   uniforms: {
     tDiffuse: { value: null },
-    uOffset:  { value: 0.003 },
+    uOffset:  { value: 0.0016 },
   },
   vertexShader: `
     varying vec2 vUv;
@@ -67,7 +67,7 @@ export class Scene {
     this.scene = new THREE.Scene();
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.32;
+    this.scene.environmentIntensity = 0.28;
     pmrem.dispose();
 
     // Create a camera group for axonometric tilt and local shake support
@@ -79,11 +79,11 @@ export class Scene {
     this._bypassPostprocessing = isRuntimeFlagEnabled('noPost', false);
 
     // Saturated ambient light to keep secondary surfaces and shadows beautifully colored
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.44);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.40);
     this.scene.add(ambientLight);
 
     // Front-top-right directional light to uniformly light the broad side-profiles of all ships across the screen
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.68);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.72);
     dirLight.position.set(80, 120, 600);
     this.scene.add(dirLight);
 
@@ -107,7 +107,7 @@ export class Scene {
     this._composer = new EffectComposer(this.renderer);
     this._composer.addPass(new RenderPass(this.scene, this.camera));
 
-    const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.34, 0.32, 0.56);
+    const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.22, 0.20, 0.68);
     this._composer.addPass(bloom);
 
     const chroma = new ShaderPass(ChromaShader);

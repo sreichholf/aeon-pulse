@@ -43,7 +43,7 @@ Use manual browser playtesting to verify gameplay feel, visuals, progression, an
 
 **Starting a focused test run**:
 - On the title screen, press `Tab` to cycle difficulty mode.
-- When advanced title options are enabled, press `UP` / `DOWN` to choose a campaign level and `LEFT` / `RIGHT` to choose the starting weapon tier.
+- In development builds, press `UP` / `DOWN` to choose a campaign level and `LEFT` / `RIGHT` to choose the starting weapon tier.
 - Press `Enter` or `Space` to start.
 - Use `M` to mute/unmute music when audio is not the test target.
 - Use `V` from the title screen to open the tactical database when validating entity or boss presentation.
@@ -141,7 +141,7 @@ Key design decisions live in `docs/adr/`. Read the relevant ADR before modifying
 **Core coordinator (`src/Game.ts`):** `Game` is now mostly a state machine and runtime orchestrator, not the full gameplay container. It owns:
 
 - top-level state transitions (`TITLE`, `LEVEL_START`, `PLAYING`, `PAUSED`, `GAME_OVER`, `LEVEL_COMPLETE`, `GAME_COMPLETE`, `VIEWER`)
-- title-screen selections for starting level, starting weapon tier, and difficulty mode
+- title-screen difficulty selection, plus development-only title selectors for starting level and starting weapon tier
 - music cue selection
 - the active `GameplayRun`
 - the `TacticalDatabase`
@@ -284,11 +284,11 @@ UI lives in `src/ui/`.
 
 Important current title-screen behavior:
 
-- `UP` / `DOWN` cycles implemented campaign levels when advanced title options are enabled.
-- `LEFT` / `RIGHT` changes starting weapon tier when advanced title options are enabled.
+- In development builds, `UP` / `DOWN` cycles implemented campaign levels.
+- In development builds, `LEFT` / `RIGHT` changes starting weapon tier.
 - `Tab` cycles difficulty mode.
 - `M` toggles music.
-- `V` opens the tactical database when advanced title options are enabled.
+- `V` opens the tactical database.
 
 The title screen now displays chapter name plus structured level ID, and high scores are stored per difficulty mode.
 
@@ -311,7 +311,7 @@ Logical keyboard mapping is defined in `src/systems/InputManager.ts`:
 - `Space` — fire / charge / select
 - `Enter` — confirm / continue
 - `Escape` or `P` — pause / unpause, exit database
-- `V` — tactical database from title when enabled
+- `V` — tactical database from title
 - `Tab` — cycle difficulty mode on the title screen
 - `M` — toggle music
 
