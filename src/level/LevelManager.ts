@@ -88,7 +88,7 @@ export class LevelManager {
     if (chapter === 1) {
       pool = [
         { type: EnemyType.STRAIGHT, weight: 0.7 },
-        { type: EnemyType.SINE, weight: 0.3 }
+        { type: EnemyType.DIVER, weight: 0.3 }
       ];
     } else if (chapter === 2) {
       pool = [

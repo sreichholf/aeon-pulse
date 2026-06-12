@@ -36,13 +36,10 @@ export function straightRowBeat(count: number, yCenter: number, ySpread: number)
   };
 }
 
-export function mirrorSineBeat(yA: number, yB: number, dx = 80): BeatPattern {
+export function supportSineBeat(y: number, dx = 0): BeatPattern {
   return {
     name: BeatType.MIRROR_SINE,
-    events: [
-      spawnEnemyEvent(EnemyType.SINE, SPAWN_X, yA),
-      spawnEnemyEvent(EnemyType.SINE, SPAWN_X + dx, yB),
-    ],
+    events: [spawnEnemyEvent(EnemyType.SINE, SPAWN_X + dx, y)],
   };
 }
 
@@ -85,12 +82,11 @@ export function mixedStraightTurretBeat(count: number, yCenter: number, ySpread:
   };
 }
 
-export function mixedMirrorSineTurretBeat(yA: number, yB: number, sineDx: number, turretY: number, turretDx: number): BeatPattern {
+export function mixedSupportSineTurretBeat(sineY: number, sineDx: number, turretY: number, turretDx: number): BeatPattern {
   return {
     name: BeatType.MIXED_MIRROR_SINE_TURRET,
     events: [
-      spawnEnemyEvent(EnemyType.SINE, SPAWN_X, yA),
-      spawnEnemyEvent(EnemyType.SINE, SPAWN_X + sineDx, yB),
+      spawnEnemyEvent(EnemyType.SINE, SPAWN_X + sineDx, sineY),
       spawnEnemyEvent(EnemyType.TURRET, SPAWN_X + turretDx, turretY),
     ],
   };
@@ -113,6 +109,26 @@ export function mixedTurretChargerBeat(turretY: number, turretDx: number, charge
   };
 }
 
+export function mixedSupportSineChargerBeat(sineY: number, sineDx: number, chargerY: number, chargerDx: number): BeatPattern {
+  return {
+    name: BeatType.MULTI_CHARGER,
+    events: [
+      spawnEnemyEvent(EnemyType.SINE, SPAWN_X + sineDx, sineY),
+      spawnEnemyEvent(EnemyType.CHARGER, SPAWN_X + chargerDx, chargerY),
+    ],
+  };
+}
+
+export function mixedStraightSineBeat(count: number, yCenter: number, ySpread: number, sineY: number, sineDx: number): BeatPattern {
+  return {
+    name: BeatType.MIXED_MIRROR_SINE_TURRET,
+    events: [
+      ...row(EnemyType.STRAIGHT, count, yCenter, ySpread),
+      spawnEnemyEvent(EnemyType.SINE, SPAWN_X + sineDx, sineY),
+    ],
+  };
+}
+
 export function dualDiverSineRowBeat(diverCount: number, diverYStep: number, sineCount: number, sineY: number, sineSpread: number): BeatPattern {
   return {
     name: BeatType.DUAL_DIVER_SINE_ROW,
@@ -130,18 +146,17 @@ function chapter2_1(): Timeline<Chapter2Anchor> {
     .anchor(Chapter2Anchor.START, 0)
     .anchor(Chapter2Anchor.MID, 4800)
     .add(Chapter2Anchor.START, 320, straightRowBeat(5, 0, 250))
-    .add(Chapter2Anchor.START, 820, mirrorSineBeat(125, -125, 80))
+    .add(Chapter2Anchor.START, 900, supportSineBeat(110))
     .add(Chapter2Anchor.START, 1360, turretBeat(-150))
-    .add(Chapter2Anchor.START, 1980, straightRowBeat(4, 95, 150))
-    .add(Chapter2Anchor.START, 2580, mixedStraightTurretBeat(3, -75, 150, 145, 90))
-    .add(Chapter2Anchor.START, 3260, mirrorSineBeat(110, -110, 80))
-    .add(Chapter2Anchor.START, 3920, straightRowBeat(5, 0, 230))
-    .add(Chapter2Anchor.START, 4480, turretBeat(130, 40))
+    .add(Chapter2Anchor.START, 2040, straightRowBeat(4, 95, 150))
+    .add(Chapter2Anchor.START, 2680, mixedStraightTurretBeat(3, -75, 150, 145, 90))
+    .add(Chapter2Anchor.START, 3440, mixedStraightSineBeat(4, 0, 220, -125, 110))
+    .add(Chapter2Anchor.START, 4200, turretBeat(130, 40))
     .add(Chapter2Anchor.MID, 280, mixedStraightTurretBeat(4, 0, 210, -135, 90))
-    .add(Chapter2Anchor.MID, 980, mirrorSineBeat(105, -105, 90))
+    .add(Chapter2Anchor.MID, 1100, supportSineBeat(-105, 50))
     .add(Chapter2Anchor.MID, 1680, swarmClusterBeat('chokepoint-1'))
-    .add(Chapter2Anchor.MID, 2440, mixedMirrorSineTurretBeat(95, -95, 90, 135, 80))
-    .add(Chapter2Anchor.MID, 3220, straightRowBeat(5, 0, 240));
+    .add(Chapter2Anchor.MID, 2500, mixedSupportSineTurretBeat(95, 0, 135, 90))
+    .add(Chapter2Anchor.MID, 3300, straightRowBeat(5, 0, 240));
 }
 
 function chapter2_2(): Timeline<Chapter2Anchor> {
@@ -150,18 +165,17 @@ function chapter2_2(): Timeline<Chapter2Anchor> {
     .anchor(Chapter2Anchor.MID, 5000)
     .add(Chapter2Anchor.START, 300, straightRowBeat(5, 0, 260))
     .add(Chapter2Anchor.START, 780, turretBeat(-150))
-    .add(Chapter2Anchor.START, 1260, mirrorSineBeat(125, -125, 75))
-    .add(Chapter2Anchor.START, 1780, mixedStraightTurretBeat(4, 105, 170, -145, 90))
-    .add(Chapter2Anchor.START, 2360, straightRowBeat(5, -85, 170))
-    .add(Chapter2Anchor.START, 2920, turretBeat(145, 60))
-    .add(Chapter2Anchor.START, 3500, sparseSwarmBeat())
-    .add(Chapter2Anchor.START, 4200, mixedMirrorSineTurretBeat(110, -110, 80, -140, 80))
+    .add(Chapter2Anchor.START, 1400, mixedStraightSineBeat(4, 105, 170, -125, 110))
+    .add(Chapter2Anchor.START, 2100, mixedStraightTurretBeat(4, -95, 160, 145, 90))
+    .add(Chapter2Anchor.START, 2800, straightRowBeat(5, -85, 170))
+    .add(Chapter2Anchor.START, 3460, sparseSwarmBeat())
+    .add(Chapter2Anchor.START, 4160, mixedSupportSineTurretBeat(110, 0, -140, 90))
     .add(Chapter2Anchor.MID, 120, straightRowBeat(6, 0, 270))
-    .add(Chapter2Anchor.MID, 780, mixedStraightTurretBeat(4, -100, 150, 135, 100))
-    .add(Chapter2Anchor.MID, 1420, mirrorSineBeat(100, -100, 90))
-    .add(Chapter2Anchor.MID, 2040, swarmClusterBeat('chokepoint-2'))
-    .add(Chapter2Anchor.MID, 2760, mixedStraightTurretBeat(5, 0, 220, -130, 90))
-    .add(Chapter2Anchor.MID, 3520, dualDiverSineRowBeat(3, 82, 2, 0, 130));
+    .add(Chapter2Anchor.MID, 900, mixedStraightTurretBeat(4, -100, 150, 135, 100))
+    .add(Chapter2Anchor.MID, 1640, supportSineBeat(-95, 60))
+    .add(Chapter2Anchor.MID, 2240, swarmClusterBeat('chokepoint-2'))
+    .add(Chapter2Anchor.MID, 2960, mixedSupportSineTurretBeat(95, 0, -130, 90))
+    .add(Chapter2Anchor.MID, 3780, dualDiverSineRowBeat(3, 82, 1, 0, 0));
 }
 
 function chapter2_3(): Timeline<Chapter2Anchor> {
@@ -169,18 +183,17 @@ function chapter2_3(): Timeline<Chapter2Anchor> {
     .anchor(Chapter2Anchor.START, 0)
     .anchor(Chapter2Anchor.MID, 5000)
     .add(Chapter2Anchor.START, 320, straightRowBeat(5, 0, 250))
-    .add(Chapter2Anchor.START, 860, turretBeat(-145))
-    .add(Chapter2Anchor.START, 1440, mirrorSineBeat(120, -120, 85))
-    .add(Chapter2Anchor.START, 2100, chargerBeat(0))
-    .add(Chapter2Anchor.START, 2860, straightRowBeat(4, 95, 170))
-    .add(Chapter2Anchor.START, 3500, mixedStraightTurretBeat(4, -95, 170, 140, 100))
-    .add(Chapter2Anchor.START, 4240, chargerBeat(-45, 70))
-    .add(Chapter2Anchor.MID, 120, mirrorSineBeat(100, -100, 90))
-    .add(Chapter2Anchor.MID, 760, mixedTurretChargerBeat(-135, 70, 45, 150))
-    .add(Chapter2Anchor.MID, 1500, sparseSwarmBeat())
-    .add(Chapter2Anchor.MID, 2220, mixedMirrorSineTurretBeat(105, -105, 85, 135, 80))
-    .add(Chapter2Anchor.MID, 2940, chargerBeat(0, 90))
-    .add(Chapter2Anchor.MID, 3660, dualDiverSineRowBeat(3, 82, 3, 0, 170));
+    .add(Chapter2Anchor.START, 900, mixedSupportSineTurretBeat(120, 0, -145, 90))
+    .add(Chapter2Anchor.START, 1660, chargerBeat(0))
+    .add(Chapter2Anchor.START, 2440, straightRowBeat(4, 95, 170))
+    .add(Chapter2Anchor.START, 3160, mixedStraightTurretBeat(4, -95, 170, 140, 100))
+    .add(Chapter2Anchor.START, 3940, mixedSupportSineChargerBeat(-120, 0, 40, 120))
+    .add(Chapter2Anchor.MID, 120, supportSineBeat(95))
+    .add(Chapter2Anchor.MID, 820, mixedTurretChargerBeat(-135, 70, 45, 170))
+    .add(Chapter2Anchor.MID, 1660, sparseSwarmBeat())
+    .add(Chapter2Anchor.MID, 2420, mixedStraightSineBeat(5, 0, 230, -110, 110))
+    .add(Chapter2Anchor.MID, 3200, chargerBeat(0, 90))
+    .add(Chapter2Anchor.MID, 3980, dualDiverSineRowBeat(3, 82, 1, 0, 0));
 }
 
 function chapter2_4(): Timeline<Chapter2Anchor> {
@@ -189,24 +202,24 @@ function chapter2_4(): Timeline<Chapter2Anchor> {
     .anchor(Chapter2Anchor.MID, 6100)
     .add(Chapter2Anchor.START, 300, straightRowBeat(5, 0, 260))
     .add(Chapter2Anchor.START, 820, mixedStraightTurretBeat(4, -100, 170, 145, 90))
-    .add(Chapter2Anchor.START, 1540, mirrorSineBeat(120, -120, 80))
-    .add(Chapter2Anchor.START, 2240, chargerBeat(20))
-    .add(Chapter2Anchor.START, 3000, straightRowBeat(5, 95, 180))
-    .add(Chapter2Anchor.START, 3720, turretBeat(-140, 60))
-    .add(Chapter2Anchor.START, 4460, multiChargerBeat([
+    .add(Chapter2Anchor.START, 1560, mixedSupportSineChargerBeat(120, 0, -20, 110))
+    .add(Chapter2Anchor.START, 2360, straightRowBeat(5, 95, 180))
+    .add(Chapter2Anchor.START, 3120, mixedSupportSineTurretBeat(-115, 0, -140, 60))
+    .add(Chapter2Anchor.START, 3940, multiChargerBeat([
       { y: 45, dx: 0 },
       { y: -45, dx: 140 },
     ]))
-    .add(Chapter2Anchor.START, 5300, sparseSwarmBeat())
-    .add(Chapter2Anchor.MID, 220, mixedMirrorSineTurretBeat(105, -105, 90, 135, 100))
-    .add(Chapter2Anchor.MID, 1060, straightRowBeat(6, 0, 270))
-    .add(Chapter2Anchor.MID, 1900, mixedTurretChargerBeat(-130, 70, 55, 160))
-    .add(Chapter2Anchor.MID, 2740, mirrorSineBeat(95, -95, 95))
-    .add(Chapter2Anchor.MID, 3540, multiChargerBeat([
+    .add(Chapter2Anchor.START, 4820, sparseSwarmBeat())
+    .add(Chapter2Anchor.START, 5600, mixedStraightTurretBeat(5, 0, 220, 135, 110))
+    .add(Chapter2Anchor.MID, 220, mixedSupportSineTurretBeat(105, 0, -135, 110))
+    .add(Chapter2Anchor.MID, 1100, straightRowBeat(6, 0, 270))
+    .add(Chapter2Anchor.MID, 1980, mixedTurretChargerBeat(-130, 70, 55, 170))
+    .add(Chapter2Anchor.MID, 2860, supportSineBeat(-95, 40))
+    .add(Chapter2Anchor.MID, 3620, multiChargerBeat([
       { y: -55, dx: 0 },
       { y: 55, dx: 130 },
     ]))
-    .add(Chapter2Anchor.MID, 4340, dualDiverSineRowBeat(4, 70, 3, 0, 160));
+    .add(Chapter2Anchor.MID, 4480, dualDiverSineRowBeat(4, 70, 1, 0, 0));
 }
 
 function chapter2_5(): Timeline<Chapter2Anchor> {
@@ -215,28 +228,27 @@ function chapter2_5(): Timeline<Chapter2Anchor> {
     .anchor(Chapter2Anchor.MID, 6000)
     .add(Chapter2Anchor.START, 300, straightRowBeat(5, 0, 260))
     .add(Chapter2Anchor.START, 820, mixedStraightTurretBeat(4, -105, 170, 145, 90))
-    .add(Chapter2Anchor.START, 1440, mirrorSineBeat(120, -120, 85))
-    .add(Chapter2Anchor.START, 2100, chargerBeat(0))
-    .add(Chapter2Anchor.START, 2780, sparseSwarmBeat())
-    .add(Chapter2Anchor.START, 3440, mixedMirrorSineTurretBeat(110, -110, 90, -140, 80))
-    .add(Chapter2Anchor.START, 4180, multiChargerBeat([
+    .add(Chapter2Anchor.START, 1480, mixedSupportSineChargerBeat(115, 0, 0, 110))
+    .add(Chapter2Anchor.START, 2260, sparseSwarmBeat())
+    .add(Chapter2Anchor.START, 2980, mixedSupportSineTurretBeat(-110, 0, -140, 90))
+    .add(Chapter2Anchor.START, 3780, multiChargerBeat([
       { y: 45, dx: 0 },
       { y: -45, dx: 140 },
     ]))
-    .add(Chapter2Anchor.START, 5000, mixedStraightTurretBeat(5, 0, 230, 135, 100))
-    .add(Chapter2Anchor.START, 5600, swarmClusterBeat('chokepoint-1'))
+    .add(Chapter2Anchor.START, 4620, mixedStraightTurretBeat(5, 0, 230, 135, 100))
+    .add(Chapter2Anchor.START, 5360, swarmClusterBeat('chokepoint-1'))
     .add(Chapter2Anchor.MID, 180, straightRowBeat(6, 0, 270))
-    .add(Chapter2Anchor.MID, 900, mixedTurretChargerBeat(-135, 70, 50, 160))
-    .add(Chapter2Anchor.MID, 1660, mirrorSineBeat(105, -105, 90))
-    .add(Chapter2Anchor.MID, 2380, swarmClusterBeat('chokepoint-2'))
-    .add(Chapter2Anchor.MID, 3060, multiChargerBeat([
+    .add(Chapter2Anchor.MID, 920, mixedTurretChargerBeat(-135, 70, 50, 170))
+    .add(Chapter2Anchor.MID, 1760, mixedStraightSineBeat(5, -90, 180, 120, 120))
+    .add(Chapter2Anchor.MID, 2520, swarmClusterBeat('chokepoint-2'))
+    .add(Chapter2Anchor.MID, 3240, multiChargerBeat([
       { y: -60, dx: 0 },
       { y: 0, dx: 110 },
       { y: 60, dx: 220 },
     ]))
-    .add(Chapter2Anchor.MID, 3820, mixedMirrorSineTurretBeat(100, -100, 90, 130, 90))
-    .add(Chapter2Anchor.MID, 4560, dualDiverSineRowBeat(4, 70, 3, 0, 170))
-    .add(Chapter2Anchor.MID, 5120, mixedTurretChargerBeat(135, 80, -45, 170));
+    .add(Chapter2Anchor.MID, 4100, mixedSupportSineTurretBeat(-100, 0, 130, 100))
+    .add(Chapter2Anchor.MID, 4860, dualDiverSineRowBeat(4, 70, 1, 0, 0))
+    .add(Chapter2Anchor.MID, 5480, mixedTurretChargerBeat(135, 80, -45, 180));
 }
 
 const CHAPTER_2_BEATS = {

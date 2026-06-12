@@ -289,7 +289,7 @@ The 35% scale-down of wave timelines to increase wave density and action pacing.
 _Avoid_: Speed scaling, wave squeezing
 
 **Ambient Popcorn Spawner**:
-The background system that spawns random popcorn enemies to keep the screen active, using spatial avoidance to prevent overlapping with scheduled wave enemies at the spawn edge.
+The background system that spawns random minor enemies to keep the screen active, using spatial avoidance to prevent overlapping with scheduled wave enemies at the spawn edge. Ambient pools are chapter-specific and may include role-driven support threats such as Chapter 1 Divers rather than only rigid filler ships.
 _Avoid_: Random hazard spawner, filler generator
 
 **Level Duration Snapping**:
@@ -297,8 +297,12 @@ Shortening level scroll distances (e.g. from 11,200 to 8,000 units) to match com
 _Avoid_: Level shrinking, scroll capping
 
 **Popcorn Enemy**:
-A simple, rigid, high-density standard enemy (e.g. Swarms or Straights) that is spawned in large groups.
-_Avoid_: Complex animated enemies, bosses
+A low-commitment standard enemy used to maintain ambient activity or fill authored density beats. Popcorn Enemies are usually simple, but the category is broader than strictly rigid filler and can include support threats when chapter pacing needs them.
+_Avoid_: Bosses, setpiece threats, assuming only Swarms or Straights qualify
+
+**Sweeper Enemy**:
+A projectile-specialist support enemy whose main gameplay value comes from claiming temporary screen space with a distinctive shot pattern rather than from direct aimed fire or body pressure. The current `EnemySine` redesign is the reference Sweeper Enemy.
+_Avoid_: Baseline shooter, lane-disturber-only label, filler ship
 
 **Enemy Instancer**:
 The batching coordinator that merges the geometries of active Popcorn Enemies into instanced rendering pools during gameplay.

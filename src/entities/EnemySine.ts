@@ -18,8 +18,9 @@ import {
 const SPEED         = 110;
 const SINE_AMP      = 35;
 const SINE_FREQ     = 1.2;
-const FIRE_INTERVAL = 2.0;
-const PAUSE_DUR     = 0.25;
+const FIRST_SHOT_DELAY = 0.85;
+const REPEAT_SHOT_DELAY = 2.4;
+const SHOT_SPEED = 210;
 const HW = 36, HH = 17;
 
 export class EnemySine extends Enemy {
@@ -29,11 +30,7 @@ export class EnemySine extends Enemy {
   private _time: number;
   private _startY: number;
   private _fireTimer: number;
-  private _pausing: boolean;
-  private _pauseTimer: number;
-  private _kickback: number;
   protected _isViewer?: boolean;  // set externally by viewer code
-  private _visualsGroup: THREE.Group | null = null;
   private _flashOverlay: THREE.Mesh<THREE.BufferGeometry, THREE.Material> | null = null;
   private _modelWrapper: THREE.Group | null = null;
 
@@ -47,16 +44,13 @@ export class EnemySine extends Enemy {
     _audio: IAudio | null = null,
   ) {
     super(scene, sprites, null, 0, 0, HW, HH, x, y, projectileFactory);
-    this._hp           = 1;
+    this._hp           = 2;
     this.score         = 150;
     this._dropChance   = 0.06;
     this._getPlayerPos = getPlayerPos;
     this._time         = 0;
     this._startY       = y;
-    this._fireTimer    = FIRE_INTERVAL * (0.4 + Math.random() * 0.6);
-    this._pausing      = false;
-    this._pauseTimer   = 0;
-    this._kickback     = 0;
+    this._fireTimer    = FIRST_SHOT_DELAY + Math.random() * 0.25;
 
     this._displayName = 'Sine';
     this._mesh = this._build3DModel();
@@ -65,29 +59,22 @@ export class EnemySine extends Enemy {
 
   get isSpaceShip(): boolean { return true; }
 
-  _shootAtPlayer(): void {
-    super._shootAtPlayer(260, ProjectileSourceKey.ENEMY_SINE);
-    this._kickback = 10.0;
+  private _fireSweepShot(): void {
+    this._newBullets.push(
+      this._projectileFactory({
+        type: ProjectileSourceKey.ENEMY_SINE,
+        x: this.x - 12,
+        y: this.y,
+        vx: -SHOT_SPEED,
+        vy: 0,
+      })
+    );
   }
 
   _tick(dt: number): void {
     this._time += dt;
     const pos = this._mesh!.position;
-    if (this._pausing) {
-      this._pauseTimer -= dt;
-      if (this._pauseTimer <= 0) {
-        this._pausing   = false;
-        this._fireTimer = FIRE_INTERVAL;
-      }
-    } else {
-      this._fireTimer -= dt;
-      if (this._fireTimer <= 0 && pos.x < HALF_W - 60) {
-        this._shootAtPlayer();
-        this._pausing    = true;
-        this._pauseTimer = PAUSE_DUR;
-      }
-    }
-    const speedX = this._pausing ? SPEED * 0.15 : SPEED;
+    const speedX = SPEED;
     pos.x -= speedX * dt;
 
     // Smooth dynamic path banking (tilt based on vertical sine velocity)
@@ -103,10 +90,12 @@ export class EnemySine extends Enemy {
       pos.y = Math.max(-HALF_H + HH, Math.min(HALF_H - HH, pos.y));
     }
 
-    // Firing Recoil Kickback Interpolation
-    this._kickback = THREE.MathUtils.lerp(this._kickback, 0, dt * 10);
-    if (this._visualsGroup) {
-      this._visualsGroup.position.x = this._kickback;
+    if (!this._isViewer) {
+      this._fireTimer -= dt;
+      if (this._fireTimer <= 0 && pos.x < HALF_W - 24) {
+        this._fireSweepShot();
+        this._fireTimer = REPEAT_SHOT_DELAY;
+      }
     }
 
     // Ship Z banking rotation matching original logic (reduced to 15% of original tilt)
@@ -119,7 +108,6 @@ export class EnemySine extends Enemy {
 
     const visuals = new THREE.Group();
     group.add(visuals);
-    this._visualsGroup = visuals;
 
     const attachModel = (source: PreparedStandardEnemyModel): void => {
       if (!this._alive || this._mesh === null) return;
@@ -184,7 +172,6 @@ export class EnemySine extends Enemy {
     if (!this._mesh) return;
     this._scene.remove(this._mesh);
     this._mesh = null;
-    this._visualsGroup = null;
     this._modelWrapper = null;
     this._flashOverlay = null;
   }

@@ -18,7 +18,7 @@ import {
 
 const SPEED         = 150;
 const VERT_SPEED    = 210;
-const FIRE_INTERVAL = 1.4;
+const FIRE_INTERVAL = 1.9;
 const PAUSE_DUR     = 0.20;
 const DIVE_TILT_FACTOR = -0.3;
 const HW = 25, HH = 22;

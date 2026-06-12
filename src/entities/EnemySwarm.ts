@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
-import { ProjectileSourceKey, type GetPositionFn, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
+import { Enemy, HALF_H } from './Enemy.ts';
+import { type GetPositionFn, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import swarmGlbUrl from '../models/swarm.glb';
 import {
@@ -16,17 +16,12 @@ import {
 } from './EnemySwarmModel.ts';
 
 const SPEED         = 230;
-const FIRE_INTERVAL = 2.7;
-const PAUSE_DUR     = 0.20;
 const HW = 18, HH = 13;
 
 export class EnemySwarm extends Enemy {
   private static _model: PreparedStandardEnemyModel | null = null;
   private static _loadPromise: Promise<PreparedStandardEnemyModel> | null = null;
 
-  private _fireTimer: number;
-  private _pausing: boolean;
-  private _pauseTimer: number;
   private _modelWrapper: THREE.Group | null = null;
   private _flashOverlay: THREE.Mesh<THREE.BufferGeometry, THREE.Material> | null = null;
 
@@ -42,10 +37,7 @@ export class EnemySwarm extends Enemy {
     super(scene, sprites, null, 0, 0, HW, HH, x, y, projectileFactory);
     this._hp           = 1;
     this.score         = 50;
-    this._getPlayerPos = getPlayerPos;
-    this._fireTimer    = FIRE_INTERVAL * (0.4 + Math.random() * 0.6);
-    this._pausing      = false;
-    this._pauseTimer   = 0;
+    void getPlayerPos;
 
     this._displayName = 'Swarm';
     this._mesh = this._build3DModel();
@@ -54,28 +46,10 @@ export class EnemySwarm extends Enemy {
 
   get isSpaceShip(): boolean { return true; }
 
-  _shootAtPlayer(): void {
-    super._shootAtPlayer(290 + Math.random() * 60, ProjectileSourceKey.ENEMY_SWARM);
-  }
-
   _tick(dt: number): void {
 
     const pos = this._mesh!.position;
-    if (this._pausing) {
-      this._pauseTimer -= dt;
-      if (this._pauseTimer <= 0) {
-        this._pausing   = false;
-        this._fireTimer = FIRE_INTERVAL;
-      }
-    } else {
-      this._fireTimer -= dt;
-      if (this._fireTimer <= 0 && pos.x < HALF_W - 60) {
-        this._shootAtPlayer();
-        this._pausing    = true;
-        this._pauseTimer = PAUSE_DUR;
-      }
-    }
-    pos.x -= (this._pausing ? SPEED * 0.15 : SPEED) * dt;
+    pos.x -= SPEED * dt;
 
     if (this.terrainBounds) {
       pos.y = Math.max(this.terrainBounds.bottom + HH, Math.min(this.terrainBounds.top - HH, pos.y));
