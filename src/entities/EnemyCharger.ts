@@ -45,7 +45,7 @@ export class EnemyCharger extends Enemy {
   private _bottomTrail: THREE.Mesh | null = null;
   private _laserMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null;
   private _laserLight: THREE.PointLight | null = null;
-  private _neonMat: THREE.MeshPhongMaterial | null = null;
+  private _neonEmissiveUniform: { value: THREE.Color } | null = null;
   private _amberMat: THREE.MeshPhongMaterial | null = null;
   private _trailMat: THREE.MeshBasicMaterial | null = null;
 
@@ -102,6 +102,9 @@ export class EnemyCharger extends Enemy {
     group.add(this._shipGroup);
 
     // Modern material design (Overcharged Plasma theme)
+    const neonEmissiveUniform = { value: new THREE.Color(0x00a8b3) };
+    this._neonEmissiveUniform = neonEmissiveUniform;
+
     const structuralMat = this._trackResource(new THREE.MeshPhongMaterial({
       color: 0xffffff,       // Vertex-colored matte/metal structural surfaces
       emissive: 0x080b10,
@@ -109,13 +112,20 @@ export class EnemyCharger extends Enemy {
       specular: 0x7f8b96,
       vertexColors: true,
     }));
-
-    const neonMat = this._trackResource(new THREE.MeshPhongMaterial({
-      color: 0x00f3ff,       // Overcharged neon-turquoise energy
-      emissive: 0x00a8b3,
-      shininess: 100,
-      specular: 0xffffff,
-    }));
+    structuralMat.userData['uNeonEmissive'] = neonEmissiveUniform;
+    structuralMat.customProgramCacheKey = () => 'EnemyChargerEmissiveV1';
+    structuralMat.onBeforeCompile = (shader) => {
+      shader.uniforms['uNeonEmissive'] = neonEmissiveUniform;
+      shader.fragmentShader = 'uniform vec3 uNeonEmissive;\n' + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        'vec3 totalEmissiveRadiance = emissive;',
+        `vec3 totalEmissiveRadiance = emissive;
+        #ifdef USE_COLOR
+        float neonMask = step(0.5, vColor.g - vColor.r);
+        totalEmissiveRadiance = mix(emissive, uNeonEmissive, neonMask);
+        #endif`
+      );
+    };
 
     const amberMat = this._trackResource(new THREE.MeshPhongMaterial({
       color: 0xff7700,       // Super hot amber reactor
@@ -123,6 +133,7 @@ export class EnemyCharger extends Enemy {
       shininess: 100,
       specular: 0xffaa44,
     }));
+    this._amberMat = amberMat;
 
     const laserMat = this._trackResource(new THREE.MeshBasicMaterial({
       color: 0xff2200,       // Warning red/orange laser
@@ -139,11 +150,15 @@ export class EnemyCharger extends Enemy {
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     }));
+    this._trailMat = trailMat;
 
     // ── 1. FUSELAGE / BODY (Glaive-Class Interceptor) ──
-    // Chunky & premium main body nose pointing left (-X)
     const bodyGeo = new THREE.ConeGeometry(10.5, 34, 8);
     const ventGeo = new THREE.CylinderGeometry(5.5, 5.5, 2, 8);
+    const spineGeo = new THREE.BoxGeometry(22, 2.5, 4.5);
+    const noseGeo = new THREE.ConeGeometry(4.5, 10, 8);
+    const reactorGeo = new THREE.SphereGeometry(7, 16, 16);
+
     const fuselageGeos = [
       coloredGeometry(bodyGeo, 0x1c1e22, geo => {
         geo.rotateZ(Math.PI / 2);
@@ -153,6 +168,16 @@ export class EnemyCharger extends Enemy {
         geo.rotateZ(Math.PI / 2);
         geo.translate(8, 0, 0);
       }),
+      coloredGeometry(spineGeo, 0x00f3ff, geo => {
+        geo.translate(-1, 0, 0);
+      }),
+      coloredGeometry(noseGeo, 0x00f3ff, geo => {
+        geo.rotateZ(Math.PI / 2);
+        geo.translate(-22, 0, 0);
+      }),
+      coloredGeometry(reactorGeo, 0x00f3ff, geo => {
+        geo.translate(6, 0, 0);
+      }),
     ];
     const fuselageGeo = this._trackResource(mergeGeometries(fuselageGeos));
     const fuselageMesh = new THREE.Mesh(fuselageGeo, structuralMat);
@@ -161,44 +186,22 @@ export class EnemyCharger extends Enemy {
     fuselageGeos.forEach(g => g.dispose());
     bodyGeo.dispose();
     ventGeo.dispose();
-
-    // Glowing energy stripe down the middle spine + nose cap + reactor core
-    const spineGeo = new THREE.BoxGeometry(22, 2.5, 4.5);
-    const spineCloned = ensureNonIndexed(spineGeo);
-    spineCloned.translate(-1, 0, 0);
-
-    const noseGeo = new THREE.ConeGeometry(4.5, 10, 8);
-    const noseCloned = ensureNonIndexed(noseGeo);
-    noseCloned.rotateZ(Math.PI / 2);
-    noseCloned.translate(-22, 0, 0);
-
-    const reactorGeo = new THREE.SphereGeometry(7, 16, 16);
-    const reactorCloned = ensureNonIndexed(reactorGeo);
-    reactorCloned.translate(6, 0, 0);
-
-    const energyGeos = [spineCloned, noseCloned, reactorCloned];
-    const mergedEnergyGeo = this._trackResource(mergeGeometries(energyGeos));
-    const energyMesh = new THREE.Mesh(mergedEnergyGeo, neonMat);
-    this._shipGroup.add(energyMesh);
-
-    energyGeos.forEach(g => g.dispose());
     spineGeo.dispose();
     noseGeo.dispose();
     reactorGeo.dispose();
 
     // ── 2. VERTICAL SCISSOR WINGS (XY Gameplay Plane) ──
-    // We construct top and bottom wings attached to pivots rotating on the Z-axis
     this._topWingGroup = new THREE.Group();
-    this._topWingGroup.position.set(2, 6, 0); // Pivot location (Top)
+    this._topWingGroup.position.set(2, 6, 0);
     this._shipGroup.add(this._topWingGroup);
 
     this._bottomWingGroup = new THREE.Group();
-    this._bottomWingGroup.position.set(2, -6, 0); // Pivot location (Bottom)
+    this._bottomWingGroup.position.set(2, -6, 0);
     this._shipGroup.add(this._bottomWingGroup);
 
-    // Top wing blade (Angled swept wing geometry, bold height)
     const topWingGeo = new THREE.BoxGeometry(18, 6, 2.5);
     const topNozzleGeo = new THREE.CylinderGeometry(2.5, 3.2, 5, 8);
+    const topChannelGeo = new THREE.BoxGeometry(14, 1.5, 2.7);
     const topStructureGeos = [
       coloredGeometry(topWingGeo, 0x607080, geo => {
         geo.translate(-4, 3, 0);
@@ -206,6 +209,9 @@ export class EnemyCharger extends Enemy {
       coloredGeometry(topNozzleGeo, 0x1c1e22, geo => {
         geo.rotateZ(Math.PI / 2);
         geo.translate(3, 6, 0);
+      }),
+      coloredGeometry(topChannelGeo, 0x00f3ff, geo => {
+        geo.translate(-3, 6.1, 0);
       }),
     ];
     const topStructureGeo = this._trackResource(mergeGeometries(topStructureGeos));
@@ -215,16 +221,11 @@ export class EnemyCharger extends Enemy {
     topStructureGeos.forEach(g => g.dispose());
     topWingGeo.dispose();
     topNozzleGeo.dispose();
+    topChannelGeo.dispose();
 
-    // Top wing energy channel
-    const topChannelGeo = this._trackResource(new THREE.BoxGeometry(14, 1.5, 2.7));
-    topChannelGeo.translate(-3, 6.1, 0);
-    const topChannel = new THREE.Mesh(topChannelGeo, neonMat);
-    this._topWingGroup.add(topChannel);
-
-    // Bottom wing blade
     const bottomWingGeo = new THREE.BoxGeometry(18, 6, 2.5);
     const bottomNozzleGeo = new THREE.CylinderGeometry(3.2, 2.5, 5, 8);
+    const bottomChannelGeo = new THREE.BoxGeometry(14, 1.5, 2.7);
     const bottomStructureGeos = [
       coloredGeometry(bottomWingGeo, 0x607080, geo => {
         geo.translate(-4, -3, 0);
@@ -232,6 +233,9 @@ export class EnemyCharger extends Enemy {
       coloredGeometry(bottomNozzleGeo, 0x1c1e22, geo => {
         geo.rotateZ(Math.PI / 2);
         geo.translate(3, -6, 0);
+      }),
+      coloredGeometry(bottomChannelGeo, 0x00f3ff, geo => {
+        geo.translate(-3, -6.1, 0);
       }),
     ];
     const bottomStructureGeo = this._trackResource(mergeGeometries(bottomStructureGeos));
@@ -241,24 +245,20 @@ export class EnemyCharger extends Enemy {
     bottomStructureGeos.forEach(g => g.dispose());
     bottomWingGeo.dispose();
     bottomNozzleGeo.dispose();
-
-    // Bottom wing energy channel
-    const bottomChannelGeo = this._trackResource(new THREE.BoxGeometry(14, 1.5, 2.7));
-    bottomChannelGeo.translate(-3, -6.1, 0);
-    const bottomChannel = new THREE.Mesh(bottomChannelGeo, neonMat);
-    this._bottomWingGroup.add(bottomChannel);
+    bottomChannelGeo.dispose();
 
     // ── 3. TWIN-ENGINE PLUMES (Wingtip spikes) ──
     const plumeTGeo = this._trackResource(new THREE.ConeGeometry(1.8, 12, 8));
     plumeTGeo.rotateZ(-Math.PI / 2);
     plumeTGeo.translate(9, 0, 0);
+    addVertexColor(plumeTGeo, 0x00f3ff);
 
     const plumeAGeo = this._trackResource(new THREE.ConeGeometry(0.9, 16, 8));
     plumeAGeo.rotateZ(-Math.PI / 2);
     plumeAGeo.translate(11, 0, 0);
 
     // Top Plume Meshes
-    this._topPlumeT = new THREE.Mesh(plumeTGeo, neonMat);
+    this._topPlumeT = new THREE.Mesh(plumeTGeo, structuralMat);
     this._topPlumeT.position.set(2, 6, 0);
     this._topWingGroup.add(this._topPlumeT);
 
@@ -267,7 +267,7 @@ export class EnemyCharger extends Enemy {
     this._topWingGroup.add(this._topPlumeA);
 
     // Bottom Plume Meshes
-    this._bottomPlumeT = new THREE.Mesh(plumeTGeo, neonMat);
+    this._bottomPlumeT = new THREE.Mesh(plumeTGeo, structuralMat);
     this._bottomPlumeT.position.set(2, -6, 0);
     this._bottomWingGroup.add(this._bottomPlumeT);
 
@@ -278,20 +278,22 @@ export class EnemyCharger extends Enemy {
     // ── 4. FUSELAGE REACTIONARY THRUSTERS (Vertical steering bursts) ──
     const steerGeo = this._trackResource(new THREE.ConeGeometry(2.0, 12, 8));
     steerGeo.rotateZ(Math.PI / 2);
-    steerGeo.translate(0, 6, 0); // Shoots upwards
+    steerGeo.translate(0, 6, 0);
 
     this._topSteerPlume = new THREE.Mesh(steerGeo, amberMat);
     this._topSteerPlume.position.set(6, 6, 0);
     this._topSteerPlume.scale.set(0, 0, 0);
+    this._topSteerPlume.visible = false;
     this._shipGroup.add(this._topSteerPlume);
 
     const steerDownGeo = this._trackResource(new THREE.ConeGeometry(2.0, 12, 8));
     steerDownGeo.rotateZ(-Math.PI / 2);
-    steerDownGeo.translate(0, -6, 0); // Shoots downwards
+    steerDownGeo.translate(0, -6, 0);
 
     this._bottomSteerPlume = new THREE.Mesh(steerDownGeo, amberMat);
     this._bottomSteerPlume.position.set(6, -6, 0);
     this._bottomSteerPlume.scale.set(0, 0, 0);
+    this._bottomSteerPlume.visible = false;
     this._shipGroup.add(this._bottomSteerPlume);
 
     // ── 5. DUAL WINGTIP SPEED TRAILS (Supersonic ribbons) ──
@@ -301,20 +303,23 @@ export class EnemyCharger extends Enemy {
 
     this._topTrail = new THREE.Mesh(trailGeo, trailMat);
     this._topTrail.position.set(2, 6, 0);
+    this._topTrail.visible = false;
     this._topWingGroup.add(this._topTrail);
 
     this._bottomTrail = new THREE.Mesh(trailGeo, trailMat);
     this._bottomTrail.position.set(2, -6, 0);
+    this._bottomTrail.visible = false;
     this._bottomWingGroup.add(this._bottomTrail);
 
     // ── 6. WARNING TARGETING LASER SIGHT ──
     const laserGeo = this._trackResource(new THREE.CylinderGeometry(0.8, 0.8, 1, 6));
     laserGeo.rotateZ(Math.PI / 2);
-    laserGeo.translate(-0.5, 0, 0); // Stretches left from origin
+    laserGeo.translate(-0.5, 0, 0);
 
     this._laserMesh = new THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>(laserGeo, laserMat);
     this._laserMesh.position.set(-22, 0, 0);
     this._laserMesh.scale.x = 0;
+    this._laserMesh.visible = false;
     this._shipGroup.add(this._laserMesh);
 
     this._laserLight = new THREE.PointLight(0xff2200, 0, 200);
@@ -332,10 +337,6 @@ export class EnemyCharger extends Enemy {
         }
       }
     });
-
-    this._neonMat = neonMat;
-    this._amberMat = amberMat;
-    this._trailMat = trailMat;
 
     return group;
   }
@@ -355,11 +356,19 @@ export class EnemyCharger extends Enemy {
       this._bottomPlumeA!.scale.set(0, 0, 0);
       this._topSteerPlume!.scale.set(0, 0, 0);
       this._bottomSteerPlume!.scale.set(0, 0, 0);
-      this._trailMat!.opacity = 0;
+
+      this._topPlumeT!.visible = false;
+      this._topPlumeA!.visible = false;
+      this._bottomPlumeT!.visible = false;
+      this._bottomPlumeA!.visible = false;
+      this._topSteerPlume!.visible = false;
+      this._bottomSteerPlume!.visible = false;
+      this._topTrail!.visible = false;
+      this._bottomTrail!.visible = false;
       this._laserMesh!.visible = false;
 
-      if (this._neonMat && this._neonMat.emissive) {
-        this._neonMat.emissive.setHex(0x00a8b3);
+      if (this._neonEmissiveUniform) {
+        this._neonEmissiveUniform.value.setHex(0x00a8b3);
       }
       if (this._amberMat && this._amberMat.emissive) {
         this._amberMat.emissive.setHex(0x772200);
@@ -380,9 +389,17 @@ export class EnemyCharger extends Enemy {
       this._bottomPlumeT!.scale.set(pulse, 0.8, 0.8);
       this._bottomPlumeA!.scale.set(pulse, 0.7, 0.7);
 
+      this._topPlumeT!.visible = true;
+      this._topPlumeA!.visible = true;
+      this._bottomPlumeT!.visible = true;
+      this._bottomPlumeA!.visible = true;
+
       this._topSteerPlume!.scale.set(0, 0, 0);
       this._bottomSteerPlume!.scale.set(0, 0, 0);
-      this._trailMat!.opacity = 0;
+      this._topSteerPlume!.visible = false;
+      this._bottomSteerPlume!.visible = false;
+      this._topTrail!.visible = false;
+      this._bottomTrail!.visible = false;
       this._laserMesh!.visible = false;
 
       // Move left
@@ -406,8 +423,8 @@ export class EnemyCharger extends Enemy {
 
       // Energy channels and reactor pulse like a high-speed heartbeat
       const heartBeat = (1 + Math.sin(this._time * 40)) * 0.5;
-      if (this._neonMat && this._neonMat.emissive) {
-        this._neonMat.emissive.setHex(heartBeat > 0.5 ? 0x00f3ff : 0x004455);
+      if (this._neonEmissiveUniform) {
+        this._neonEmissiveUniform.value.setHex(heartBeat > 0.5 ? 0x00f3ff : 0x004455);
       }
       if (this._amberMat && this._amberMat.emissive) {
         this._amberMat.emissive.setHex(heartBeat > 0.5 ? 0xffaa00 : 0x441100);
@@ -419,6 +436,18 @@ export class EnemyCharger extends Enemy {
       this._topPlumeA!.scale.set(pulse, pulse, pulse);
       this._bottomPlumeT!.scale.set(pulse, pulse, pulse);
       this._bottomPlumeA!.scale.set(pulse, pulse, pulse);
+
+      this._topPlumeT!.visible = true;
+      this._topPlumeA!.visible = true;
+      this._bottomPlumeT!.visible = true;
+      this._bottomPlumeA!.visible = true;
+
+      this._topSteerPlume!.scale.set(0, 0, 0);
+      this._bottomSteerPlume!.scale.set(0, 0, 0);
+      this._topSteerPlume!.visible = false;
+      this._bottomSteerPlume!.visible = false;
+      this._topTrail!.visible = false;
+      this._bottomTrail!.visible = false;
 
       // Ship shudders/vibrates under high-frequency tension (vertical tremor)
       const shudder = Math.sin(this._time * 120) * 0.75;
@@ -456,8 +485,8 @@ export class EnemyCharger extends Enemy {
       if (this._lockTimer <= 0) {
         // Reset color, vibration, and advance to charge
         this._shipGroup!.position.set(0, 0, 0);
-        if (this._neonMat && this._neonMat.emissive) {
-          this._neonMat.emissive.setHex(0x00a8b3);
+        if (this._neonEmissiveUniform) {
+          this._neonEmissiveUniform.value.setHex(0x00a8b3);
         }
         if (this._amberMat && this._amberMat.emissive) {
           this._amberMat.emissive.setHex(0x772200);
@@ -481,8 +510,15 @@ export class EnemyCharger extends Enemy {
       this._bottomPlumeT!.scale.set(3.2 * flicker, 1.4, 1.4);
       this._bottomPlumeA!.scale.set(4.2 * flicker, 0.8, 0.8);
 
+      this._topPlumeT!.visible = true;
+      this._topPlumeA!.visible = true;
+      this._bottomPlumeT!.visible = true;
+      this._bottomPlumeA!.visible = true;
+
       // Energy tails glow bright and fade in length
       this._trailMat!.opacity = 0.20 + Math.sin(this._time * 50) * 0.05;
+      this._topTrail!.visible = true;
+      this._bottomTrail!.visible = true;
 
       pos.x -= CHARGE_SPEED * dt;
 
@@ -499,20 +535,28 @@ export class EnemyCharger extends Enemy {
         if (diff > 5) {
           // Steering UP -> fire bottom thruster downwards
           this._bottomSteerPlume!.scale.set(1.5 + Math.random() * 0.5, 2.2, 1.5 + Math.random() * 0.5);
+          this._bottomSteerPlume!.visible = true;
           this._topSteerPlume!.scale.set(0, 0, 0);
+          this._topSteerPlume!.visible = false;
         } else if (diff < -5) {
           // Steering DOWN -> fire top thruster upwards
           this._topSteerPlume!.scale.set(1.5 + Math.random() * 0.5, 2.2, 1.5 + Math.random() * 0.5);
+          this._topSteerPlume!.visible = true;
           this._bottomSteerPlume!.scale.set(0, 0, 0);
+          this._bottomSteerPlume!.visible = false;
         } else {
           this._topSteerPlume!.scale.set(0, 0, 0);
           this._bottomSteerPlume!.scale.set(0, 0, 0);
+          this._topSteerPlume!.visible = false;
+          this._bottomSteerPlume!.visible = false;
         }
       } else {
         // Homing lock disengaged / frozen close to player
         this._homingFrozen = true;
         this._topSteerPlume!.scale.set(0, 0, 0);
         this._bottomSteerPlume!.scale.set(0, 0, 0);
+        this._topSteerPlume!.visible = false;
+        this._bottomSteerPlume!.visible = false;
       }
     }
 
