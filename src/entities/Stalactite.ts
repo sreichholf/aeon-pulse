@@ -3,7 +3,7 @@ import { ProjectileSourceKey, type GetPositionFn, type IBullet, type ITerrain, t
 import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ensureNonIndexed } from '../utils/ProceduralToolkit.ts';
-
+import { DEFAULT_FLASH_MATERIAL } from '../systems/StandardEnemyModel.ts';
 
 const FALL_SPEED = 320;
 const SCROLL_SPD = 140;
@@ -21,6 +21,223 @@ interface ShardParticle {
 }
 
 export class Stalactite extends Enemy {
+  private static _cachedGeometries: {
+    rock: THREE.BufferGeometry;
+    armor: THREE.BufferGeometry;
+    spike: THREE.BufferGeometry;
+    joint: THREE.BufferGeometry;
+    tip: THREE.BufferGeometry;
+    shardBox: THREE.BufferGeometry;
+    shardCone: THREE.BufferGeometry;
+    shardSphere: THREE.BufferGeometry;
+    flash: THREE.BufferGeometry;
+  } | null = null;
+
+  private static _cachedMaterials: {
+    rock: THREE.MeshPhongMaterial;
+    armor: THREE.MeshPhongMaterial;
+    spike: THREE.MeshPhongMaterial;
+    jointTemplate: THREE.MeshPhongMaterial;
+    lavaTipTemplate: THREE.MeshPhongMaterial;
+    shardRockTemplate: THREE.MeshPhongMaterial;
+    shardLavaTemplate: THREE.MeshPhongMaterial;
+  } | null = null;
+
+  static initSharedResources(): void {
+    if (Stalactite._cachedGeometries) return;
+
+    // 1. Geometries
+    const geo1 = new THREE.CylinderGeometry(15, 12, 16, 5);
+    const geo1Cloned = ensureNonIndexed(geo1);
+    geo1Cloned.translate(0, 20, 0);
+
+    const geo2 = new THREE.CylinderGeometry(10, 7.5, 16, 5);
+    const geo2Cloned = ensureNonIndexed(geo2);
+    geo2Cloned.translate(0, 0, 0);
+
+    const geo3 = new THREE.ConeGeometry(6, 20, 5);
+    const geo3Cloned = ensureNonIndexed(geo3);
+    geo3Cloned.rotateZ(Math.PI);
+    geo3Cloned.translate(0, -20, 0);
+
+    const rockGeos = [geo1Cloned, geo2Cloned, geo3Cloned];
+    const mergedRockGeo = mergeGeometries(rockGeos);
+    if (!mergedRockGeo) throw new Error('Stalactite: failed to merge rock geometry');
+    mergedRockGeo.computeVertexNormals();
+    mergedRockGeo.computeBoundingBox();
+    mergedRockGeo.computeBoundingSphere();
+
+    rockGeos.forEach(g => g.dispose());
+    geo1.dispose();
+    geo2.dispose();
+    geo3.dispose();
+
+    // Armor
+    const armor1Geo = new THREE.CylinderGeometry(16.5, 13.5, 6, 5);
+    const armor1Cloned = ensureNonIndexed(armor1Geo);
+    armor1Cloned.translate(0, 22, 0);
+
+    const armor2Geo = new THREE.CylinderGeometry(11.5, 9, 5, 5);
+    const armor2Cloned = ensureNonIndexed(armor2Geo);
+    armor2Cloned.translate(0, 1.5, 0);
+
+    const armorGeos = [armor1Cloned, armor2Cloned];
+    const mergedArmorGeo = mergeGeometries(armorGeos);
+    if (!mergedArmorGeo) throw new Error('Stalactite: failed to merge armor geometry');
+    mergedArmorGeo.computeVertexNormals();
+    mergedArmorGeo.computeBoundingBox();
+    mergedArmorGeo.computeBoundingSphere();
+
+    armorGeos.forEach(g => g.dispose());
+    armor1Geo.dispose();
+    armor2Geo.dispose();
+
+    // Spikes
+    const spikeGeo = new THREE.ConeGeometry(2.5, 8, 4);
+
+    const spike1aCloned = ensureNonIndexed(spikeGeo);
+    spike1aCloned.rotateZ(Math.PI / 3);
+    spike1aCloned.translate(13, 20, 0);
+
+    const spike1bCloned = ensureNonIndexed(spikeGeo);
+    spike1bCloned.translate(-13, 20, 0);
+
+    const spike2Geo = new THREE.ConeGeometry(2, 6, 4);
+
+    const spike2aCloned = ensureNonIndexed(spike2Geo);
+    spike2aCloned.rotateZ(Math.PI / 4);
+    spike2aCloned.translate(8.5, -1, 0);
+
+    const spike2bCloned = ensureNonIndexed(spike2Geo);
+    spike2bCloned.translate(-8.5, -1, 0);
+
+    const spikeGeos = [spike1aCloned, spike1bCloned, spike2aCloned, spike2bCloned];
+    const mergedSpikeGeo = mergeGeometries(spikeGeos);
+    if (!mergedSpikeGeo) throw new Error('Stalactite: failed to merge spike geometry');
+    mergedSpikeGeo.computeVertexNormals();
+    mergedSpikeGeo.computeBoundingBox();
+    mergedSpikeGeo.computeBoundingSphere();
+
+    spikeGeos.forEach(g => g.dispose());
+    spikeGeo.dispose();
+    spike2Geo.dispose();
+
+    // Joints
+    const joint1Geo = new THREE.SphereGeometry(8, 8, 8);
+    const joint1Cloned = ensureNonIndexed(joint1Geo);
+    joint1Cloned.translate(0, 10, 0);
+
+    const joint2Geo = new THREE.SphereGeometry(5.5, 8, 8);
+    const joint2Cloned = ensureNonIndexed(joint2Geo);
+    joint2Cloned.translate(0, -10, 0);
+
+    const jointGeos = [joint1Cloned, joint2Cloned];
+    const mergedJointGeo = mergeGeometries(jointGeos);
+    if (!mergedJointGeo) throw new Error('Stalactite: failed to merge joint geometry');
+    mergedJointGeo.computeVertexNormals();
+    mergedJointGeo.computeBoundingBox();
+    mergedJointGeo.computeBoundingSphere();
+
+    jointGeos.forEach(g => g.dispose());
+    joint1Geo.dispose();
+    joint2Geo.dispose();
+
+    // Tip
+    const tipGeo = new THREE.SphereGeometry(3.5, 8, 8);
+
+    // Shard geometries
+    const shardBox = new THREE.BoxGeometry(4.5, 4.5, 4.5);
+    const shardCone = new THREE.ConeGeometry(2.5, 6, 4);
+    const shardSphere = new THREE.SphereGeometry(3, 4, 4);
+
+    // Single merged flash geometry (clone and combine components)
+    const tipCloned = ensureNonIndexed(tipGeo);
+    tipCloned.translate(0, -30, 0);
+    const flashGeos = [
+      mergedRockGeo.clone(),
+      mergedArmorGeo.clone(),
+      mergedSpikeGeo.clone(),
+      mergedJointGeo.clone(),
+      tipCloned,
+    ];
+    const mergedFlashGeo = mergeGeometries(flashGeos);
+    if (!mergedFlashGeo) throw new Error('Stalactite: failed to merge flash geometry');
+    flashGeos.forEach(g => g.dispose());
+
+    Stalactite._cachedGeometries = {
+      rock: mergedRockGeo,
+      armor: mergedArmorGeo,
+      spike: mergedSpikeGeo,
+      joint: mergedJointGeo,
+      tip: tipGeo,
+      shardBox,
+      shardCone,
+      shardSphere,
+      flash: mergedFlashGeo,
+    };
+
+    // 2. Materials
+    const rockMat = new THREE.MeshPhongMaterial({
+      color: 0x7a6a5f,
+      emissive: 0x381f12,
+      specular: 0x54473e,
+      shininess: 35,
+    });
+
+    const armorMat = new THREE.MeshPhongMaterial({
+      color: 0x948375,
+      emissive: 0x3c2311,
+      specular: 0x6a5d52,
+      shininess: 25,
+    });
+
+    const jointTemplate = new THREE.MeshPhongMaterial({
+      color: 0xff3300,
+      emissive: 0xff3300,
+      shininess: 10,
+    });
+
+    const spikeMat = new THREE.MeshPhongMaterial({
+      color: 0x7a6c5f,
+      emissive: 0x1c0f08,
+      specular: 0x3e342c,
+      shininess: 30,
+    });
+
+    const lavaTipTemplate = new THREE.MeshPhongMaterial({
+      color: 0xffaa00,
+      emissive: 0xff3300,
+      shininess: 50,
+    });
+
+    const shardRockTemplate = new THREE.MeshPhongMaterial({
+      color: 0x44372e,
+      emissive: 0x1e1007,
+      specular: 0x382c24,
+      shininess: 35,
+      transparent: true,
+      opacity: 1
+    });
+
+    const shardLavaTemplate = new THREE.MeshPhongMaterial({
+      color: 0xff3300,
+      emissive: 0xff3300,
+      shininess: 20,
+      transparent: true,
+      opacity: 1
+    });
+
+    Stalactite._cachedMaterials = {
+      rock: rockMat,
+      armor: armorMat,
+      spike: spikeMat,
+      jointTemplate,
+      lavaTipTemplate,
+      shardRockTemplate,
+      shardLavaTemplate,
+    };
+  }
+
   private _getScrollX: (() => number) | null;
   private _terrain: ITerrain | null;
   private _audio: IAudio | null;
@@ -36,9 +253,9 @@ export class Stalactite extends Enemy {
   private _segments: THREE.Group[];
   private _joints: THREE.Mesh[];
   private _tipMesh: THREE.Mesh | null;
-  private _light: THREE.PointLight | null;
   private _shardMaterials: THREE.MeshPhongMaterial[] | null;
   private _shardGeometries: THREE.BufferGeometry[] | null;
+  private _flashOverlay: THREE.Mesh | null = null;
 
   constructor(
     scene: IScene,
@@ -67,35 +284,26 @@ export class Stalactite extends Enemy {
     this._time           = 0;
     this._shards         = [];
 
+    // Make sure static resources are initialized
+    Stalactite.initSharedResources();
+    const geos = Stalactite._cachedGeometries!;
+    const mats = Stalactite._cachedMaterials!;
+
     // Pre-allocate physical shrapnel shards geometries and materials
-    const shardRockMat = new THREE.MeshPhongMaterial({
-      color: 0x44372e,
-      emissive: 0x1e1007,
-      specular: 0x382c24,
-      shininess: 35,
-      transparent: true,
-      opacity: 1
-    });
-
-    const shardLavaMat = new THREE.MeshPhongMaterial({
-      color: 0xff3300,
-      emissive: 0xff3300,
-      shininess: 20,
-      transparent: true,
-      opacity: 1
-    });
-
-    this._shardMaterials = [shardRockMat, shardLavaMat];
+    this._shardMaterials = [
+      mats.shardRockTemplate.clone(),
+      mats.shardLavaTemplate.clone()
+    ];
 
     this._shardGeometries = [
-      new THREE.BoxGeometry(4.5, 4.5, 4.5),
-      new THREE.ConeGeometry(2.5, 6, 4),
-      new THREE.SphereGeometry(3, 4, 4)
+      geos.shardBox,
+      geos.shardCone,
+      geos.shardSphere
     ];
 
     // Initialize joint/tip material refs
-    this._jointMat    = null;
-    this._lavaTipMat  = null;
+    this._jointMat    = mats.jointTemplate.clone();
+    this._lavaTipMat  = mats.lavaTipTemplate.clone();
     this._segments    = [];
     this._joints      = [];
     this._tipMesh     = null;
@@ -122,155 +330,36 @@ export class Stalactite extends Enemy {
     const group = new THREE.Group();
     group.position.set(this.x, this.y, 0);
 
-    // Warm basalt dark brown-grey matching RockDrake (brightened for visibility)
-    const rockMat = new THREE.MeshPhongMaterial({
-      color: 0x7a6a5f,
-      emissive: 0x381f12,
-      specular: 0x54473e,
-      shininess: 35,
-    });
+    const geos = Stalactite._cachedGeometries!;
+    const mats = Stalactite._cachedMaterials!;
 
-    // Lighter volcanic crust/slate (brightened for visibility)
-    const armorMat = new THREE.MeshPhongMaterial({
-      color: 0x948375,
-      emissive: 0x3c2311,
-      specular: 0x6a5d52,
-      shininess: 25,
-    });
-
-    // Molten joint material that we will clone/animate for breathing & shaking
-    this._jointMat = new THREE.MeshPhongMaterial({
-      color: 0xff3300,
-      emissive: 0xff3300,
-      shininess: 10,
-    });
-
-    const spikeMat = new THREE.MeshPhongMaterial({
-      color: 0x7a6c5f,
-      emissive: 0x1c0f08,
-      specular: 0x3e342c,
-      shininess: 30,
-    });
-
-    this._lavaTipMat = new THREE.MeshPhongMaterial({
-      color: 0xffaa00,
-      emissive: 0xff3300,
-      shininess: 50,
-    });
-
-    this._segments = [];
-    this._joints = [];
-
-    // 1. Rock Segment (Top, Middle, Bottom merged)
-    const geo1 = new THREE.CylinderGeometry(15, 12, 16, 5);
-    const geo1Cloned = ensureNonIndexed(geo1);
-    geo1Cloned.translate(0, 20, 0);
-
-    const geo2 = new THREE.CylinderGeometry(10, 7.5, 16, 5);
-    const geo2Cloned = ensureNonIndexed(geo2);
-    geo2Cloned.translate(0, 0, 0);
-
-    const geo3 = new THREE.ConeGeometry(6, 20, 5);
-    const geo3Cloned = ensureNonIndexed(geo3);
-    geo3Cloned.rotateZ(Math.PI);
-    geo3Cloned.translate(0, -20, 0);
-
-    const rockGeos = [geo1Cloned, geo2Cloned, geo3Cloned];
-    const mergedRockGeo = mergeGeometries(rockGeos);
-    const stalactiteRockMesh = new THREE.Mesh(mergedRockGeo, rockMat);
+    // 1. Rock Segment (merged cylinder/cone)
+    const stalactiteRockMesh = new THREE.Mesh(geos.rock, mats.rock);
     group.add(stalactiteRockMesh);
 
-    rockGeos.forEach(g => g.dispose());
-    geo1.dispose();
-    geo2.dispose();
-    geo3.dispose();
-
     // 2. Armor Crust Plates merged
-    const armor1Geo = new THREE.CylinderGeometry(16.5, 13.5, 6, 5);
-    const armor1Cloned = ensureNonIndexed(armor1Geo);
-    armor1Cloned.translate(0, 22, 0);
-
-    const armor2Geo = new THREE.CylinderGeometry(11.5, 9, 5, 5);
-    const armor2Cloned = ensureNonIndexed(armor2Geo);
-    armor2Cloned.translate(0, 1.5, 0);
-
-    const armorGeos = [armor1Cloned, armor2Cloned];
-    const mergedArmorGeo = mergeGeometries(armorGeos);
-    const stalactiteCrustMesh = new THREE.Mesh(mergedArmorGeo, armorMat);
+    const stalactiteCrustMesh = new THREE.Mesh(geos.armor, mats.armor);
     group.add(stalactiteCrustMesh);
 
-    armorGeos.forEach(g => g.dispose());
-    armor1Geo.dispose();
-    armor2Geo.dispose();
-
     // 3. Spikes merged
-    const spikeGeo = new THREE.ConeGeometry(2.5, 8, 4);
-
-    const spike1aCloned = ensureNonIndexed(spikeGeo);
-    spike1aCloned.rotateZ(Math.PI / 3);
-    spike1aCloned.translate(13, 20, 0);
-
-    const spike1bCloned = ensureNonIndexed(spikeGeo);
-    spike1bCloned.translate(-13, 20, 0);
-
-    const spike2Geo = new THREE.ConeGeometry(2, 6, 4);
-
-    const spike2aCloned = ensureNonIndexed(spike2Geo);
-    spike2aCloned.rotateZ(Math.PI / 4);
-    spike2aCloned.translate(8.5, -1, 0);
-
-    const spike2bCloned = ensureNonIndexed(spike2Geo);
-    spike2bCloned.translate(-8.5, -1, 0);
-
-    const spikeGeos = [spike1aCloned, spike1bCloned, spike2aCloned, spike2bCloned];
-    const mergedSpikeGeo = mergeGeometries(spikeGeos);
-    const stalactiteSpikeMesh = new THREE.Mesh(mergedSpikeGeo, spikeMat);
+    const stalactiteSpikeMesh = new THREE.Mesh(geos.spike, mats.spike);
     group.add(stalactiteSpikeMesh);
 
-    spikeGeos.forEach(g => g.dispose());
-    spikeGeo.dispose();
-    spike2Geo.dispose();
-
     // 4. Molten joints merged
-    const joint1Geo = new THREE.SphereGeometry(8, 8, 8);
-    const joint1Cloned = ensureNonIndexed(joint1Geo);
-    joint1Cloned.translate(0, 10, 0);
-
-    const joint2Geo = new THREE.SphereGeometry(5.5, 8, 8);
-    const joint2Cloned = ensureNonIndexed(joint2Geo);
-    joint2Cloned.translate(0, -10, 0);
-
-    const jointGeos = [joint1Cloned, joint2Cloned];
-    const mergedJointGeo = mergeGeometries(jointGeos);
-    const stalactiteJointMesh = new THREE.Mesh(mergedJointGeo, this._jointMat);
+    const stalactiteJointMesh = new THREE.Mesh(geos.joint, this._jointMat!);
     group.add(stalactiteJointMesh);
 
-    jointGeos.forEach(g => g.dispose());
-    joint1Geo.dispose();
-    joint2Geo.dispose();
-
     // 5. Searing molten glowing tip (separate because it scales dynamically)
-    const tipGeo = new THREE.SphereGeometry(3.5, 8, 8);
-    const tip = new THREE.Mesh(tipGeo, this._lavaTipMat);
+    const tip = new THREE.Mesh(geos.tip, this._lavaTipMat!);
     tip.position.set(0, -30, 0);
     group.add(tip);
     this._tipMesh = tip;
 
-    // Add point light at the magma tip
-    const light = new THREE.PointLight(0xff6600, 2.2, 45);
-    light.position.set(0, -30, 0);
-    group.add(light);
-    this._light = light;
-
-    // Cache original colors for flashing
-    group.traverse((child: THREE.Object3D) => {
-      if (child instanceof THREE.Mesh && child.material) {
-        const mat = child.material as THREE.MeshPhongMaterial;
-        if (mat.color) {
-          child.userData['origColor'] = mat.color.getHex();
-        }
-      }
-    });
+    // 6. Flash overlay
+    this._flashOverlay = new THREE.Mesh(geos.flash, DEFAULT_FLASH_MATERIAL);
+    this._flashOverlay.visible = false;
+    this._flashOverlay.renderOrder = 20;
+    group.add(this._flashOverlay);
 
     return group;
   }
@@ -503,11 +592,25 @@ export class Stalactite extends Enemy {
     }
   }
 
-  override destroy(): void {
-    // 1. Base class destroy (handles main mesh group, geometries, materials)
-    super.destroy();
+  override _flash(): void {
+    if (this._flashOverlay) {
+      this._flashOverlay.visible = true;
+    }
+    this._hitFlashTimer = 0.08;
+  }
 
-    // 2. Clean up physical shard meshes from scene
+  override _restoreFlash(): void {
+    if (this._flashOverlay) {
+      this._flashOverlay.visible = false;
+    }
+  }
+
+  override destroy(): void {
+    if (this._mesh) {
+      this._scene.remove(this._mesh);
+      this._mesh = null;
+    }
+
     if (this._shards && this._scene) {
       for (const shard of this._shards) {
         this._scene.remove(shard.mesh);
@@ -515,14 +618,21 @@ export class Stalactite extends Enemy {
       this._shards = [];
     }
 
-    // 3. Dispose of shard-specific geometries and materials
-    if (this._shardGeometries) {
-      for (const geo of this._shardGeometries) geo.dispose();
-      this._shardGeometries = null;
+    if (this._jointMat) {
+      this._jointMat.dispose();
+      this._jointMat = null;
+    }
+    if (this._lavaTipMat) {
+      this._lavaTipMat.dispose();
+      this._lavaTipMat = null;
     }
     if (this._shardMaterials) {
       for (const mat of this._shardMaterials) mat.dispose();
       this._shardMaterials = null;
     }
+
+    this._shardGeometries = null;
+    this._tipMesh = null;
+    this._flashOverlay = null;
   }
 }

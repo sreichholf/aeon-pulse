@@ -252,6 +252,14 @@ _Avoid_: Mutating model materials, baking damage feedback into model identity
 A runtime grouping of Standard Enemy Model surfaces that share rendering rules, such as opaque body, transparent glass, or emissive glow. Model Render Buckets may collapse multiple authored GLB materials when that preserves enemy readability while reducing draw impact.
 _Avoid_: Authored material name, one material per color, gameplay part
 
+**Procedural Enemy Resource Cache**:
+The static caching of geometries and material templates for procedurally built standard enemies (such as Stalactites, Enemy Turrets, and Rock Drakes) at boot time, preventing redundant geometry processing and material allocations on spawn.
+_Avoid_: Lazy procedural geometry generation, runtime material instantiation
+
+**Procedural Flash Overlay**:
+A localized transparent overlay mesh attached to procedurally animated standard enemies, which displays hit feedback by toggling visibility rather than mutating shared materials.
+_Avoid_: Mutating shared materials on hit, static full-body flash overlays on segmented moving parts
+
 **Module Test Harness**:
 The Vitest-based automated test layer for deterministic module seams. It protects pure or near-pure code such as collision contact detection, combat resolution, campaign helpers, and wave timeline compilation.
 _Avoid_: Browser playtest replacement, render profiler

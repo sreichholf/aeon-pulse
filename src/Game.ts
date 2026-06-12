@@ -28,6 +28,9 @@ import { EnemyDiver } from './entities/EnemyDiver.ts';
 import { EnemyStraight } from './entities/EnemyStraight.ts';
 import { EnemySine } from './entities/EnemySine.ts';
 import { EnemySwarm } from './entities/EnemySwarm.ts';
+import { Stalactite } from './entities/Stalactite.ts';
+import { EnemyTurret } from './entities/EnemyTurret.ts';
+import { RockDrake } from './entities/RockDrake.ts';
 import {
   beginPerfFrame,
   endPerfFrame,
@@ -179,6 +182,7 @@ export class Game {
     const warmup = await withStandardEnemyRenderWarmup(
       this.scene,
       this.sprites,
+      this.playerModel,
       () => this.scene.warmupRenderPaths(),
     );
 
@@ -234,6 +238,15 @@ export class Game {
       .catch((error) => {
         console.error('Failed to preload swarm GLB model:', error);
       });
+
+    // Initialize static caches for optimized procedural enemies
+    try {
+      Stalactite.initSharedResources();
+      EnemyTurret.initSharedResources();
+      RockDrake.initSharedResources();
+    } catch (error) {
+      console.error('Failed to initialize procedural shared resources:', error);
+    }
 
     await Promise.all([
       playerModelPromise,

@@ -836,10 +836,6 @@ export class Boss4 extends BossBase {
     this._coreMesh.position.set(-10, 0, 8);
     group.add(this._coreMesh);
 
-    const coreLight = new THREE.PointLight(0xff3300, 3.0, 60);
-    coreLight.position.set(-10, 0, 15);
-    group.add(coreLight);
-
     this._plateLMesh = new THREE.Group();
     this._plateLMesh.position.set(-10, 34, 0);
 

@@ -44,7 +44,6 @@ export class EnemyCharger extends Enemy {
   private _topTrail: THREE.Mesh | null = null;
   private _bottomTrail: THREE.Mesh | null = null;
   private _laserMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null;
-  private _laserLight: THREE.PointLight | null = null;
   private _neonEmissiveUniform: { value: THREE.Color } | null = null;
   private _amberMat: THREE.MeshPhongMaterial | null = null;
   private _trailMat: THREE.MeshBasicMaterial | null = null;
@@ -322,9 +321,6 @@ export class EnemyCharger extends Enemy {
     this._laserMesh.visible = false;
     this._shipGroup.add(this._laserMesh);
 
-    this._laserLight = new THREE.PointLight(0xff2200, 0, 200);
-    this._laserMesh.add(this._laserLight);
-
     group.traverse(child => {
       if (child instanceof THREE.Mesh) {
         const mat = child.material;
@@ -470,10 +466,6 @@ export class EnemyCharger extends Enemy {
       this._laserMesh!.scale.y = pulseWidth;
       this._laserMesh!.scale.z = pulseWidth;
       this._laserMesh!.material.opacity = 0.5 + progress * 0.5;
-
-      if (this._laserLight) {
-        this._laserLight.intensity = progress * 2.0;
-      }
 
       // Overclock flash at the last instant
       if (this._lockTimer <= 0.08) {

@@ -49,7 +49,7 @@ const DEFAULT_GLOW_MATERIAL = new THREE.MeshBasicMaterial({
   toneMapped: false,
 });
 
-const DEFAULT_FLASH_MATERIAL = new THREE.MeshBasicMaterial({
+export const DEFAULT_FLASH_MATERIAL = new THREE.MeshBasicMaterial({
   color: 0xfff0e8,
   transparent: true,
   opacity: 0.72,

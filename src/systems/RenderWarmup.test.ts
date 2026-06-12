@@ -38,6 +38,7 @@ describe('withStandardEnemyRenderWarmup', () => {
         flash: vi.fn(),
       },
       {},
+      null,
       warmupCallback,
     );
 
