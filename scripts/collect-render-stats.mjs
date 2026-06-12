@@ -1,4 +1,24 @@
-const BASE_URL = process.env.BASE_URL ?? 'http://localhost:5173/?renderStats=1&invincible=1';
+const PROFILE_MODE = process.env.PROFILE_MODE ?? 'baseline';
+if (!['baseline', 'long-frames'].includes(PROFILE_MODE)) {
+  throw new Error(`Unsupported PROFILE_MODE: ${PROFILE_MODE}`);
+}
+
+function withRuntimeFlags(url, flags) {
+  const parsed = new URL(url);
+  for (const [key, value] of Object.entries(flags)) {
+    parsed.searchParams.set(key, value);
+  }
+  return parsed.toString();
+}
+
+const BASE_URL = PROFILE_MODE === 'long-frames'
+  ? withRuntimeFlags(process.env.BASE_URL ?? 'http://localhost:5173/?renderStats=1&invincible=1', {
+      renderStats: '1',
+      invincible: '1',
+      perfProbe: '1',
+      ...(process.env.BYPASS_POSTPROCESSING === '1' ? { noPost: '1' } : {}),
+    })
+  : (process.env.BASE_URL ?? 'http://localhost:5173/?renderStats=1&invincible=1');
 const CDP_BASE = process.env.CDP_BASE ?? 'http://127.0.0.1:9222';
 const DURATION_SCALE = Number.parseFloat(process.env.DURATION_SCALE ?? '1');
 const SELECTED_SCENARIOS = new Set(
@@ -211,6 +231,16 @@ async function readStats(cdp) {
   return parseStats(await readFpsText(cdp));
 }
 
+async function readPerfProbe(cdp) {
+  const raw = await evaluate(cdp, `document.getElementById('aeon-perf-probe')?.textContent ?? ''`);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { parseError: true, raw };
+  }
+}
+
 async function startScenario(cdp, { levelAdvance = 0, tierAdvance = 0 }) {
   await cdp.send('Page.navigate', { url: BASE_URL });
   await waitUntil(cdp, 'document.readyState === "complete" && !!window.game', 15000, 'game boot');
@@ -232,6 +262,7 @@ async function startScenario(cdp, { levelAdvance = 0, tierAdvance = 0 }) {
 async function runScenario(config) {
   const { cdp, targetId } = await newPage();
   const samples = [];
+  let perfProbe = null;
   try {
     await startScenario(cdp, config);
     const start = Date.now();
@@ -250,6 +281,9 @@ async function runScenario(config) {
       }
       await sleep(50);
     }
+    if (PROFILE_MODE === 'long-frames') {
+      perfProbe = await readPerfProbe(cdp);
+    }
   } finally {
     cdp.close();
     await fetch(`${CDP_BASE}/json/close/${targetId}`).catch(() => {});
@@ -257,10 +291,10 @@ async function runScenario(config) {
   if (samples.length === 0) {
     throw new Error(`No render stats samples captured for ${config.name}`);
   }
-  return { name: config.name, samples };
+  return { name: config.name, samples, perfProbe };
 }
 
-function summarize({ name, samples }) {
+function summarize({ name, samples, perfProbe }) {
   const calls = samples.map((sample) => sample.calls);
   const fps = samples.map((sample) => sample.fps);
   const triangles = samples.map((sample) => sample.triangles).filter((value) => typeof value === 'number');
@@ -300,6 +334,7 @@ function summarize({ name, samples }) {
     maxDetails: sortRecordDesc(maxDetails),
     maxSources: sortRecordDesc(maxSources),
     maxSourceRenderUnits: sortRecordDesc(maxSourceRenderUnits),
+    perfProbe: PROFILE_MODE === 'long-frames' ? perfProbe : undefined,
     lastRaw: samples.at(-1)?.raw ?? '',
   };
 }
@@ -348,6 +383,6 @@ for (const scenario of scenarios) {
   const result = await runScenario(scenario);
   const summary = summarize(result);
   console.error(`finished ${scenario.name}`);
-  console.log(JSON.stringify(summary, null, 2));
+  console.log(JSON.stringify({ profileMode: PROFILE_MODE, ...summary }, null, 2));
   results.push({ ...result, summary });
 }

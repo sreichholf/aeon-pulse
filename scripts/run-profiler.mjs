@@ -9,9 +9,13 @@
  *   node scripts/run-profiler.mjs
  *
  * Env overrides (pass-through to collect-render-stats.mjs):
- *   SCENARIOS, DURATION_SCALE, BASE_URL
+ *   PROFILE_MODE, SCENARIOS, DURATION_SCALE, BASE_URL
+ *
+ *   PROFILE_MODE=baseline      — normal cross-scenario summary (default)
+ *   PROFILE_MODE=long-frames   — targeted PerfProbe long-frame capture
  *
  * Env flags for this script:
+ *   BROWSER_EXE=<path> — force a specific Edge/Chrome executable.
  *   USE_SWIFTSHADER=1  — force software WebGL via SwiftShader (fallback when
  *                        no GPU is available or hardware WebGL fails to init).
  *                        Default: hardware GPU is used.
@@ -38,6 +42,11 @@ const PROFILE_DIR = join(ROOT, '.tmp', 'profiler-profile');
 const USE_SWIFTSHADER = process.env.USE_SWIFTSHADER === '1';
 
 function findBrowser() {
+  if (process.env.BROWSER_EXE) {
+    if (existsSync(process.env.BROWSER_EXE)) return process.env.BROWSER_EXE;
+    throw new Error(`BROWSER_EXE does not exist: ${process.env.BROWSER_EXE}`);
+  }
+
   for (const p of BROWSER_CANDIDATES) {
     if (existsSync(p)) return p;
   }
@@ -78,6 +87,7 @@ const browserArgs = [
   `--user-data-dir=${PROFILE_DIR}`,
   '--no-first-run',
   ...(USE_SWIFTSHADER ? ['--use-gl=swiftshader'] : []),
+  'about:blank',
 ];
 
 const browser = spawn(browserExe, browserArgs, { stdio: 'ignore', detached: false });

@@ -34,7 +34,9 @@ import {
   initPerfProbe,
   measurePerfPhase,
   setPerfCount,
+  setPerfLabel,
 } from './systems/PerfProbe.ts';
+import { withStandardEnemyRenderWarmup } from './systems/RenderWarmup.ts';
 
 
 
@@ -162,13 +164,33 @@ export class Game {
   start() {
     this._running = true;
     this._preloadAssets()
+      .then(() => this._warmupGameplayRender())
       .catch((error) => {
-        console.error('Failed to preload startup assets:', error);
+        console.error('Failed during startup warmup sequence:', error);
       })
       .finally(() => {
         this._setState(GameState.TITLE);
         requestAnimationFrame((t) => this._loop(t));
       });
+  }
+
+  private async _warmupGameplayRender(): Promise<void> {
+    const startedAt = performance.now();
+    const warmup = await withStandardEnemyRenderWarmup(
+      this.scene,
+      this.sprites,
+      () => this.scene.warmupRenderPaths(),
+    );
+
+    if (this._showRenderStats || isRuntimeFlagEnabled('perfProbe', false)) {
+      const totalDurationMs = performance.now() - startedAt;
+      console.log('Render warmup complete', {
+        durationMs: Number(totalDurationMs.toFixed(1)),
+        spawnDurationMs: Number(warmup.durationMs.toFixed(1)),
+        spawnedCount: warmup.spawnedCount,
+        warmedEnemyTypes: warmup.warmedEnemyTypes,
+      });
+    }
   }
 
   private async _preloadAssets(): Promise<void> {
@@ -280,6 +302,7 @@ export class Game {
     measurePerfPhase('game.input', () => this.input.update());
     measurePerfPhase('game.render', () => this.scene.render(dt));
     setPerfCount('state.playing', this._state === GameState.PLAYING ? 1 : 0);
+    setPerfLabel('game.state', this._state ?? 'UNKNOWN');
     endPerfFrame();
 
     requestAnimationFrame((t) => this._loop(t));

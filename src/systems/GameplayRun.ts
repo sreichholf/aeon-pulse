@@ -16,11 +16,11 @@ import { LEVELS } from '../level/Levels.ts';
 import { StageEventType, type StageEvent } from '../level/StageEvents.ts';
 import type { CampaignLevelRecord } from '../campaign/Campaign.ts';
 import { CampaignAttempt } from '../campaign/CampaignAttempt.ts';
-import { measurePerfPhase, setPerfCount } from './PerfProbe.ts';
+import { measurePerfPhase, recordPerfEvent, setPerfCount, setPerfLabel } from './PerfProbe.ts';
 
 import {
   DifficultyMode,
-  type EnemyType,
+  EnemyType,
   type IBackgroundWithSpeed,
   type IBoss,
   type IBullet,
@@ -84,6 +84,7 @@ export class GameplayRun implements LevelGameHost {
   private _levelExitHoldTimer: number;
   private _levelExitTimer: number;
   private _levelExitFlyoutStarted: boolean;
+  private _enemyTypes: WeakMap<IEnemy, EnemyType>;
 
   private _attempt: CampaignAttempt | null;
 
@@ -106,6 +107,7 @@ export class GameplayRun implements LevelGameHost {
     this._levelExitHoldTimer = 0;
     this._levelExitTimer = 0;
     this._levelExitFlyoutStarted = false;
+    this._enemyTypes = new WeakMap();
   }
 
   start(attempt: CampaignAttempt, mode: DifficultyMode): void {
@@ -144,6 +146,7 @@ export class GameplayRun implements LevelGameHost {
     this._terrain = levelDef.createTerrain?.(this._deps.scene, levelDef.terrainPoints) ?? null;
     this._playfieldBounds = levelDef.playfieldBounds;
     this._player.terrainBounds = this._playfieldBounds;
+    this._enemyTypes = new WeakMap();
   }
 
   tick(dt: number): void {
@@ -174,6 +177,7 @@ export class GameplayRun implements LevelGameHost {
     setPerfCount('bullets', this._bullets.length);
     setPerfCount('powerups', this._powerups.length);
     setPerfCount('effects', this._effects.length);
+    this._recordGameplayProbeContext();
 
     if (this._isExitingLevel) {
       this._clearHostileBullets();
@@ -278,6 +282,14 @@ export class GameplayRun implements LevelGameHost {
   }
 
   handleStageEvent(event: StageEvent): void {
+    recordPerfEvent('stageEvent', {
+      kind: event.kind,
+      enemyType: event.kind === StageEventType.SPAWN_ENEMY ? event.enemyType : null,
+      x: event.kind === StageEventType.SPAWN_ENEMY ? Math.round(event.x) : null,
+      y: event.kind === StageEventType.SPAWN_ENEMY ? Math.round(event.y) : null,
+      scrollX: Math.round(this._levelManager?.scrollX ?? 0),
+    });
+
     switch (event.kind) {
       case StageEventType.SPAWN_ENEMY:
         this.spawnEnemy(event.enemyType, event.x, event.y);
@@ -302,6 +314,7 @@ export class GameplayRun implements LevelGameHost {
     });
 
     if (enemy) {
+      this._enemyTypes.set(enemy, type);
       if (this._playfieldBounds) {
         enemy.terrainBounds = this._playfieldBounds;
       }
@@ -313,6 +326,12 @@ export class GameplayRun implements LevelGameHost {
       }
 
       this._enemies.push(enemy);
+      recordPerfEvent('enemySpawned', {
+        enemyType: type,
+        x: Math.round(enemy.x),
+        y: Math.round(enemy.y),
+        scrollX: Math.round(this._levelManager?.scrollX ?? 0),
+      });
     }
   }
 
@@ -382,6 +401,25 @@ export class GameplayRun implements LevelGameHost {
       this._projectilePool.destroyOrRelease(bullet);
       return false;
     });
+  }
+
+  private _recordGameplayProbeContext(): void {
+    if (this._level) {
+      setPerfLabel('level.id', this._level.id);
+      setPerfLabel('level.chapter', this._level.chapterName);
+    }
+    setPerfCount('level.scrollX', Math.round(this._levelManager?.scrollX ?? 0));
+
+    const byType: Partial<Record<EnemyType, number>> = {};
+    for (const enemy of this._enemies) {
+      const type = this._enemyTypes.get(enemy);
+      if (!type) continue;
+      byType[type] = (byType[type] ?? 0) + 1;
+    }
+
+    for (const type of Object.values(EnemyType)) {
+      setPerfCount(`enemyType.${type}`, byType[type] ?? 0);
+    }
   }
 
   private _tickLevelExit(dt: number): void {

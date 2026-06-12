@@ -21,6 +21,7 @@ Automated module tests use Vitest. Verification is:
 Vitest tests are co-located with the modules they protect as `src/**/*.test.ts`, run in the `node` environment, and are limited by `vitest.config.ts` to source tests so browser profile artifacts under `.tmp/` are not collected. Use plain object fakes for deterministic module seams instead of constructing full Three.js entities unless the integration itself is under test.
 
 For render-performance work, see `docs/render-optimization-notes.md` and `scripts/collect-render-stats.mjs`.
+For the current Chapter 4 FPS investigation and intermediate diagnosis log, see `docs/chapter4-fps-diagnosis.md`.
 For the current cross-chapter draw-call baseline, see `docs/render-baseline.md`.
 
 ### Manual Playtesting
@@ -85,6 +86,7 @@ On Linux Wayland, use a headed Chrome window for CDP render-stat runs. Headless 
    ```
    node scripts/run-profiler.mjs
    ```
+   Use `PROFILE_MODE=long-frames` with `SCENARIOS="L4-4 no-fire,L4-4 tier5 tap-fire"` for targeted long-frame diagnosis after a baseline shows Chapter 4 FPS dips.
 3. The orchestrator will:
    - Spawn a headless Edge (or Chrome) instance as a **child process of Node** using hardware GPU WebGL by default (or `--use-gl=swiftshader` if fallback env var `USE_SWIFTSHADER=1` is set) and a dedicated profile folder (`.tmp/profiler-profile`).
    - Wait for CDP to become ready on port `9222`.
@@ -106,6 +108,7 @@ If you see this pattern, use `scripts/run-profiler.mjs` instead of running `coll
 - Use Edge (`msedge.exe`) as the primary browser candidate on Windows. It is typically more stable in headless mode than the `x86` Chrome install.
 
 For scenario guidelines and historical optimization results, see `docs/render-optimization-notes.md`.
+For the current Chapter 4 FPS investigation and intermediate diagnosis log, see `docs/chapter4-fps-diagnosis.md`.
 For the current cross-chapter draw-call baseline, see `docs/render-baseline.md`.
 
 ## Git

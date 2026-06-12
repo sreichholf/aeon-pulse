@@ -6,6 +6,8 @@ It is intentionally not an ADR. These notes describe a useful implementation app
 
 For the **current cross-chapter draw-call baseline** (replaces this file's historical tables as the live snapshot), see [render-baseline.md](/E:/Develop/GitHub/aeon-pulse/docs/render-baseline.md).
 
+For the current Chapter 4 FPS investigation and intermediate diagnosis log, see [chapter4-fps-diagnosis.md](/E:/Develop/GitHub/aeon-pulse/docs/chapter4-fps-diagnosis.md).
+
 ## Profiling Workflow
 
 Use the runtime flags already wired into the game:
@@ -37,9 +39,45 @@ For scripted capture, use:
 
 - [scripts/collect-render-stats.mjs](/E:/Develop/GitHub/aeon-pulse/scripts/collect-render-stats.mjs)
 
+### Baseline vs Long-Frame Diagnosis
+
+Use the profiler in two passes:
+
+1. **Baseline mode** records the cross-scenario draw-call/FPS ownership snapshot:
+   ```bash
+   PROFILE_MODE=baseline node scripts/run-profiler.mjs
+   ```
+   `baseline` is the default when `PROFILE_MODE` is omitted.
+2. **Long-frame mode** is a targeted second pass when baseline results show bad minimum FPS or visible stutter:
+   ```bash
+   PROFILE_MODE=long-frames SCENARIOS="L4-4 no-fire,L4-4 tier5 tap-fire" node scripts/run-profiler.mjs
+   ```
+
+Long-frame mode keeps the same CDP scenario driver but adds `perfProbe=1` to the runtime URL. It captures hidden `PerfProbe` output for each scenario, including long-frame records, phase timings, level labels, `scrollX`, enemy counts by type, stage events, collision contacts, render calls, triangles, render categories/details, and bullet source counts.
+
+To isolate post-processing cost from raw scene rendering, long-frame mode also supports:
+
+```bash
+BYPASS_POSTPROCESSING=1 PROFILE_MODE=long-frames SCENARIOS="L4-4 no-fire" node scripts/run-profiler.mjs
+```
+
+This adds `noPost=1`, keeping the gameplay camera tilt and scene contents intact while bypassing `EffectComposer` for a direct `renderer.render()` path.
+
+### Chapter 4 Long-Frame Finding
+
+The full progress log lives in [chapter4-fps-diagnosis.md](/E:/Develop/GitHub/aeon-pulse/docs/chapter4-fps-diagnosis.md).
+
+Manual in-app browser runs on `L4-4 no-fire` showed three separate effects:
+
+- **First-use GPU warm-up dominates the worst freezes.** A cold `noPost=1` run still showed roughly 500-600 ms render frames, but a warmed rerun dropped the max direct-render frame to roughly 57 ms.
+- **Post-processing is additive, not primary.** A warmed normal run with composer enabled peaked around 72 ms in the same scroll band.
+- **The remaining warmed stalls are enemy-render bound.** The repeatable hot bands were high-detail enemy mixes, especially `rockDrake` + `sine` near `scrollX ~= 1680` and `diver` + `turret` + `stalactite` near `scrollX ~= 3090`. Gameplay update and collision phases stayed small compared with render phases.
+
+Treat Chapter 4 dips as a render warm-up plus standard-enemy visual-cost problem before changing wave timing or collision/update code.
+
 ## Current Heuristic
 
-When a chapter is draw-call bound, start with the largest `background.*` or `terrain.*` detail owners before touching shared gameplay systems.
+When a chapter is draw-call bound, start with the largest current ownership bucket from `cats` and `details`. Earlier Chapter 1/4 passes were scenery-bound, so `background.*` and `terrain.*` were the right first targets. The current cross-chapter baseline has shifted toward `enemy.*`, so run long-frame diagnosis before choosing a shared enemy, projectile, terrain, or wave-density optimization.
 
 Prefer `THREE.InstancedMesh` when all of the following are true:
 

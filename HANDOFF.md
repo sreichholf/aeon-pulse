@@ -1,141 +1,107 @@
-# AEON PULSE Chapter 4 Stutter Investigation Handoff
+# AEON PULSE Render Warm-Up Handoff
 
-Updated: 2026-06-10
+Updated: 2026-06-12
 
-## Current State
+## Current Objective
 
-Chapter 4 stutter investigation has moved from diagnosis into a first render-cost reduction pass. Keep the probe for now; it is still useful and query-gated behind `?perfProbe=1`.
+Implement the first Chapter 4 FPS mitigation pass: a boot-time **render warm-up pass** for standard enemy visuals.
 
-The strongest finding remains: the stutter is render/compositor-side, not Terrain4, Background4, collision, or general gameplay update work. The worst spikes now appear lower after batching selected enemy visuals, but they are not fully eliminated.
+The design decision is resolved: this is render warm-up, not asset preload. Existing preload loads GLB data, but the measured stalls are first-use GPU/material/shader/render work.
 
-## Files Changed
+## Suggested Skills
 
-- `src/Game.ts`
-- `src/Scene.ts`
-- `src/entities/EntityCatalog.ts`
-- `src/entities/EnemySine.ts`
-- `src/entities/EnemyStraight.ts`
-- `src/systems/Gameplay.ts`
-- `src/systems/GameplayRun.ts`
-- `src/systems/PerfProbe.ts` new
-- `vite.config.js`
+- `diagnose` — use when validating whether the warm-up actually removes cold long frames.
+- `grill-with-docs` — use if the implementation scope drifts into a broader render-resource lifecycle decision.
+- `handoff` — use again if stopping before implementation or measurement is complete.
 
-## Implemented
+## Must-Read References
 
-1. Perf overlay/probe
+- `docs/chapter4-fps-diagnosis.md` — full diagnosis log, measurements, resolved warm-up plan, guardrails, and acceptance target.
+- `docs/render-optimization-notes.md` — profiler workflow and long-frame mode commands.
+- `AGENTS.md` — current test/browser/profiler guidance.
+- `src/Game.ts` — existing boot preload flow.
+- `src/Scene.ts` — renderer/composer ownership and `noPost=1` diagnostic switch.
+- `src/entities/EntityCatalog.ts` — source-of-truth spawn path for standard enemies.
 
-- `Game.ts` now updates the visible allocation/perf panel DOM every 250 ms instead of every RAF.
-- Heap sampling still happens per frame.
-- `PerfProbe.ts` adds hidden JSON output in `#aeon-perf-probe` when `?perfProbe=1`.
-- Probe records frame gaps, previous-frame timing, phase maxima, heap deltas, entity counts, render counts, and render ownership.
+## Resolved Design
 
-2. Render ownership instrumentation
+Do not create an ADR for this first pass. Keep it documented in `docs/chapter4-fps-diagnosis.md` and `docs/render-optimization-notes.md`.
 
-- `Scene.ts` records projectile, flash, and composer/render timings.
-- `Scene.ts` records render calls, triangles, active bullets, and category/detail render ownership when probe is enabled.
-- `Gameplay.ts` / `GameplayRun.ts` record update-side timings and active object counts.
-- `EntityCatalog.ts` marks spawned enemies with detail labels like `enemy.sine` and `enemy.straight`.
+Warm-up should:
 
-3. Vite dev-server stability
+- Run after `Game._preloadAssets()` and before entering `TITLE`.
+- Use the real `EntityCatalog` / `spawnEnemy()` path.
+- Start with `straight`, `sine`, `diver`, `swarm`, `turret`, `charger`, `rockDrake`, and `stalactite`.
+- Exclude projectile warm-up initially. Add it later only if measurements show projectile-specific cold stalls.
+- Keep warm-up entities visible to the camera during compile/render work, then destroy them before the title screen appears.
+- Use no-op audio and projectile seams.
+- Avoid creating a fake `GameplayRun`.
+- Log warm-up duration when profiling/debug flags are enabled.
 
-- `vite.config.js` ignores `.tmp/**` in the file watcher.
-- This prevents Chrome/CDP profile files under `.tmp` from crashing Vite with locked cookie/cache files.
+## Acceptance Criteria
 
-4. `EnemySine` render reduction
+- Cold `L4-4 no-fire` no longer shows 500-600 ms render frames.
+- First target for worst cold long frame is roughly `<= 100 ms`, near warmed behavior.
+- No title/gameplay state changes after warm-up.
+- No visible title flicker or enemy flash.
+- Scene counts return to normal after cleanup.
+- Warm-up duration is observable in logs/probe output.
+- Remaining warmed 50-75 ms enemy-render dips are treated as a separate visual-cost optimization task.
 
-- Top/bottom nozzle meshes are now one 2-instance `InstancedMesh`.
-- Top/bottom flame meshes are now one 2-instance `InstancedMesh`.
-- Existing vectoring and flame jitter behavior is preserved through per-frame instance matrix updates.
-- Claws, iris, pupil, recoil, and banking remain independent.
+## Implementation Sketch
 
-5. `EnemyStraight` render reduction
+Likely add `src/systems/RenderWarmup.ts`.
 
-- A worker subagent was assigned `EnemyStraight`; it did not return a final message before shutdown, but visible local edits were reviewed and verified.
-- The kept changes merge the red visor strip into the hull geometry and drive its glow through the hull shader uniform.
-- Flame outer cones and hot cores are merged into one animated flame mesh using vertex colors.
-- Recoil, flame scaling, visor pulse, gun-point world positions, projectile semantics, and cockpit transparency are preserved.
-- A local experiment to remove the full procedural decal shader was reverted because it did not improve measured spikes and downgraded visible detail.
+Potential shape:
 
-## Measurements
+1. Receive `Scene`, `sprites`, and no-op seams.
+2. Spawn selected standard enemies through `spawnEnemy()`.
+3. Place them in a compact visible grid inside the gameplay camera frustum.
+4. Call `scene.renderer.compileAsync(...)` if usable for the real scene/camera.
+5. Force one or two `scene.render(0)` calls, including composer path when normal post-processing is active.
+6. Destroy all spawned enemies and verify cleanup.
+7. Return duration/status for logging.
 
-In-app browser was used first. It loads the app and probe with no console errors, but keyboard automation still does not advance the game past the title screen. CDP fallback was used only for automated gameplay timing.
+Be careful not to set warm-up objects `visible = false`; Three.js may skip invisible objects and fail to compile/upload the target render paths.
 
-Final CDP run against `http://127.0.0.1:5174/?renderStats=1&perfProbe=1&invincible=1`:
+## Verification Plan
 
-- `4-4` no-fire, 35 s:
-  - long frames: 6
-  - long-frame rate: 0.0021
-  - worst gap: 58.1 ms
-  - max render/composer: 59.1 / 59.0 ms
-  - max render calls: 156
-  - max render objects: 157
-  - max enemy units: 133
-  - max `enemy.sine`: 90
-  - max `enemy.straight`: 24
-
-- `4-4` tier-5 tap-fire, 45 s:
-  - long frames: 8
-  - long-frame rate: 0.0023
-  - worst gap: 43.5 ms
-  - max render/composer: 39.6 / 39.4 ms
-  - max render calls: 135
-  - max render objects: 123
-  - max enemy units: 70
-  - max bullets: 42 active render units
-
-Earlier CDP runs before these enemy reductions had render/composer spikes in the 90 ms to 500 ms range depending on run variance. The current result is better, but still has occasional >25 ms frames.
-
-## Verification
-
-Passing after the latest changes:
+Run:
 
 ```bash
 npm test
 npm run build
+node --check scripts\collect-render-stats.mjs
+node --check scripts\run-profiler.mjs
 ```
 
-`npm test` passed with 160/160 tests.
+Then use the in-app browser or profiler flow:
 
-In-app browser smoke:
+```bash
+PROFILE_MODE=long-frames SCENARIOS="L4-4 no-fire,L4-4 tier5 tap-fire" node scripts/run-profiler.mjs
+```
 
-- Loaded `http://127.0.0.1:5174/?perfProbe=1&invincible=1`.
-- Canvas present.
-- Hidden probe present.
-- No browser console errors.
-- Automated in-app keyboard input still did not reach gameplay, so CDP was used for play/probe automation.
+For post-processing isolation:
 
-## Important Failed Experiments
+```bash
+BYPASS_POSTPROCESSING=1 PROFILE_MODE=long-frames SCENARIOS="L4-4 no-fire" node scripts/run-profiler.mjs
+```
 
-Do not repeat these without a new reason:
+Compare against the measurements in `docs/chapter4-fps-diagnosis.md`.
 
-- `Scene.precompile()` / level-start warm-up: tried and removed; did not reduce active-play stalls.
-- `noPost=1` render bypass: tried and removed; direct `renderer.render()` still exhibited stalls.
-- Removing `EnemyStraight` procedural decals: tried and reverted; no measured benefit, visible detail loss.
+## Current Working Tree Context
 
-## Recommended Next Steps
+There are already uncommitted diagnostic changes:
 
-1. Keep `PerfProbe.ts` for now.
+- `AGENTS.md`
+- `docs/chapter4-fps-diagnosis.md`
+- `docs/render-optimization-notes.md`
+- `scripts/collect-render-stats.mjs`
+- `scripts/run-profiler.mjs`
+- `src/Game.ts`
+- `src/Scene.ts`
+- `src/systems/GameplayRun.ts`
+- `src/systems/PerfProbe.ts`
+- `HANDOFF.md`
 
-It is query-gated, low overhead when off, and gives useful phase/render ownership data.
-
-2. Manually inspect visuals.
-
-Use the in-app browser visually or a controlled Chrome session:
-
-- `EnemySine` in gameplay scale and tactical database
-- `EnemyStraight` in gameplay scale and tactical database
-- Check Sine nozzles/flames still vector and pulse
-- Check Straight visor pulse, flame scale, recoil, and gun firing positions
-
-3. If stutter remains visible, optimize the next shared render offenders.
-
-The final probe still shows high enemy render ownership during dense Chapter 4 windows. Next likely targets:
-
-- `EnemyTurret` at up to 20 render units
-- `Stalactite` at up to 20 render units
-- `RockDrake` at 16 render units
-- remaining `EnemySine` claws if visual fidelity allows a per-enemy claw instancing pass
-
-4. Consider a shared enemy visual batching strategy only after one more targeted pass.
-
-Several enemies repeat small static meshes with independent animation. A shared helper for per-entity 2-instance or 4-instance mesh parts may be worth it, but only if another concrete entity optimization repeats the same pattern.
+Do not revert these unless explicitly asked. They are part of the current diagnosis/profiler work.

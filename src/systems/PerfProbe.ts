@@ -2,6 +2,12 @@ import { isRuntimeFlagEnabled } from '../constants.ts';
 
 type PhaseMap = Record<string, number>;
 type CountMap = Record<string, number>;
+type LabelMap = Record<string, string>;
+
+interface ProbeEvent {
+  name: string;
+  data?: Record<string, string | number | boolean | null>;
+}
 
 interface FrameProbe {
   t: number;
@@ -9,6 +15,8 @@ interface FrameProbe {
   dtMs: number;
   phases: PhaseMap;
   counts: CountMap;
+  labels: LabelMap;
+  events: ProbeEvent[];
   heapDeltaKb: number | null;
   heapUsedMb: number | null;
   previousFrame?: Omit<FrameProbe, 'previousFrame'>;
@@ -21,6 +29,7 @@ interface PhaseAggregate {
 
 const LONG_FRAME_MS = 25;
 const MAX_LONG_FRAMES = 24;
+const MAX_FRAME_EVENTS = 32;
 
 let enabled = false;
 let outputEl: HTMLElement | null = null;
@@ -54,9 +63,17 @@ function cloneFrame(frame: FrameProbe): FrameProbe {
     dtMs: frame.dtMs,
     phases: { ...frame.phases },
     counts: { ...frame.counts },
+    labels: { ...frame.labels },
+    events: frame.events.map((event) => ({ name: event.name, data: event.data ? { ...event.data } : undefined })),
     heapDeltaKb: frame.heapDeltaKb,
     heapUsedMb: frame.heapUsedMb,
-    previousFrame: frame.previousFrame ? { ...frame.previousFrame, phases: { ...frame.previousFrame.phases }, counts: { ...frame.previousFrame.counts } } : undefined,
+    previousFrame: frame.previousFrame ? {
+      ...frame.previousFrame,
+      phases: { ...frame.previousFrame.phases },
+      counts: { ...frame.previousFrame.counts },
+      labels: { ...frame.previousFrame.labels },
+      events: frame.previousFrame.events.map((event) => ({ name: event.name, data: event.data ? { ...event.data } : undefined })),
+    } : undefined,
   };
 }
 
@@ -67,6 +84,8 @@ function cloneFrameWithoutPrevious(frame: FrameProbe): Omit<FrameProbe, 'previou
     dtMs: frame.dtMs,
     phases: { ...frame.phases },
     counts: { ...frame.counts },
+    labels: { ...frame.labels },
+    events: frame.events.map((event) => ({ name: event.name, data: event.data ? { ...event.data } : undefined })),
     heapDeltaKb: frame.heapDeltaKb,
     heapUsedMb: frame.heapUsedMb,
   };
@@ -145,9 +164,17 @@ export function beginPerfFrame(timestamp: number, dt: number): void {
     dtMs: dt * 1000,
     phases: {},
     counts: {},
+    labels: {},
+    events: [],
     heapDeltaKb: heapDeltaKb === null ? null : Number(heapDeltaKb.toFixed(1)),
     heapUsedMb: heapUsedMb === null ? null : Number(heapUsedMb.toFixed(1)),
-    previousFrame: previousFrame ? { ...previousFrame, phases: { ...previousFrame.phases }, counts: { ...previousFrame.counts } } : undefined,
+    previousFrame: previousFrame ? {
+      ...previousFrame,
+      phases: { ...previousFrame.phases },
+      counts: { ...previousFrame.counts },
+      labels: { ...previousFrame.labels },
+      events: previousFrame.events.map((event) => ({ name: event.name, data: event.data ? { ...event.data } : undefined })),
+    } : undefined,
   };
   lastTimestamp = timestamp;
   lastHeapBytes = heap;
@@ -162,6 +189,17 @@ export function setPerfCount(name: string, value: number): void {
   if (!enabled || !current) return;
   current.counts[name] = value;
   countMax[name] = Math.max(countMax[name] ?? 0, value);
+}
+
+export function setPerfLabel(name: string, value: string): void {
+  if (!enabled || !current) return;
+  current.labels[name] = value;
+}
+
+export function recordPerfEvent(name: string, data?: Record<string, string | number | boolean | null>): void {
+  if (!enabled || !current) return;
+  current.events.push({ name, data });
+  if (current.events.length > MAX_FRAME_EVENTS) current.events.shift();
 }
 
 export function measurePerfPhase<T>(name: string, fn: () => T): T {

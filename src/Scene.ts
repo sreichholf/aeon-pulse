@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { GAME_WIDTH, GAME_HEIGHT } from './constants.ts';
+import { GAME_WIDTH, GAME_HEIGHT, isRuntimeFlagEnabled } from './constants.ts';
 import { RenderCategory, UserDataKey } from './types.ts';
 
 
@@ -48,6 +48,7 @@ export class Scene {
   private _composer!: EffectComposer;
   private _projectileInstancer: ProjectileInstancer;
   private _activeBullets: Set<THREE.Object3D>;
+  private _bypassPostprocessing: boolean;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
@@ -72,6 +73,7 @@ export class Scene {
     this.scene.add(this.cameraGroup);
 
     this._tilted = false;
+    this._bypassPostprocessing = isRuntimeFlagEnabled('noPost', false);
 
     // Saturated ambient light to keep secondary surfaces and shadows beautifully colored
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.44);
@@ -192,7 +194,7 @@ export class Scene {
       }
     });
     
-    if (this._tilted) {
+    if (this._tilted && !this._bypassPostprocessing) {
       measurePerfPhase('scene.composer', () => this._composer.render());
     } else {
       measurePerfPhase('scene.renderer', () => this.renderer.render(this.scene, this.camera));
@@ -208,6 +210,27 @@ export class Scene {
       for (const [detail, units] of Object.entries(stats.byDetail)) {
         setPerfCount(`detail.${detail}`, units);
       }
+    }
+  }
+
+  async warmupRenderPaths(): Promise<void> {
+    const previousTilted = this._tilted;
+
+    try {
+      try {
+        await this.renderer.compileAsync(this.scene, this.camera);
+      } catch (error) {
+        console.warn('Scene warmup compileAsync failed; continuing with direct renders.', error);
+      }
+
+      this.renderer.render(this.scene, this.camera);
+
+      if (!this._bypassPostprocessing) {
+        this.setTilted(true);
+        this._composer.render();
+      }
+    } finally {
+      this.setTilted(previousTilted);
     }
   }
 
