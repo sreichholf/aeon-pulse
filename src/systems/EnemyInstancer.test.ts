@@ -136,4 +136,33 @@ describe('EnemyInstancer', () => {
     const instMesh = scene.children[0] as THREE.InstancedMesh;
     expect(instMesh.count).toBe(capacity);
   });
+
+  it('does not compile hidden meshes into instanced batches', () => {
+    const scene = new THREE.Scene();
+    const instancer = new EnemyInstancer(scene);
+
+    const enemyMesh = new THREE.Object3D();
+
+    const visibleMesh = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial(),
+    );
+    const hiddenMesh = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial(),
+    );
+    hiddenMesh.visible = false;
+
+    enemyMesh.add(visibleMesh);
+    enemyMesh.add(hiddenMesh);
+
+    instancer.beginFrame();
+    instancer.addEnemy(enemyMesh);
+    instancer.endFrame();
+
+    const compiled = enemyMesh.userData[UserDataKey.COMPILED_MESHES];
+    expect(compiled).toHaveLength(1);
+    expect(compiled[0].mesh).toBe(visibleMesh);
+    expect(scene.children).toHaveLength(1);
+  });
 });

@@ -39,7 +39,7 @@ export class EnemyInstancer {
     if (!compiled) {
       compiled = [];
       enemyMesh.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
+        if (child instanceof THREE.Mesh && child.visible) {
           const geo = child.geometry;
           const mat = child.material;
           const key = `${geo.uuid}_${mat.uuid}`;
@@ -74,6 +74,7 @@ export class EnemyInstancer {
         
         // Satisfy ADR 0003 string enum category marking
         markRenderCategory(instMesh, RenderCategory.ENEMY);
+        instMesh.frustumCulled = false;
         
         this._scene.add(instMesh);
         this._instancedMeshes.set(key, instMesh);
@@ -95,7 +96,7 @@ export class EnemyInstancer {
       if (count < INSTANCE_CAPACITY) {
         // Copy the world matrix of the child mesh to the instanced batch
         instMesh.setMatrixAt(count, entry.mesh.matrixWorld);
-        
+
         // Copy flash color or default white to the instanced batch
         instMesh.setColorAt(count, isFlashing ? FLASH_COLOR : DEFAULT_COLOR);
         
