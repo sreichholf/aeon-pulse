@@ -1,8 +1,8 @@
 export const GAME_WIDTH  = 960;
 export const GAME_HEIGHT = 540;
 
-// Temporary build-time switch for exposing all title-screen options in production.
-export const ENABLE_ADVANCED_TITLE_OPTIONS = true;
+// Expose title-screen developer selectors in local development, but keep production clean.
+export const ENABLE_ADVANCED_TITLE_OPTIONS = import.meta.env.DEV;
 
 export const ENABLE_RENDER_STATS = false;
 export const ENABLE_INVINCIBLE_PLAYER = false;

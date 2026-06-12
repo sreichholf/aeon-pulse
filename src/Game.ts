@@ -436,7 +436,7 @@ export class Game {
   }
 
   _updateTitle(_dt: number): void {
-    if (this._showAdvancedTitleOptions && this.input.wasJustPressed(Action.VIEWER)) {
+    if (this.input.wasJustPressed(Action.VIEWER)) {
       this.audio.play('menuSelect');
       this._setState(GameState.VIEWER);
       return;

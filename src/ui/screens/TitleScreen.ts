@@ -65,7 +65,14 @@ export class TitleScreen {
     const s = this.el;
     s.appendChild(this._el('div', 'title-logo', 'AEON PULSE'));
 
-    // Mode selection prominently placed right under Logo
+    s.appendChild(this._el('div', 'title-kicker', 'ARCADE STRIKE RUN'));
+
+    const startBlock = this._el('div', 'title-start-block');
+    startBlock.appendChild(this._el('div', 'title-start', 'PRESS SPACE TO START'));
+    startBlock.appendChild(this._el('div', 'title-start-subtitle', 'ENTER ALSO STARTS A RUN'));
+    s.appendChild(startBlock);
+
+    // Mode selection sits below the primary call to action.
     const modeSelection = this._el('div', 'title-mode-selection');
     modeSelection.appendChild(this._el('span', 'title-mode-label', 'DIFFICULTY:'));
     this._titleModeValue = this._el('span', 'title-mode-value', 'ACE');
@@ -73,9 +80,8 @@ export class TitleScreen {
     modeSelection.appendChild(this._el('div', 'title-mode-hint', '[ PRESS TAB TO CHANGE ]'));
     s.appendChild(modeSelection);
 
-    s.appendChild(this._el('div', 'title-start', 'PRESS SPACE TO START'));
-    s.appendChild(this._el('div', 'title-viewer-hint',
-      this._showAdvancedOptions ? 'PRESS V FOR DATABASE | PRESS M TO TOGGLE MUSIC' : 'PRESS M TO TOGGLE MUSIC'));
+    s.appendChild(this._el('div', 'title-help-copy', 'ROOKIE EASES YOU IN. PILOT AND ACE EXPECT CLEAN DODGING.'));
+    s.appendChild(this._el('div', 'title-viewer-hint', 'PRESS V FOR DATABASE | PRESS M TO TOGGLE MUSIC'));
 
     if (this._showAdvancedOptions) {
       // Selector row: Level + Weapon (Developer Settings)
