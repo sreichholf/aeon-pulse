@@ -17,7 +17,7 @@ function coloredGeometry(
 
 
 const SPEED        = 150;
-const STOP_X       = 100;
+const TRIGGER_DISTANCE = 520;
 const LOCK_DUR     = 1.0;
 const CHARGE_SPEED = 700;
 const HW = 22, HH = 12;
@@ -404,8 +404,8 @@ export class EnemyCharger extends Enemy {
 
       // Move left
       pos.x -= SPEED * dt;
-      if (pos.x <= STOP_X) {
-        pos.x = STOP_X;
+      const playerX = this._getPlayerPos!().x;
+      if (pos.x <= 400 && pos.x - playerX <= TRIGGER_DISTANCE) {
         this._state = 'locking';
         this._lockTimer = LOCK_DUR;
         this._chargeTargetY = this._getPlayerPos!().y;
