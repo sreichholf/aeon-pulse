@@ -22,17 +22,71 @@ export function straightRowBeat(count: number, yCenter: number, ySpread: number)
   };
 }
 
-export function sineRowBeat(count: number, yCenter: number, ySpread: number): BeatPattern {
+export function supportSineBeat(y: number, dx = 0): BeatPattern {
   return {
     name: BeatType.SINE_ROW,
-    events: row(EnemyType.SINE, count, yCenter, ySpread),
+    events: [spawnEnemyEvent(EnemyType.SINE, SPAWN_X + dx, y)],
   };
 }
 
-export function diverVBeat(count: number, yStep: number): BeatPattern {
+export function sinePairBeat(y1: number, y2: number, dx = 120): BeatPattern {
+  return {
+    name: BeatType.SINE_ROW,
+    events: [
+      spawnEnemyEvent(EnemyType.SINE, SPAWN_X, y1),
+      spawnEnemyEvent(EnemyType.SINE, SPAWN_X + dx, y2),
+    ],
+  };
+}
+
+export function diverVBeat(count: number, yStep = 72): BeatPattern {
   return {
     name: BeatType.DIVER_V,
     events: vForm(EnemyType.DIVER, count, yStep),
+  };
+}
+
+export function mixedStraightSineBeat(count: number, yCenter: number, ySpread: number, sineY: number, sineDx: number): BeatPattern {
+  return {
+    name: BeatType.MIXED_STRAIGHT_SINE,
+    events: [
+      ...row(EnemyType.STRAIGHT, count, yCenter, ySpread),
+      spawnEnemyEvent(EnemyType.SINE, SPAWN_X + sineDx, sineY),
+    ],
+  };
+}
+
+export function mixedDiverSineBeat(diverCount: number, diverYStep: number, sineY: number, sineDx: number): BeatPattern {
+  return {
+    name: BeatType.MIXED_DIVER_SINE,
+    events: [
+      ...vForm(EnemyType.DIVER, diverCount, diverYStep),
+      spawnEnemyEvent(EnemyType.SINE, SPAWN_X + sineDx, sineY),
+    ],
+  };
+}
+
+export function mixedStraightDiverBeat(count: number, yCenter: number, ySpread: number, diverY: number, diverDx: number): BeatPattern {
+  return {
+    name: BeatType.MIXED_STRAIGHT_DIVER,
+    events: [
+      ...row(EnemyType.STRAIGHT, count, yCenter, ySpread),
+      spawnEnemyEvent(EnemyType.DIVER, SPAWN_X + diverDx, diverY),
+    ],
+  };
+}
+
+export function turretBeat(y: number, dx = 0): BeatPattern {
+  return {
+    name: BeatType.TURRET,
+    events: [spawnEnemyEvent(EnemyType.TURRET, SPAWN_X + dx, y)],
+  };
+}
+
+export function chargerBeat(y: number, dx = 0): BeatPattern {
+  return {
+    name: BeatType.CHARGER,
+    events: [spawnEnemyEvent(EnemyType.CHARGER, SPAWN_X + dx, y)],
   };
 }
 
@@ -169,6 +223,22 @@ export function finalGauntletBeat(
   };
 }
 
+export function mixedStraightTurretBeat(
+  count: number,
+  yCenter: number,
+  ySpread: number,
+  turretY: number,
+  turretDx: number,
+): BeatPattern {
+  return {
+    name: BeatType.MIXED_STRAIGHT_TURRET,
+    events: [
+      ...row(EnemyType.STRAIGHT, count, yCenter, ySpread),
+      spawnEnemyEvent(EnemyType.TURRET, SPAWN_X + turretDx, turretY),
+    ],
+  };
+}
+
 export function dualTurretStalactiteBeat(turretYA: number, turretYB: number, stalactiteDx: number): BeatPattern {
   return {
     name: BeatType.LAVA_AND_TURRET,
@@ -186,105 +256,118 @@ function chapter4_1(): Timeline<Chapter4Anchor> {
   return new Timeline<Chapter4Anchor>(0.65)
     .anchor(Chapter4Anchor.START, 0)
     .anchor(Chapter4Anchor.MID, 5000)
-    .add(Chapter4Anchor.START, 320, sineRowBeat(5, 0, 250))
-    .add(Chapter4Anchor.START, 900, straightRowBeat(5, -85, 170))
-    .add(Chapter4Anchor.START, 1540, stalactitePairBeat(40, 180))
-    .add(Chapter4Anchor.START, 2240, sineRowBeat(4, 90, 170))
-    .add(Chapter4Anchor.START, 2980, mixedStalactiteMirrorSineBeat(20, 160, -75, 75, 90))
-    .add(Chapter4Anchor.START, 3760, diverVBeat(4, 66))
-    .add(Chapter4Anchor.START, 4540, stalactiteBarrageBeat([20, 150, 280]))
-    .add(Chapter4Anchor.MID, 220, straightRowBeat(5, 0, 240))
-    .add(Chapter4Anchor.MID, 960, mixedDiverVStalactiteBeat(4, 62, 70, 210))
-    .add(Chapter4Anchor.MID, 1760, sineRowBeat(5, -70, 170))
-    .add(Chapter4Anchor.MID, 2540, stalactitePairBeat(30, 210))
-    .add(Chapter4Anchor.MID, 3340, swarmChokepointBeat());
+    // START
+    .add(Chapter4Anchor.START, 300, straightRowBeat(4, 0, 220))
+    .add(Chapter4Anchor.START, 800, stalactitePairBeat(20, 160))
+    .add(Chapter4Anchor.START, 1400, supportSineBeat(-90))
+    .add(Chapter4Anchor.START, 2000, mixedStraightDiverBeat(3, 85, 140, -120, 90))
+    .add(Chapter4Anchor.START, 2700, supportSineBeat(90, 40))
+    .add(Chapter4Anchor.START, 3400, diverVBeat(3, 72))
+    .add(Chapter4Anchor.START, 4100, stalactiteBarrageBeat([30, 180]))
+    .add(Chapter4Anchor.START, 4700, swarmChokepointBeat())
+    // MID
+    .add(Chapter4Anchor.MID, 200, straightRowBeat(4, -85, 160))
+    .add(Chapter4Anchor.MID, 800, mixedDiverSineBeat(3, 68, 90, 90))
+    .add(Chapter4Anchor.MID, 1600, stalactitePairBeat(40, 200))
+    .add(Chapter4Anchor.MID, 2300, mixedStraightDiverBeat(4, 85, 150, -135, 80))
+    .add(Chapter4Anchor.MID, 3100, supportSineBeat(-45))
+    .add(Chapter4Anchor.MID, 3700, swarmChokepointBeat());
 }
 
 function chapter4_2(): Timeline<Chapter4Anchor> {
   return new Timeline<Chapter4Anchor>(0.65)
     .anchor(Chapter4Anchor.START, 0)
     .anchor(Chapter4Anchor.MID, 5200)
-    .add(Chapter4Anchor.START, 300, sineRowBeat(5, 0, 250))
-    .add(Chapter4Anchor.START, 820, lavaPulseBeat())
-    .add(Chapter4Anchor.START, 1120, straightRowBeat(5, -90, 170))
-    .add(Chapter4Anchor.START, 1860, mixedStalactiteMirrorSineBeat(0, 150, 75, -75, 100))
-    .add(Chapter4Anchor.START, 2660, lavaAndTurretBeat(120))
-    .add(Chapter4Anchor.START, 3460, diverVBeat(4, 66))
-    .add(Chapter4Anchor.START, 4280, stalactiteBarrageBeat([30, 170, 310]))
+    // START
+    .add(Chapter4Anchor.START, 300, straightRowBeat(4, 0, 240))
+    .add(Chapter4Anchor.START, 800, lavaPulseBeat())
+    .add(Chapter4Anchor.START, 1400, turretBeat(-120))
+    .add(Chapter4Anchor.START, 2000, supportSineBeat(90))
+    .add(Chapter4Anchor.START, 2600, stalactitePairBeat(20, 160))
+    .add(Chapter4Anchor.START, 3300, mixedStraightTurretBeat(3, 85, 140, -135, 90))
+    .add(Chapter4Anchor.START, 4100, diverVBeat(4, 66))
+    .add(Chapter4Anchor.START, 4800, stalactiteBarrageBeat([30, 180]))
+    // MID
     .add(Chapter4Anchor.MID, 160, lavaPulseBeat())
-    .add(Chapter4Anchor.MID, 520, sineRowBeat(5, 85, 170))
-    .add(Chapter4Anchor.MID, 1320, mixedChargerStalactiteBarrageBeat(-35, [70, 200]))
-    .add(Chapter4Anchor.MID, 2180, straightRowBeat(6, 0, 250))
-    .add(Chapter4Anchor.MID, 3000, lavaAndTurretBeat(-120))
-    .add(Chapter4Anchor.MID, 3820, mixedDiverVStalactiteBeat(5, 58, 60, 220));
+    .add(Chapter4Anchor.MID, 700, chargerBeat(0))
+    .add(Chapter4Anchor.MID, 1300, mixedChargerStalactiteBarrageBeat(-45, [60, 210]))
+    .add(Chapter4Anchor.MID, 2100, mixedStraightSineBeat(4, -85, 150, 90, 100))
+    .add(Chapter4Anchor.MID, 2900, turretBeat(-120))
+    .add(Chapter4Anchor.MID, 3600, mixedDiverVStalactiteBeat(3, 62, 50, 190));
 }
 
 function chapter4_3(): Timeline<Chapter4Anchor> {
   return new Timeline<Chapter4Anchor>(0.65)
     .anchor(Chapter4Anchor.START, 0)
     .anchor(Chapter4Anchor.MID, 5400)
-    .add(Chapter4Anchor.START, 300, sineRowBeat(5, 0, 250))
-    .add(Chapter4Anchor.START, 920, rockDrakeBeat(220))
-    .add(Chapter4Anchor.START, 1760, straightRowBeat(5, -80, 170))
-    .add(Chapter4Anchor.START, 2540, stalactitePairBeat(60, 220))
-    .add(Chapter4Anchor.START, 3340, rockDrakeBeat(-220))
-    .add(Chapter4Anchor.START, 4200, lavaPulseBeat())
-    .add(Chapter4Anchor.START, 4560, sineRowBeat(4, 80, 170))
-    .add(Chapter4Anchor.MID, 200, finalGauntletBeat(220, 4, -70, 150, 120))
-    .add(Chapter4Anchor.MID, 1040, diverVBeat(5, 58))
-    .add(Chapter4Anchor.MID, 1900, lavaAndDrakeBeat(-220))
-    .add(Chapter4Anchor.MID, 2780, mixedStalactiteMirrorSineBeat(40, 190, 85, -85, 110))
-    .add(Chapter4Anchor.MID, 3660, finalGauntletBeat(220, 5, 0, 210, 180))
-    .add(Chapter4Anchor.MID, 4520, lavaPulseBeat());
+    // START
+    .add(Chapter4Anchor.START, 300, supportSineBeat(-90))
+    .add(Chapter4Anchor.START, 800, rockDrakeBeat(220))
+    .add(Chapter4Anchor.START, 1600, straightRowBeat(4, -80, 150))
+    .add(Chapter4Anchor.START, 2200, stalactitePairBeat(40, 200))
+    .add(Chapter4Anchor.START, 2800, rockDrakeBeat(-220))
+    .add(Chapter4Anchor.START, 3600, mixedStraightDiverBeat(3, 80, 140, -120, 90))
+    .add(Chapter4Anchor.START, 4400, lavaPulseBeat())
+    // MID
+    .add(Chapter4Anchor.MID, 200, sinePairBeat(90, -90))
+    .add(Chapter4Anchor.MID, 1000, diverVBeat(4, 66))
+    .add(Chapter4Anchor.MID, 1800, lavaAndDrakeBeat(-220))
+    .add(Chapter4Anchor.MID, 2600, mixedStalactiteMirrorSineBeat(40, 180, 85, -85, 110))
+    .add(Chapter4Anchor.MID, 3400, finalGauntletBeat(220, 3, -60, 120, 140))
+    .add(Chapter4Anchor.MID, 4300, lavaPulseBeat());
 }
 
 function chapter4_4(): Timeline<Chapter4Anchor> {
   return new Timeline<Chapter4Anchor>(0.65)
     .anchor(Chapter4Anchor.START, 0)
     .anchor(Chapter4Anchor.MID, 6200)
-    .add(Chapter4Anchor.START, 300, sineRowBeat(6, 0, 270))
+    // START
+    .add(Chapter4Anchor.START, 300, sinePairBeat(90, -90))
     .add(Chapter4Anchor.START, 900, lavaPulseBeat())
-    .add(Chapter4Anchor.START, 1280, mixedStalactiteMirrorSineBeat(20, 170, 80, -80, 100))
-    .add(Chapter4Anchor.START, 2140, rockDrakeBeat(220))
-    .add(Chapter4Anchor.START, 3000, straightRowBeat(7, 0, 260))
-    .add(Chapter4Anchor.START, 3860, dualTurretStalactiteBeat(-120, 105, 180))
-    .add(Chapter4Anchor.START, 4740, mixedDiverVStalactiteBeat(6, 54, 50, 210))
-    .add(Chapter4Anchor.START, 5600, rockDrakeBeat(-220))
-    .add(Chapter4Anchor.MID, 260, lavaPulseBeat())
-    .add(Chapter4Anchor.MID, 620, swarmChokepointBeat())
-    .add(Chapter4Anchor.MID, 1420, finalGauntletBeat(220, 6, -65, 180, 120))
-    .add(Chapter4Anchor.MID, 2260, mixedChargerStalactiteBarrageBeat(35, [80, 220, 340, 460]))
-    .add(Chapter4Anchor.MID, 3180, lavaAndDrakeBeat(-220))
-    .add(Chapter4Anchor.MID, 3720, straightRowBeat(6, -90, 180))
-    .add(Chapter4Anchor.MID, 4240, mixedDiverVStalactiteBeat(5, 56, 70, 230))
-    .add(Chapter4Anchor.MID, 4820, sineRowBeat(6, 70, 190))
-    .add(Chapter4Anchor.MID, 5420, finalGauntletBeat(-220, 5, 80, 170, 160))
-    .add(Chapter4Anchor.MID, 5900, mirrorRockDrakeBeat(220, -220));
+    .add(Chapter4Anchor.START, 1400, mixedStalactiteMirrorSineBeat(20, 170, 80, -80, 100))
+    .add(Chapter4Anchor.START, 2100, rockDrakeBeat(220))
+    .add(Chapter4Anchor.START, 2800, straightRowBeat(5, 0, 240))
+    .add(Chapter4Anchor.START, 3500, dualTurretStalactiteBeat(-120, 105, 180))
+    .add(Chapter4Anchor.START, 4300, mixedDiverVStalactiteBeat(4, 62, 50, 200))
+    .add(Chapter4Anchor.START, 5100, rockDrakeBeat(-220))
+    // MID
+    .add(Chapter4Anchor.MID, 200, lavaPulseBeat())
+    .add(Chapter4Anchor.MID, 700, swarmChokepointBeat())
+    .add(Chapter4Anchor.MID, 1400, finalGauntletBeat(220, 4, -65, 150, 120))
+    .add(Chapter4Anchor.MID, 2200, mixedChargerStalactiteBarrageBeat(35, [80, 220]))
+    .add(Chapter4Anchor.MID, 3000, lavaAndDrakeBeat(-220))
+    .add(Chapter4Anchor.MID, 3700, straightRowBeat(5, -80, 160))
+    .add(Chapter4Anchor.MID, 4400, mixedDiverVStalactiteBeat(4, 62, 70, 210))
+    .add(Chapter4Anchor.MID, 5100, supportSineBeat(0))
+    .add(Chapter4Anchor.MID, 5700, finalGauntletBeat(-220, 4, 75, 150, 160))
+    .add(Chapter4Anchor.MID, 6500, mirrorRockDrakeBeat(220, -220));
 }
 
 function chapter4_5(): Timeline<Chapter4Anchor> {
   return new Timeline<Chapter4Anchor>(0.65)
     .anchor(Chapter4Anchor.START, 0)
     .anchor(Chapter4Anchor.MID, 6200)
-    .add(Chapter4Anchor.START, 320, straightRowBeat(6, 0, 250))
-    .add(Chapter4Anchor.START, 860, lavaPulseBeat())
-    .add(Chapter4Anchor.START, 1160, rockDrakeBeat(220))
-    .add(Chapter4Anchor.START, 1960, mixedStalactiteMirrorSineBeat(0, 180, 70, -70, 90))
-    .add(Chapter4Anchor.START, 2800, swarmChokepointBeat())
-    .add(Chapter4Anchor.START, 3540, lavaAndDrakeBeat(-220))
-    .add(Chapter4Anchor.START, 4240, straightRowBeat(5, 90, 170))
-    .add(Chapter4Anchor.START, 4860, mixedChargerStalactiteBarrageBeat(0, [60, 180, 300, 420]))
-    .add(Chapter4Anchor.START, 5320, mirrorRockDrakeBeat(220, -220))
+    // START
+    .add(Chapter4Anchor.START, 300, straightRowBeat(5, 0, 240))
+    .add(Chapter4Anchor.START, 800, lavaPulseBeat())
+    .add(Chapter4Anchor.START, 1300, rockDrakeBeat(220))
+    .add(Chapter4Anchor.START, 2000, mixedStalactiteMirrorSineBeat(0, 180, 70, -70, 90))
+    .add(Chapter4Anchor.START, 2700, swarmChokepointBeat())
+    .add(Chapter4Anchor.START, 3300, lavaAndDrakeBeat(-220))
+    .add(Chapter4Anchor.START, 4100, straightRowBeat(5, 80, 160))
+    .add(Chapter4Anchor.START, 4800, mixedChargerStalactiteBarrageBeat(0, [60, 200]))
+    .add(Chapter4Anchor.START, 5500, mirrorRockDrakeBeat(220, -220))
+    // MID
     .add(Chapter4Anchor.MID, 180, dualTurretStalactiteBeat(-125, 115, 120))
-    .add(Chapter4Anchor.MID, 940, mixedDiverVStalactiteBeat(6, 54, 40, 180))
-    .add(Chapter4Anchor.MID, 1800, finalGauntletBeat(220, 6, 0, 230, 100))
-    .add(Chapter4Anchor.MID, 2640, lavaAndDrakeBeat(-220))
-    .add(Chapter4Anchor.MID, 3240, sineRowBeat(5, -85, 170))
-    .add(Chapter4Anchor.MID, 3780, mixedChargerStalactiteBarrageBeat(-35, [40, 160, 280, 400]))
-    .add(Chapter4Anchor.MID, 4260, mirrorRockDrakeBeat(220, -220))
-    .add(Chapter4Anchor.MID, 4800, dualTurretStalactiteBeat(115, -115, 200))
-    .add(Chapter4Anchor.MID, 5320, finalGauntletBeat(-220, 6, 70, 190, 160))
-    .add(Chapter4Anchor.MID, 5860, lavaAndTurretBeat(120));
+    .add(Chapter4Anchor.MID, 900, mixedDiverVStalactiteBeat(4, 62, 40, 180))
+    .add(Chapter4Anchor.MID, 1700, finalGauntletBeat(220, 4, -60, 140, 120))
+    .add(Chapter4Anchor.MID, 2500, lavaAndDrakeBeat(-220))
+    .add(Chapter4Anchor.MID, 3200, sinePairBeat(90, -90))
+    .add(Chapter4Anchor.MID, 3900, mixedChargerStalactiteBarrageBeat(-35, [40, 180]))
+    .add(Chapter4Anchor.MID, 4600, mirrorRockDrakeBeat(220, -220))
+    .add(Chapter4Anchor.MID, 5200, dualTurretStalactiteBeat(115, -115, 200))
+    .add(Chapter4Anchor.MID, 5900, finalGauntletBeat(-220, 4, 70, 150, 160))
+    .add(Chapter4Anchor.MID, 6500, lavaAndTurretBeat(120));
 }
 
 const CHAPTER_4_BEATS = {
