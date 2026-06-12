@@ -15,14 +15,14 @@ Do not edit manually — numbers come from `scripts/run-profiler.mjs`.
 
 | Scenario | Avg calls | Max calls | Avg FPS | Min FPS (Lows) | Max objects | Top category (max units) |
 |---|:---:|:---:|:---:|:---:|:---:|:---|
-| **L1-4 no-fire** | 78 | 106 | 75 | 71 | 92 | enemy 63 |
-| **L1-4 tier5 tap-fire** | 74 | 92 | 75 | 75 | 83 | bullet 34, enemy 26 |
-| **L2-4 no-fire** | 77 | 108 | 75 | 75 | 85 | enemy 52 |
-| **L2-4 tier5 tap-fire** | 80 | 98 | 75 | 75 | 91 | bullet 36, enemy 31 |
-| **L3-4 no-fire** | 72 | 100 | 75 | 74 | 77 | enemy 45 |
-| **L3-4 tier5 tap-fire** | 78 | 91 | 75 | 74 | 80 | bullet 35, enemy 21 |
-| **L4-4 no-fire** | 81 | 118 | 75 | 75 | 110 | enemy 80 |
-| **L4-4 tier5 tap-fire** | 79 | 106 | 75 | 75 | 109 | enemy 47, bullet 41 |
+| **L1-4 no-fire** | 77 | 109 | 75 | 74 | 89 | enemy 60 |
+| **L1-4 tier5 tap-fire** | 79 | 96 | 75 | 73 | 87 | bullet 34, enemy 21 |
+| **L2-4 no-fire** | 76 | 105 | 75 | 74 | 82 | enemy 49 |
+| **L2-4 tier5 tap-fire** | 79 | 100 | 75 | 75 | 95 | bullet 36, enemy 34 |
+| **L3-4 no-fire** | 72 | 102 | 75 | 75 | 82 | enemy 51 |
+| **L3-4 tier5 tap-fire** | 80 | 93 | 75 | 75 | 90 | bullet 36, enemy 24 |
+| **L4-4 no-fire** | 78 | 110 | 75 | 75 | 111 | enemy 80 |
+| **L4-4 tier5 tap-fire** | 79 | 109 | 75 | 75 | 111 | enemy 54, bullet 41 |
 
 ---
 
@@ -31,29 +31,27 @@ Do not edit manually — numbers come from `scripts/run-profiler.mjs`.
 ### L1-4 no-fire
 
 ```
-calls   avg 78  max 106
-fps     avg 75  max 76  (min 71)
-objects avg 65  max 92
+calls   avg 77  max 109
+fps     avg 75  max 76  (min 74)
+objects avg 63  max 89
 ```
 
 **Max category ownership:**
 
 | Category | Max units |
 |---|:---:|
-| enemy | 63 |
+| enemy | 60 |
 | background | 21 |
 | bullet | 6 |
 | player | 3 |
-| uncategorized | 3 |
 | effect | 1 |
 
 **Top detail owners:**
 
 | Detail | Max units |
 |---|:---:|
-| enemy.straight | 36 |
-| enemy.swarm | 16 |
-| enemy.sine | 15 |
+| enemy.straight | 39 |
+| enemy.sine | 18 |
 | enemy.diver | 12 |
 | background.arch | 5 |
 | background.tower | 4 |
@@ -66,10 +64,10 @@ objects avg 65  max 92
 ### L1-4 tier5 tap-fire
 
 ```
-calls   avg 74  max 92
-fps     avg 75  max 76  (min 75)
-objects avg 65  max 83
-bullets avg 31  max 38  (render units avg 49 max 57)
+calls   avg 79  max 96
+fps     avg 75  max 76  (min 73)
+objects avg 72  max 87
+bullets avg 30  max 36  (render units avg 48 max 55)
 ```
 
 **Max category ownership:**
@@ -77,8 +75,9 @@ bullets avg 31  max 38  (render units avg 49 max 57)
 | Category | Max units |
 |---|:---:|
 | bullet | 34 |
-| enemy | 26 |
 | background | 21 |
+| enemy | 21 |
+| uncategorized | 9 |
 | player | 3 |
 | effect | 2 |
 
@@ -87,9 +86,8 @@ bullets avg 31  max 38  (render units avg 49 max 57)
 | Detail | Max units |
 |---|:---:|
 | enemy.straight | 15 |
-| enemy.swarm | 14 |
 | enemy.diver | 12 |
-| enemy.sine | 6 |
+| enemy.sine | 9 |
 | background.arch | 5 |
 | background.tower | 4 |
 | background.dust | 4 |
@@ -103,10 +101,10 @@ bullets avg 31  max 38  (render units avg 49 max 57)
 | Source | Max bullets | Max render units |
 |---|:---:|:---:|
 | player | 20 | 40 |
-| enemy | 11 | 11 |
 | playerWave | 10 | 10 |
+| enemy | 9 | 9 |
 | enemySwarm | 4 | 4 |
-| enemySine | 2 | 2 |
+| enemySine | 3 | 3 |
 
 ---
 
@@ -115,16 +113,16 @@ bullets avg 31  max 38  (render units avg 49 max 57)
 ### L2-4 no-fire
 
 ```
-calls   avg 77  max 108
-fps     avg 75  max 76  (min 75)
-objects avg 65  max 85
+calls   avg 76  max 105
+fps     avg 75  max 76  (min 74)
+objects avg 64  max 82
 ```
 
 **Max category ownership:**
 
 | Category | Max units |
 |---|:---:|
-| enemy | 52 |
+| enemy | 49 |
 | background | 17 |
 | bullet | 8 |
 | terrain | 5 |
@@ -135,11 +133,10 @@ objects avg 65  max 85
 
 | Detail | Max units |
 |---|:---:|
-| enemy.straight | 30 |
+| enemy.straight | 27 |
 | enemy.charger | 17 |
 | enemy.sine | 12 |
 | enemy.turret | 10 |
-| enemy.swarm | 8 |
 | background.turbine | 4 |
 | background.spark | 4 |
 | background.column | 3 |
@@ -152,10 +149,10 @@ objects avg 65  max 85
 ### L2-4 tier5 tap-fire
 
 ```
-calls   avg 80  max 98
+calls   avg 79  max 100
 fps     avg 75  max 76  (min 75)
-objects avg 72  max 91
-bullets avg 30  max 37  (render units avg 48 max 59)
+objects avg 71  max 95
+bullets avg 30  max 40  (render units avg 49 max 62)
 ```
 
 **Max category ownership:**
@@ -163,11 +160,11 @@ bullets avg 30  max 37  (render units avg 48 max 59)
 | Category | Max units |
 |---|:---:|
 | bullet | 36 |
-| enemy | 31 |
+| enemy | 34 |
 | background | 17 |
-| uncategorized | 9 |
 | terrain | 5 |
 | player | 3 |
+| uncategorized | 3 |
 | effect | 2 |
 
 **Top detail owners:**
@@ -176,8 +173,8 @@ bullets avg 30  max 37  (render units avg 48 max 59)
 |---|:---:|
 | enemy.straight | 18 |
 | enemy.turret | 10 |
-| enemy.charger | 8 |
-| enemy.sine | 6 |
+| enemy.sine | 9 |
+| enemy.charger | 7 |
 | background.turbine | 4 |
 | background.spark | 4 |
 | background.column | 3 |
@@ -185,7 +182,6 @@ bullets avg 30  max 37  (render units avg 48 max 59)
 | terrain.panel | 3 |
 | background.gear | 2 |
 | terrain.pillar | 2 |
-| enemy.swarm | 2 |
 | background.backdrop | 1 |
 
 **Max bullet sources (render units):**
@@ -193,10 +189,10 @@ bullets avg 30  max 37  (render units avg 48 max 59)
 | Source | Max bullets | Max render units |
 |---|:---:|:---:|
 | player | 20 | 40 |
-| playerWave | 9 | 9 |
+| playerWave | 10 | 10 |
 | enemy | 8 | 8 |
 | bossLaser | 3 | 6 |
-| enemySine | 2 | 2 |
+| enemySine | 3 | 3 |
 
 ---
 
@@ -205,16 +201,16 @@ bullets avg 30  max 37  (render units avg 48 max 59)
 ### L3-4 no-fire
 
 ```
-calls   avg 72  max 100
-fps     avg 75  max 76  (min 74)
-objects avg 59  max 77
+calls   avg 72  max 102
+fps     avg 75  max 76  (min 75)
+objects avg 61  max 82
 ```
 
 **Max category ownership:**
 
 | Category | Max units |
 |---|:---:|
-| enemy | 45 |
+| enemy | 51 |
 | background | 17 |
 | terrain | 7 |
 | bullet | 5 |
@@ -225,8 +221,8 @@ objects avg 59  max 77
 
 | Detail | Max units |
 |---|:---:|
-| enemy.straight | 21 |
-| enemy.sine | 15 |
+| enemy.sine | 18 |
+| enemy.straight | 18 |
 | enemy.charger | 15 |
 | enemy.obstacle | 9 |
 | background.womb | 4 |
@@ -237,30 +233,29 @@ objects avg 59  max 77
 | background.pod | 3 |
 | terrain.spike | 3 |
 | background.column | 2 |
-| enemy.swarm | 2 |
 | background.backdrop | 1 |
 
 ### L3-4 tier5 tap-fire
 
 ```
-calls   avg 78  max 91
-fps     avg 75  max 76  (min 74)
-objects avg 69  max 80
-bullets avg 30  max 39  (render units avg 61 max 109)
+calls   avg 80  max 93
+fps     avg 75  max 76  (min 75)
+objects avg 74  max 90
+bullets avg 29  max 39  (render units avg 56 max 106)
 ```
 
-> **Note:** Homing missiles (`homing` source) dominate render units at **max 70** despite only 10 active missiles. Each homing missile currently costs ~7 render units (70 / 10). This is the most significant per-unit overhead visible in this baseline.
+> **Note:** Homing missiles (`homing` source) dominate render units at **max 56** despite only 8 active missiles. Each homing missile currently costs ~7 render units (56 / 8). This is the most significant per-unit overhead visible in this baseline.
 
 **Max category ownership:**
 
 | Category | Max units |
 |---|:---:|
-| bullet | 35 |
-| enemy | 21 |
+| bullet | 36 |
+| enemy | 24 |
 | background | 17 |
 | terrain | 7 |
 | player | 3 |
-| uncategorized | 3 |
+| uncategorized | 9 |
 | effect | 2 |
 
 **Top detail owners:**
@@ -269,9 +264,9 @@ bullets avg 30  max 39  (render units avg 61 max 109)
 |---|:---:|
 | enemy.straight | 12 |
 | enemy.sine | 9 |
+| enemy.spore | 8 |
 | enemy.charger | 7 |
 | enemy.obstacle | 6 |
-| enemy.spore | 6 |
 | background.womb | 4 |
 | background.spore | 4 |
 | terrain.panel | 4 |
@@ -279,18 +274,17 @@ bullets avg 30  max 39  (render units avg 61 max 109)
 | background.pod | 3 |
 | terrain.spike | 3 |
 | background.column | 2 |
-| enemy.swarm | 2 |
 | background.backdrop | 1 |
 
 **Max bullet sources (render units):**
 
 | Source | Max bullets | Max render units |
 |---|:---:|:---:|
-| homing | 10 | 70 |
+| homing | 8 | 56 |
 | player | 20 | 40 |
-| playerWave | 9 | 9 |
-| enemySine | 5 | 5 |
-| enemy | 4 | 4 |
+| playerWave | 10 | 10 |
+| enemy | 6 | 6 |
+| enemySine | 4 | 4 |
 | enemySwarm | 1 | 1 |
 
 ---
@@ -300,41 +294,40 @@ bullets avg 30  max 39  (render units avg 61 max 109)
 ### L4-4 no-fire
 
 ```
-calls   avg 81  max 118
+calls   avg 78  max 110
 fps     avg 75  max 76  (min 75)
-objects avg 72  max 110
+objects avg 72  max 111
 ```
 
-> Chapter 4 carries the widest enemy set. `enemy` dominates at **max 80 units** — roughly 7–8× the background cost. Following optimizations to cache procedural resources and maintain a constant PointLight count, FPS remains completely stable with a minimum of 75 FPS throughout peak frames.
+> Chapter 4 carries the widest enemy set. `enemy` dominates at **max 80 units** — roughly 7–8× the background cost. Following optimizations to cache procedural resources, maintain a constant PointLight count, and batch Swarm enemies, FPS remains completely stable with a minimum of 75 FPS throughout peak frames.
 
 **Max category ownership:**
 
 | Category | Max units |
 |---|:---:|
 | enemy | 80 |
-| bullet | 15 |
+| bullet | 14 |
 | background | 11 |
 | terrain | 5 |
 | player | 3 |
-| effect | 3 |
+| effect | 1 |
 
 **Top detail owners:**
 
 | Detail | Max units |
 |---|:---:|
-| enemy.sine | 24 |
+| enemy.sine | 27 |
 | enemy.straight | 24 |
 | enemy.turret | 20 |
 | enemy.diver | 18 |
 | enemy.rockDrake | 16 |
 | enemy.stalactite | 15 |
-| enemy.charger | 8 |
+| enemy.charger | 9 |
 | background.geyser | 4 |
 | background.spire | 2 |
 | background.rockPlate | 2 |
 | terrain.column | 2 |
 | terrain.backing | 2 |
-| enemy.swarm | 2 |
 | background.backdrop | 1 |
 | background.geyserParticle | 1 |
 | background.ember | 1 |
@@ -343,17 +336,17 @@ objects avg 72  max 110
 ### L4-4 tier5 tap-fire
 
 ```
-calls   avg 79  max 106
+calls   avg 79  max 109
 fps     avg 75  max 76  (min 75)
-objects avg 74  max 109
-bullets avg 30  max 38  (render units avg 49 max 63)
+objects avg 78  max 111
+bullets avg 30  max 37  (render units avg 50 max 61)
 ```
 
 **Max category ownership:**
 
 | Category | Max units |
 |---|:---:|
-| enemy | 47 |
+| enemy | 54 |
 | bullet | 41 |
 | background | 11 |
 | terrain | 5 |
@@ -367,17 +360,16 @@ bullets avg 30  max 38  (render units avg 49 max 63)
 |---|:---:|
 | enemy.turret | 22 |
 | enemy.stalactite | 20 |
-| enemy.sine | 18 |
 | enemy.straight | 18 |
 | enemy.rockDrake | 16 |
+| enemy.charger | 15 |
+| enemy.sine | 12 |
 | enemy.diver | 12 |
-| enemy.charger | 8 |
 | background.geyser | 4 |
 | background.spire | 2 |
 | background.rockPlate | 2 |
 | terrain.column | 2 |
 | terrain.backing | 2 |
-| enemy.swarm | 2 |
 | background.backdrop | 1 |
 | background.geyserParticle | 1 |
 | background.ember | 1 |
@@ -389,17 +381,19 @@ bullets avg 30  max 38  (render units avg 49 max 63)
 |---|:---:|:---:|
 | player | 20 | 40 |
 | bossLaser | 6 | 12 |
-| playerWave | 10 | 10 |
 | lava | 5 | 10 |
+| playerWave | 9 | 9 |
 | enemySine | 4 | 4 |
 | enemy | 4 | 4 |
+| enemySwarm | 1 | 1 |
 
 ---
 
 ## Cross-Chapter Observations
 
 - **All chapters are enemy-bound**, not background- or terrain-bound. The prior background instancing work has been effective — background max ownership is 21 (Ch1), 17 (Ch2/3), 11 (Ch4).
-- **FPS lows are completely resolved** across all chapters, with the minimum recorded framerate now locked at **71 FPS** or above (stable around 75 FPS throughout), compared to baseline drops as low as 33–34 FPS.
+- **FPS lows are completely resolved** across all chapters, with the minimum recorded framerate now locked at **73 FPS** or above (stable around 75 FPS throughout), compared to baseline drops as low as 33–34 FPS.
+- **Popcorn instancing is active**: Spawning groups of `EnemySwarm` is now batched under `THREE.InstancedMesh`. Swarm counts are successfully collapsed out of unique scene graph traversals.
 - **Bullet rendering is well-controlled** in Chapters 1/2/4. Chapter 3 homing missiles are the standout outlier (~7 render units per missile vs ~2 for other projectile types).
-- **Uncategorized objects** appear in tier5 scenarios (max 9 in Ch2, max 3 in Ch3/Ch4) — these are meshes not yet tagged with a `RenderCategory` and should be investigated.
+- **Uncategorized objects** appear in tier5 scenarios (max 9 in Ch1/Ch3, max 3 in Ch2/Ch4) — these are meshes not yet tagged with a `RenderCategory` and should be investigated.
 - The next optimization target across all chapters is most likely `enemy.*` draw call consolidation or the homing missile render unit cost in Chapter 3.
