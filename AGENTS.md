@@ -21,6 +21,7 @@ Automated module tests use Vitest. Verification is:
 Vitest tests are co-located with the modules they protect as `src/**/*.test.ts`, run in the `node` environment, and are limited by `vitest.config.ts` to source tests so browser profile artifacts under `.tmp/` are not collected. Use plain object fakes for deterministic module seams instead of constructing full Three.js entities unless the integration itself is under test.
 
 For render-performance work, see `docs/render-optimization-notes.md` and `scripts/collect-render-stats.mjs`.
+For the current cross-chapter draw-call baseline, see `docs/render-baseline.md`.
 
 ### Manual Playtesting
 
@@ -80,13 +81,32 @@ On Linux Wayland, use a headed Chrome window for CDP render-stat runs. Headless 
 
 **Authorized Windows Workflow**:
 1. Ensure the development server is active at `http://localhost:5173` (start manually via `npm run dev`).
-2. Run the pre-authorized profiling orchestrator using the absolute path to the primary runtime Node executable. This bypasses system sandbox permission restrictions
-3. The orchestrator script will:
-   - Programmatically spawn a headless Google Chrome instance on port `9222` using a dedicated profile folder (`.tmp/chrome-profile`) to avoid conflicts with active desktop sessions.
-   - Connect via WebSockets and execute `scripts/collect-render-stats.mjs`.
-   - Cycle through all 4 dense gameplay scenarios, gather FPS/draw calls, print the JSON results, and cleanly kill the browser process on completion.
+2. Run the profiling orchestrator, which spawns the browser and collector as a single Node process tree:
+   ```
+   node scripts/run-profiler.mjs
+   ```
+3. The orchestrator will:
+   - Spawn a headless Edge (or Chrome) instance as a **child process of Node** using hardware GPU WebGL by default (or `--use-gl=swiftshader` if fallback env var `USE_SWIFTSHADER=1` is set) and a dedicated profile folder (`.tmp/profiler-profile`).
+   - Wait for CDP to become ready on port `9222`.
+   - Import and run `scripts/collect-render-stats.mjs` in the same Node process.
+   - Cycle through the 8 cross-chapter scenarios, print JSON results to stdout, and kill the browser on completion.
 
-For further render-performance work, see `docs/render-optimization-notes.md` for detailed scenario guidelines and historical benchmark datasets.
+**Why the orchestrator is required on Windows:**
+Windows security policy (observed on Windows 10/11 with both Chrome 149 and Edge 149) kills headless Chrome/Edge within seconds when a separately launched Node process attempts a CDP connection to port `9222`, even though the browser accepts connections from PowerShell in the same session. The browser must be spawned as a **child of the connecting Node process** to be accepted. Symptoms of this problem:
+- Browser starts and responds to `Invoke-WebRequest` or `curl` manually.
+- `node scripts/collect-render-stats.mjs` immediately fails with `ECONNREFUSED 127.0.0.1:9222`.
+- The browser process disappears at the moment Node first connects.
+
+If you see this pattern, use `scripts/run-profiler.mjs` instead of running `collect-render-stats.mjs` directly.
+
+**Additional Windows notes:**
+- Do not use `--disable-gpu`. The game is WebGL-only — disabling the GPU kills the renderer.
+- The orchestrator uses hardware GPU by default. If WebGL fails to initialise (blank scene, `window.game` never becomes ready), re-run with `USE_SWIFTSHADER=1 node scripts/run-profiler.mjs` to fall back to software rendering.
+- `localhost` resolves to `::1` (IPv6) before `127.0.0.1` on some Windows systems. The scripts default to `127.0.0.1` to avoid this. Do not revert to `localhost` in `CDP_BASE`.
+- Use Edge (`msedge.exe`) as the primary browser candidate on Windows. It is typically more stable in headless mode than the `x86` Chrome install.
+
+For scenario guidelines and historical optimization results, see `docs/render-optimization-notes.md`.
+For the current cross-chapter draw-call baseline, see `docs/render-baseline.md`.
 
 ## Git
 

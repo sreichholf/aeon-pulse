@@ -4,6 +4,8 @@ This document records the current render-profiling workflow and the optimization
 
 It is intentionally not an ADR. These notes describe a useful implementation approach, not a hard architectural commitment.
 
+For the **current cross-chapter draw-call baseline** (replaces this file's historical tables as the live snapshot), see [render-baseline.md](/E:/Develop/GitHub/aeon-pulse/docs/render-baseline.md).
+
 ## Profiling Workflow
 
 Use the runtime flags already wired into the game:

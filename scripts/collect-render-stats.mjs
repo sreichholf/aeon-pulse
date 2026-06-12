@@ -1,5 +1,5 @@
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:5173/?renderStats=1&invincible=1';
-const CDP_BASE = process.env.CDP_BASE ?? 'http://localhost:9222';
+const CDP_BASE = process.env.CDP_BASE ?? 'http://127.0.0.1:9222';
 const DURATION_SCALE = Number.parseFloat(process.env.DURATION_SCALE ?? '1');
 const SELECTED_SCENARIOS = new Set(
   (process.env.SCENARIOS ?? '')
@@ -320,10 +320,17 @@ function sortRecordDesc(record) {
 }
 
 const scenarios = [
-  { name: 'L1-1 no-fire', levelAdvance: 0, tierAdvance: 0, durationMs: 25000, fireEveryMs: null },
-  { name: 'L1-1 tier5 tap-fire', levelAdvance: 0, tierAdvance: 4, durationMs: 35000, fireEveryMs: 190 },
-  { name: 'L4-4 no-fire', levelAdvance: 18, tierAdvance: 0, durationMs: 30000, fireEveryMs: null },
-  { name: 'L4-4 tier5 tap-fire', levelAdvance: 18, tierAdvance: 4, durationMs: 45000, fireEveryMs: 190 },
+  // Cross-chapter baseline: level 4 of each chapter (dense non-finale), no-fire + tier5 tap-fire.
+  // levelAdvance is the ArrowUp count from the title screen (0-indexed position in IMPLEMENTED_LEVELS).
+  // L1-4 = index 3, L2-4 = index 8, L3-4 = index 13, L4-4 = index 18
+  { name: 'L1-4 no-fire',         levelAdvance: 3,  tierAdvance: 0, durationMs: 30000, fireEveryMs: null },
+  { name: 'L1-4 tier5 tap-fire',  levelAdvance: 3,  tierAdvance: 4, durationMs: 45000, fireEveryMs: 190 },
+  { name: 'L2-4 no-fire',         levelAdvance: 8,  tierAdvance: 0, durationMs: 30000, fireEveryMs: null },
+  { name: 'L2-4 tier5 tap-fire',  levelAdvance: 8,  tierAdvance: 4, durationMs: 45000, fireEveryMs: 190 },
+  { name: 'L3-4 no-fire',         levelAdvance: 13, tierAdvance: 0, durationMs: 30000, fireEveryMs: null },
+  { name: 'L3-4 tier5 tap-fire',  levelAdvance: 13, tierAdvance: 4, durationMs: 45000, fireEveryMs: 190 },
+  { name: 'L4-4 no-fire',         levelAdvance: 18, tierAdvance: 0, durationMs: 30000, fireEveryMs: null },
+  { name: 'L4-4 tier5 tap-fire',  levelAdvance: 18, tierAdvance: 4, durationMs: 45000, fireEveryMs: 190 },
 ]
   .filter((scenario) => SELECTED_SCENARIOS.size === 0 || SELECTED_SCENARIOS.has(scenario.name))
   .map((scenario) => ({
