@@ -66,6 +66,25 @@ Key design decisions live in `docs/adr/`. Read the relevant ADR before modifying
 - `0027-sector-based-environment-variation.md` — each Level maps to a Sector; mapping in `Campaign.ts`, definitions in `src/level/sectors/chapterX.ts`.
 - `0028-destructible-props-as-world-entities.md` — props are a first-class `props` collection routed through collision/combat; non-solid in v1.
 - `0029-sector-visuals-stay-procedural.md` — Sector identity comes from procedural landmarks via `InstancedScrollLayer`; no background GLB pipeline.
+- `0030-solid-props-and-sector-corridor-margins.md` — Props can become solid obstacles and Sectors can narrow the playable corridor with `playfieldMargins`.
+- `0031-corridor-relative-enemy-spawn-coordinates.md` — wave spawn positions are authored as normalized safe-corridor coordinates and resolved to screen space at level-build time.
+- `0032-procedural-resource-cache-span.md` — procedural geometry/material cache spans standard enemies and the Chapter 4 finale boss via `ProceduralResourceCache`.
+- `0033-deferred-level-completion.md` — finale-boss level completion is deferred out of the gameplay tick stack via `hasPendingLevelComplete`.
+- `0034-projectile-lifecycle-stays-in-gameplay-run.md` — projectile create/retain/release/cancel rules stay private to `GameplayRun` rather than a separate lifecycle module.
+- `0035-ambient-popcorn-stays-in-level-manager.md` — ambient popcorn spawning stays in `LevelManager` rather than a dedicated module.
+- `0036-playwright-automated-browser-tests.md` — `@playwright/test` replaces CDP as the blessed browser automation layer for smoke tests, campaign validation, and render-baseline profiling.
+
+## Agent Skills
+
+Specialized agent skills live under `.agents/skills/`. Load one with the `skill` tool when its description matches the task.
+
+Notable skills include:
+
+- `grill-with-docs` — stress-test a plan against the project's domain model and documented decisions; update `CONTEXT.md` and ADRs inline as terminology and trade-offs crystallize.
+- `diagnose` — disciplined reproduce/hypothesize/instrument/fix loop for hard bugs and performance regressions.
+- `improve-codebase-architecture` — find consolidation and testability opportunities informed by `CONTEXT.md` and the ADRs.
+
+See each skill's `SKILL.md` for its full workflow.
 
 ## High-Level Architecture
 

@@ -1,4 +1,4 @@
-# ADR 0026 — Playwright Automated Browser Tests
+# ADR 0036 — Playwright Automated Browser Tests
 
 **Status:** Accepted  
 **Date:** 2026-06-21
