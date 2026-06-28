@@ -1,0 +1,31 @@
+{
+  "name": "aeon-pulse-game",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "preview": "vite preview",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "profile": "playwright test --project=render-baseline"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.4.0",
+    "@gltf-transform/functions": "^4.4.0",
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^26.0.0",
+    "@types/three": "^0.184.1",
+    "meshoptimizer": "^1.1.1",
+    "typescript": "^6.0.3",
+    "vite": "^5.4.11",
+    "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "three": "^0.184.0"
+  }
+}

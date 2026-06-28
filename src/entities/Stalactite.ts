@@ -1,0 +1,639 @@
+import * as THREE from 'three';
+import { EnemyType, ProjectileSourceKey, UserDataKey, type GetPositionFn, type IBullet, type ITerrain, type IAudio, type IScene, type ProjectileFactoryFn } from '../types.ts';
+import { Enemy, HALF_W, HALF_H } from './Enemy.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ensureNonIndexed, ProceduralResourceCache, setMaterialBucket, VOLCANIC_MATERIAL_PARAMS, VOLCANIC_COLORS } from '../utils/ProceduralToolkit.ts';
+import { DEFAULT_FLASH_MATERIAL } from '../systems/StandardEnemyModel.ts';
+import { RenderCategory, markRenderCategory } from '../systems/RenderStats.ts';
+
+const FALL_SPEED = 320;
+const SCROLL_SPD = 140;
+
+type StalactiteState = 'hanging' | 'shaking' | 'falling' | 'shattered';
+
+interface ShardParticle {
+  mesh: THREE.Mesh;
+  vx: number;
+  vy: number;
+  vz: number;
+  rx: number;
+  ry: number;
+  rz: number;
+}
+
+interface StalactiteResources {
+  geometries: {
+    rock: THREE.BufferGeometry;
+    armor: THREE.BufferGeometry;
+    spike: THREE.BufferGeometry;
+    joint: THREE.BufferGeometry;
+    tip: THREE.BufferGeometry;
+    shardBox: THREE.BufferGeometry;
+    shardCone: THREE.BufferGeometry;
+    shardSphere: THREE.BufferGeometry;
+    flash: THREE.BufferGeometry;
+  };
+  materials: {
+    rock: THREE.MeshPhongMaterial;
+    armor: THREE.MeshPhongMaterial;
+    spike: THREE.MeshPhongMaterial;
+    jointTemplate: THREE.MeshPhongMaterial;
+    lavaTipTemplate: THREE.MeshPhongMaterial;
+    shardRockTemplate: THREE.MeshPhongMaterial;
+    shardLavaTemplate: THREE.MeshPhongMaterial;
+  };
+}
+
+export class Stalactite extends Enemy {
+  private static _cache = new ProceduralResourceCache<StalactiteResources>();
+
+  static initSharedResources(): void {
+    Stalactite._cache.init(() => {
+      // 1. Geometries
+      const geo1 = new THREE.CylinderGeometry(15, 12, 16, 5);
+      const geo1Cloned = ensureNonIndexed(geo1);
+      geo1Cloned.translate(0, 20, 0);
+
+      const geo2 = new THREE.CylinderGeometry(10, 7.5, 16, 5);
+      const geo2Cloned = ensureNonIndexed(geo2);
+      geo2Cloned.translate(0, 0, 0);
+
+      const geo3 = new THREE.ConeGeometry(6, 20, 5);
+      const geo3Cloned = ensureNonIndexed(geo3);
+      geo3Cloned.rotateZ(Math.PI);
+      geo3Cloned.translate(0, -20, 0);
+
+      const rockGeos = [geo1Cloned, geo2Cloned, geo3Cloned];
+      const mergedRockGeo = mergeGeometries(rockGeos);
+      if (!mergedRockGeo) throw new Error('Stalactite: failed to merge rock geometry');
+      mergedRockGeo.computeVertexNormals();
+      mergedRockGeo.computeBoundingBox();
+      mergedRockGeo.computeBoundingSphere();
+
+      rockGeos.forEach(g => g.dispose());
+      geo1.dispose();
+      geo2.dispose();
+      geo3.dispose();
+
+      // Armor
+      const armor1Geo = new THREE.CylinderGeometry(16.5, 13.5, 6, 5);
+      const armor1Cloned = ensureNonIndexed(armor1Geo);
+      armor1Cloned.translate(0, 22, 0);
+
+      const armor2Geo = new THREE.CylinderGeometry(11.5, 9, 5, 5);
+      const armor2Cloned = ensureNonIndexed(armor2Geo);
+      armor2Cloned.translate(0, 1.5, 0);
+
+      const armorGeos = [armor1Cloned, armor2Cloned];
+      const mergedArmorGeo = mergeGeometries(armorGeos);
+      if (!mergedArmorGeo) throw new Error('Stalactite: failed to merge armor geometry');
+      mergedArmorGeo.computeVertexNormals();
+      mergedArmorGeo.computeBoundingBox();
+      mergedArmorGeo.computeBoundingSphere();
+
+      armorGeos.forEach(g => g.dispose());
+      armor1Geo.dispose();
+      armor2Geo.dispose();
+
+      // Spikes
+      const spikeGeo = new THREE.ConeGeometry(2.5, 8, 4);
+
+      const spike1aCloned = ensureNonIndexed(spikeGeo);
+      spike1aCloned.rotateZ(Math.PI / 3);
+      spike1aCloned.translate(13, 20, 0);
+
+      const spike1bCloned = ensureNonIndexed(spikeGeo);
+      spike1bCloned.translate(-13, 20, 0);
+
+      const spike2Geo = new THREE.ConeGeometry(2, 6, 4);
+
+      const spike2aCloned = ensureNonIndexed(spike2Geo);
+      spike2aCloned.rotateZ(Math.PI / 4);
+      spike2aCloned.translate(8.5, -1, 0);
+
+      const spike2bCloned = ensureNonIndexed(spike2Geo);
+      spike2bCloned.translate(-8.5, -1, 0);
+
+      const spikeGeos = [spike1aCloned, spike1bCloned, spike2aCloned, spike2bCloned];
+      const mergedSpikeGeo = mergeGeometries(spikeGeos);
+      if (!mergedSpikeGeo) throw new Error('Stalactite: failed to merge spike geometry');
+      mergedSpikeGeo.computeVertexNormals();
+      mergedSpikeGeo.computeBoundingBox();
+      mergedSpikeGeo.computeBoundingSphere();
+
+      spikeGeos.forEach(g => g.dispose());
+      spikeGeo.dispose();
+      spike2Geo.dispose();
+
+      // Joints
+      const joint1Geo = new THREE.SphereGeometry(8, 8, 8);
+      const joint1Cloned = ensureNonIndexed(joint1Geo);
+      joint1Cloned.translate(0, 10, 0);
+
+      const joint2Geo = new THREE.SphereGeometry(5.5, 8, 8);
+      const joint2Cloned = ensureNonIndexed(joint2Geo);
+      joint2Cloned.translate(0, -10, 0);
+
+      const jointGeos = [joint1Cloned, joint2Cloned];
+      const mergedJointGeo = mergeGeometries(jointGeos);
+      if (!mergedJointGeo) throw new Error('Stalactite: failed to merge joint geometry');
+      mergedJointGeo.computeVertexNormals();
+      mergedJointGeo.computeBoundingBox();
+      mergedJointGeo.computeBoundingSphere();
+
+      jointGeos.forEach(g => g.dispose());
+      joint1Geo.dispose();
+      joint2Geo.dispose();
+
+      // Tip
+      const tipGeo = new THREE.SphereGeometry(3.5, 8, 8);
+
+      // Shard geometries
+      const shardBox = new THREE.BoxGeometry(4.5, 4.5, 4.5);
+      const shardCone = new THREE.ConeGeometry(2.5, 6, 4);
+      const shardSphere = new THREE.SphereGeometry(3, 4, 4);
+
+      // Single merged flash geometry (clone and combine components)
+      const tipCloned = ensureNonIndexed(tipGeo);
+      tipCloned.translate(0, -30, 0);
+      const flashGeos = [
+        mergedRockGeo.clone(),
+        mergedArmorGeo.clone(),
+        mergedSpikeGeo.clone(),
+        mergedJointGeo.clone(),
+        tipCloned,
+      ];
+      const mergedFlashGeo = mergeGeometries(flashGeos);
+      if (!mergedFlashGeo) throw new Error('Stalactite: failed to merge flash geometry');
+      flashGeos.forEach(g => g.dispose());
+
+      const geometries = {
+        rock: mergedRockGeo,
+        armor: mergedArmorGeo,
+        spike: mergedSpikeGeo,
+        joint: mergedJointGeo,
+        tip: tipGeo,
+        shardBox,
+        shardCone,
+        shardSphere,
+        flash: mergedFlashGeo,
+      };
+
+      // 2. Materials
+      const rockMat = new THREE.MeshPhongMaterial({ ...VOLCANIC_MATERIAL_PARAMS.rock });
+      setMaterialBucket(rockMat, 'body');
+
+      const armorMat = new THREE.MeshPhongMaterial({ ...VOLCANIC_MATERIAL_PARAMS.armor });
+      setMaterialBucket(armorMat, 'body');
+
+      const jointTemplate = new THREE.MeshPhongMaterial({ ...VOLCANIC_MATERIAL_PARAMS.joint });
+      setMaterialBucket(jointTemplate, 'glow');
+
+      const spikeMat = new THREE.MeshPhongMaterial({
+        color: 0x7a6c5f,
+        emissive: 0x1c0f08,
+        specular: 0x3e342c,
+        shininess: 30,
+      });
+      setMaterialBucket(spikeMat, 'body');
+
+      const lavaTipTemplate = new THREE.MeshPhongMaterial({
+        color: VOLCANIC_COLORS.LAVA_TIP,
+        emissive: VOLCANIC_COLORS.MOLTEN,
+        shininess: 50,
+      });
+      setMaterialBucket(lavaTipTemplate, 'glow');
+
+      const shardRockTemplate = new THREE.MeshPhongMaterial({
+        color: 0x44372e,
+        emissive: 0x1e1007,
+        specular: 0x382c24,
+        shininess: 35,
+        transparent: true,
+        opacity: 1
+      });
+      setMaterialBucket(shardRockTemplate, 'body');
+
+      const shardLavaTemplate = new THREE.MeshPhongMaterial({
+        color: VOLCANIC_COLORS.MOLTEN,
+        emissive: VOLCANIC_COLORS.MOLTEN,
+        shininess: 20,
+        transparent: true,
+        opacity: 1
+      });
+      setMaterialBucket(shardLavaTemplate, 'glow');
+
+      const materials = {
+        rock: rockMat,
+        armor: armorMat,
+        spike: spikeMat,
+        jointTemplate,
+        lavaTipTemplate,
+        shardRockTemplate,
+        shardLavaTemplate,
+      };
+
+      return { geometries, materials };
+    });
+  }
+
+  private _getScrollX: (() => number) | null;
+  private _terrain: ITerrain | null;
+  private _audio: IAudio | null;
+  private _state: StalactiteState;
+  private _shakeTimer: number;
+  private _shakeDuration: number;
+  private _shatterTimer: number;
+  private _time: number;
+  private _shards: ShardParticle[];
+  private _anchorY: number;
+  private _jointMat: THREE.MeshPhongMaterial | null;
+  private _lavaTipMat: THREE.MeshPhongMaterial | null;
+  private _segments: THREE.Group[];
+  private _joints: THREE.Mesh[];
+  private _tipMesh: THREE.Mesh | null;
+  private _shardMaterials: THREE.MeshPhongMaterial[] | null;
+  private _shardGeometries: THREE.BufferGeometry[] | null;
+  private _flashOverlay: THREE.Mesh | null = null;
+
+  constructor(
+    scene: IScene,
+    sprites: Record<string, THREE.Texture>,
+    x: number,
+    y: number,
+    getPlayerPos: GetPositionFn | null,
+    getScrollX: (() => number) | null,
+    terrain: ITerrain | null,
+    audio: IAudio | null,
+    projectileFactory: ProjectileFactoryFn,
+  ) {
+    super(scene, sprites, null, 0, 0, 12, 32, x, y, projectileFactory);
+    this._hp           = 1;
+    this.score         = 150;
+    this._getPlayerPos = getPlayerPos;
+    this._getScrollX   = getScrollX;
+    this._terrain      = terrain;
+    this._audio        = audio;
+
+    // Trap States: 'hanging', 'shaking', 'falling', 'shattered'
+    this._state          = 'hanging';
+    this._shakeTimer     = 0;
+    this._shakeDuration  = 0.4;
+    this._shatterTimer   = 0;
+    this._time           = 0;
+    this._shards         = [];
+
+    // Make sure static resources are initialized
+    Stalactite.initSharedResources();
+    const { geometries: geos, materials: mats } = Stalactite._cache.resources;
+
+    // Pre-allocate physical shrapnel shards geometries and materials
+    this._shardMaterials = [
+      mats.shardRockTemplate.clone(),
+      mats.shardLavaTemplate.clone()
+    ];
+
+    this._shardGeometries = [
+      geos.shardBox,
+      geos.shardCone,
+      geos.shardSphere
+    ];
+
+    // Initialize joint/tip material refs
+    this._jointMat    = mats.jointTemplate.clone();
+    this._lavaTipMat  = mats.lavaTipTemplate.clone();
+    this._segments    = [];
+    this._joints      = [];
+    this._tipMesh     = null;
+    this._light       = null;
+
+    // Initialize anchor position aligned with actual ceiling terrain contour
+    let ceilingY = y;
+    if (this._terrain) {
+      const scroll = this._getScrollX ? this._getScrollX() : 0;
+      const worldX = scroll + x;
+      const walls = this._terrain.getWallsAt(worldX);
+      ceilingY = walls.top;
+    }
+    this._anchorY = ceilingY;
+
+    this._displayName = 'Stalactite';
+    this._mesh = this._build3DModel();
+    this._mesh.position.y = ceilingY; // Align mesh to ceiling dynamically
+    this._mesh.position.z = 1;
+    this._scene.add(this._mesh);
+  }
+
+  private _build3DModel(): THREE.Group {
+    const group = new THREE.Group();
+    group.position.set(this.x, this.y, 0);
+
+    const { geometries: geos, materials: mats } = Stalactite._cache.resources;
+
+    // 1. Rock Segment (merged cylinder/cone)
+    const stalactiteRockMesh = new THREE.Mesh(geos.rock, mats.rock);
+    group.add(stalactiteRockMesh);
+
+    // 2. Armor Crust Plates merged
+    const stalactiteCrustMesh = new THREE.Mesh(geos.armor, mats.armor);
+    group.add(stalactiteCrustMesh);
+
+    // 3. Spikes merged
+    const stalactiteSpikeMesh = new THREE.Mesh(geos.spike, mats.spike);
+    group.add(stalactiteSpikeMesh);
+
+    // 4. Molten joints merged
+    const stalactiteJointMesh = new THREE.Mesh(geos.joint, this._jointMat!);
+    group.add(stalactiteJointMesh);
+
+    // 5. Searing molten glowing tip (separate because it scales dynamically)
+    const tip = new THREE.Mesh(geos.tip, this._lavaTipMat!);
+    tip.position.set(0, -30, 0);
+    group.add(tip);
+    this._tipMesh = tip;
+
+    // 6. Flash overlay
+    this._flashOverlay = new THREE.Mesh(geos.flash, DEFAULT_FLASH_MATERIAL);
+    this._flashOverlay.visible = false;
+    this._flashOverlay.renderOrder = 20;
+    group.add(this._flashOverlay);
+
+    group.userData.isInstanced = true;
+    group.userData[UserDataKey.ENEMY_TYPE] = EnemyType.STALACTITE;
+    return group;
+  }
+
+  override get isAlive(): boolean {
+    return this._alive && this._state !== 'shattered';
+  }
+
+  override get isOffscreen(): boolean {
+    return this.x < -HALF_W - 80 || (this._state === 'falling' && this.y < -HALF_H - 120);
+  }
+
+  _tick(dt: number): void {
+    this._time += dt;
+    const scroll = this._getScrollX ? this._getScrollX() : 0;
+    const player = this._getPlayerPos ? this._getPlayerPos() : { x: 0, y: 0 };
+    const mesh = this._mesh as THREE.Group | null;
+    if (!mesh) return;
+
+    switch (this._state) {
+      case 'hanging':
+        // 1. Anchored to ceiling: scroll left with camera to appear stationary
+        mesh.position.x -= SCROLL_SPD * dt;
+
+        // Dynamically adjust Y to follow the jagged terrain ceiling contour
+        if (this._terrain) {
+          const worldX = scroll + this.x;
+          const walls = this._terrain.getWallsAt(worldX);
+          mesh.position.y = walls.top;
+          this._anchorY = walls.top;
+        }
+
+        // 2. Volcanic Thermal Heartbeat animation (slow scale and emissive pulse)
+        {
+          const pulse = 0.55 + 0.45 * Math.abs(Math.sin(this._time * 3));
+          if (this._jointMat) {
+            this._jointMat.emissive.setHex(0xff3300).multiplyScalar(pulse);
+          }
+          if (this._lavaTipMat) {
+            this._lavaTipMat.emissive.setHex(0xff3300).multiplyScalar(pulse);
+          }
+          if (this._tipMesh) {
+            const tipScale = 0.95 + 0.15 * Math.abs(Math.sin(this._time * 3));
+            this._tipMesh.scale.set(tipScale, tipScale, tipScale);
+          }
+        }
+
+        // 3. Proximity detection: trigger when player is within 220 units horizontally
+        if (Math.abs(this.x - player.x) <= 220 && player.x < this.x) {
+          this._state = 'shaking';
+          this._shakeTimer = 0;
+          this._audio?.play('rockRumble');
+        }
+        break;
+
+      case 'shaking':
+        // 1. Still scroll left with camera
+        mesh.position.x -= SCROLL_SPD * dt;
+
+        // Also track the ceiling contour during shake so it doesn't float/detach
+        if (this._terrain) {
+          const worldX = scroll + this.x;
+          const walls = this._terrain.getWallsAt(worldX);
+          this._anchorY = walls.top;
+        }
+
+        // 2. Jitter the coordinate visual position rapidly for warning alert
+        this._shakeTimer += dt;
+
+        {
+          const jitterX = (Math.random() - 0.5) * 2.5;
+          const jitterY = (Math.random() - 0.5) * 2.5;
+
+          mesh.position.y = this._anchorY + jitterY;
+          mesh.position.x += jitterX;
+
+          // 3. Blinding white-hot warning flash
+          const t = this._shakeTimer / this._shakeDuration; // 0..1
+          if (this._jointMat) {
+            this._jointMat.emissive.setRGB(1.0 + t * 4, 0.2 + t * 4, t * 4); // turns blinding white-hot
+          }
+          if (this._lavaTipMat) {
+            this._lavaTipMat.emissive.setRGB(1.0 + t * 4, 0.6 + t * 4, t * 4);
+          }
+        }
+
+        if (this._shakeTimer >= this._shakeDuration) {
+          mesh.position.y = this._anchorY;
+          this._state = 'falling';
+        }
+        break;
+
+      case 'falling':
+        // 1. Plunge rapidly and scroll left
+        mesh.position.y -= FALL_SPEED * dt;
+        mesh.position.x -= SCROLL_SPD * dt;
+
+        // 2. Reset emissive glow back to rich lava levels during fall
+        if (this._jointMat) {
+          this._jointMat.emissive.setHex(0xff3300).multiplyScalar(1.2);
+        }
+        if (this._lavaTipMat) {
+          this._lavaTipMat.emissive.setHex(0xff3300).multiplyScalar(1.2);
+        }
+
+        // 3. Collision with floor (Terrain bottom wall)
+        {
+          let floorY = -HALF_H - 50;
+          if (this._terrain) {
+            const worldX = scroll + this.x;
+            const walls = this._terrain.getWallsAt(worldX);
+            floorY = walls.bottom;
+          }
+
+          // Detect impact when the tip of the stalactite (extends 30px below origin) touches floor or screen bottom
+          if (this.y - 30 <= floorY || this.y < -HALF_H + 40) {
+            this._shatter();
+          }
+        }
+        break;
+
+      case 'shattered':
+        // 1. Update visual shrapnel particles in the scene
+        this._shatterTimer += dt;
+        {
+          const progress = this._shatterTimer / 0.5;
+
+          if (this._shards) {
+            const gravity = -550; // pixels/s^2 downwards
+            for (const shard of this._shards) {
+              shard.vy += gravity * dt;
+
+              shard.mesh.position.x += shard.vx * dt;
+              shard.mesh.position.y += shard.vy * dt;
+              shard.mesh.position.z += shard.vz * dt;
+
+              shard.mesh.rotation.x += shard.rx * dt;
+              shard.mesh.rotation.y += shard.ry * dt;
+              shard.mesh.rotation.z += shard.rz * dt;
+            }
+          }
+
+          // 2. Fade out materials dynamically
+          if (this._shardMaterials) {
+            for (const mat of this._shardMaterials) {
+              mat.opacity = Math.max(0, 1 - progress);
+            }
+          }
+
+          // 3. Complete the shatter sequence after 0.5s
+          if (this._shatterTimer >= 0.5) {
+            this._alive = false;
+          }
+        }
+        break;
+    }
+  }
+
+  private _shatter(): void {
+    this._state = 'shattered';
+    this._shatterTimer = 0;
+    this._hp = 0;
+
+    // Play explosion sound
+    this._audio?.play('explosion');
+
+    // Remove main mesh group from scene (instancer skips removed objects,
+    // and group-level .visible=false is not respected by the instancer)
+    if (this._mesh) {
+      this._scene.remove(this._mesh);
+    }
+
+    // 1. Spawn 3 lava bullets in an upward-left spread (angles 110°, 135°, 160°)
+    const angles = [
+      Math.PI * 0.61,
+      Math.PI * 0.75,
+      Math.PI * 0.89
+    ];
+    const speed = 160;
+
+    for (const angle of angles) {
+      this._newBullets.push(
+        this._projectileFactory({
+          type: ProjectileSourceKey.LAVA,
+          x: this.x,
+          y: this.y - 28,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+        })
+      );
+    }
+
+    // 2. Spawn 3D physical shrapnel shards!
+    this._shards = [];
+
+    if (this._shardGeometries && this._shardMaterials) {
+      const shardRockMat = this._shardMaterials[0]!;
+      const shardLavaMat = this._shardMaterials[1]!;
+
+      // Reset material opacities for the fade effect
+      shardRockMat.opacity = 1;
+      shardLavaMat.opacity = 1;
+
+      const numShards = 6;
+      for (let i = 0; i < numShards; i++) {
+        const geo = this._shardGeometries[i % this._shardGeometries.length]!;
+        const mat = i % 2 === 0 ? shardRockMat : shardLavaMat;
+        const shardMesh = new THREE.Mesh(geo, mat);
+
+        shardMesh.position.set(
+          this.x + (Math.random() - 0.5) * 8,
+          this.y - 28,
+          (Math.random() - 0.5) * 10
+        );
+        markRenderCategory(shardMesh, RenderCategory.EFFECT, 'stalactiteShard');
+        this._scene.add(shardMesh);
+
+        const vx = (Math.random() - 0.5) * 200 - SCROLL_SPD * 0.5;
+        const vy = 120 + Math.random() * 150;
+        const vz = (Math.random() - 0.5) * 120;
+
+        const rx = (Math.random() - 0.5) * 10;
+        const ry = (Math.random() - 0.5) * 10;
+        const rz = (Math.random() - 0.5) * 10;
+
+        this._shards.push({
+          mesh: shardMesh,
+          vx, vy, vz,
+          rx, ry, rz
+        });
+      }
+    }
+  }
+
+  override _flash(): void {
+    if (this._flashOverlay) {
+      this._flashOverlay.visible = true;
+    }
+    this._hitFlashTimer = 0.08;
+  }
+
+  override _restoreFlash(): void {
+    if (this._flashOverlay) {
+      this._flashOverlay.visible = false;
+    }
+  }
+
+  override destroy(): void {
+    if (this._mesh) {
+      this._scene.remove(this._mesh);
+      this._mesh = null;
+    }
+
+    if (this._shards && this._scene) {
+      for (const shard of this._shards) {
+        this._scene.remove(shard.mesh);
+      }
+      this._shards = [];
+    }
+
+    if (this._jointMat) {
+      this._jointMat.dispose();
+      this._jointMat = null;
+    }
+    if (this._lavaTipMat) {
+      this._lavaTipMat.dispose();
+      this._lavaTipMat = null;
+    }
+    if (this._shardMaterials) {
+      for (const mat of this._shardMaterials) mat.dispose();
+      this._shardMaterials = null;
+    }
+
+    this._shardGeometries = null;
+    this._tipMesh = null;
+    this._flashOverlay = null;
+  }
+}

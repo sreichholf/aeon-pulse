@@ -1,0 +1,5 @@
+# Sector visuals stay procedural: bespoke landmarks, no background asset pipeline
+
+Each **Sector** (per `CONTEXT.md`) gets its visual identity from **bespoke procedural-geometry landmarks** — new Three.js geometry/material builders authored per Sector and rendered through the existing `InstancedScrollLayer` — combined with recomposed ambient layers, distinct terrain control points, and its prop set. Backgrounds and terrain remain fully procedural; **no background/terrain GLB asset-loading pipeline is introduced** (only entities use `.glb` assets today).
+
+This keeps Sector variation within the codebase's deliberate procedural-background direction (the earlier sprite/art flows were removed). Loading external `.glb` backgrounds was rejected because it would require a brand-new background asset pipeline, DCC production for 12–20 Sector backgrounds, and would reverse that direction — a separate, larger commitment that should not be an implicit consequence of per-level environment variation. Buildout is staged: the Sector framework and prop system are proven on one pilot chapter before bespoke landmark geometry is commissioned for the remaining chapters.
