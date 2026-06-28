@@ -270,7 +270,8 @@ export interface IEnemy extends ICollidable {
   readonly metadata: EntityMetadata;
   terrainBounds: TerrainBounds | null;
   update(dt: number): IBullet[];
-  hit(damage?: number): HitResult | null;
+  hit(damage?: number, bypassArmor?: boolean): HitResult | null;
+  applyDurabilityScaling(hpBonus: number, armored: boolean): void;
   destroy(): void;
 }
 

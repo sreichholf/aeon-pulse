@@ -429,8 +429,16 @@ The physical score token created when a bullet is cancelled. These items briefly
 _Avoid_: Passive score pop, generic powerup
 
 **Smart Bomb**:
-A finite, stock-based defensive and offensive resource. When activated, it clears all enemy bullets on the screen, deals massive damage to all visible enemies (destroying popcorn/sweepers and chunking bosses), and provides a brief window of invulnerability. Stock resets on life loss.
+A finite, stock-based defensive and offensive resource. When activated, it clears all enemy bullets on the screen, deals massive damage to all visible enemies (destroying popcorn/sweepers and chunking bosses), and provides a brief window of invulnerability. The Smart Bomb bypasses **Armor**. Stock resets on life loss.
 _Avoid_: Cooldown ability, charge meter, purely defensive tool
+
+**Shield**:
+The player's survivability buffer in Rookie and Pilot difficulty modes. A Shield absorbs one hit entirely (no life lost, no weapon tier dropped) and regenerates after a hit-free window. Ace mode has no Shield. Distinct from **Armor**.
+_Avoid_: Armor, enemy absorb, hit sponge
+
+**Armor**:
+An absorb layer on specific standard enemies that soaks the first hit entirely before the enemy takes HP damage. Armor is chapter-gated (active from Chapter 2 onward) and applies only to low-HP standard enemy types whose scaled HP would otherwise be one-tapped by high weapon tiers; it does not regenerate and is bypassed by the **Smart Bomb**. Distinct from the player **Shield**.
+_Avoid_: Enemy shield, shield (reserved for the player mechanic), damage sponge
 
 **Bullet Active-Flag Synchronization**:
 The mechanism that lets bullet removal performed during the gameplay tick (cancellation, smart-bomb clear, hostile-bullet clear on level exit) survive the post-tick sync back into the run. Each affected bullet is deactivated in place rather than removed from its containing array, and the tick's post-update filter then drops inactive bullets from the shared array reference. This is why mid-tick cancellation is not reverted when the run re-reads the array.

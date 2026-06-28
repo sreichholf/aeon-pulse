@@ -36,8 +36,8 @@ export function planTapFire(tier: WeaponTierValue, hardpoints: WeaponHardpoints)
     case WeaponTier.SPREAD:
       return [
         spawn(BulletType.PLAYER, nose.x, nose.y, 520, 0, 0xffffff),
-        spawn(BulletType.PLAYER, leftWing.x, leftWing.y, 470, 170, 0xffffff),
-        spawn(BulletType.PLAYER, rightWing.x, rightWing.y, 470, -170, 0xffffff),
+        spawn(BulletType.PLAYER, leftWing.x, leftWing.y, 483, 129, 0xffffff),
+        spawn(BulletType.PLAYER, rightWing.x, rightWing.y, 483, -129, 0xffffff),
       ];
     case WeaponTier.WAVE:
       return [spawn(BulletType.PLAYER_WAVE, nose.x, nose.y, 500, 0, 0xff00ff, 2)];
@@ -45,8 +45,8 @@ export function planTapFire(tier: WeaponTierValue, hardpoints: WeaponHardpoints)
     default:
       return [
         spawn(BulletType.PLAYER_WAVE, nose.x, nose.y, 500, 0, 0x00ffd5, 2),
-        spawn(BulletType.PLAYER, leftWing.x, leftWing.y, 500, 170, 0x00ffd5),
-        spawn(BulletType.PLAYER, rightWing.x, rightWing.y, 500, -170, 0x00ffd5),
+        spawn(BulletType.PLAYER, leftWing.x, leftWing.y, 510, 137, 0x00ffd5),
+        spawn(BulletType.PLAYER, rightWing.x, rightWing.y, 510, -137, 0x00ffd5),
       ];
   }
 }
@@ -65,8 +65,8 @@ export function planChargedFire(tier: WeaponTierValue, hardpoints: WeaponHardpoi
     case WeaponTier.SPREAD:
       return [
         spawn(BulletType.PLAYER_CHARGE, nose.x, nose.y, 620, 0, 0xffd700),
-        spawn(BulletType.PLAYER_CHARGE, leftWing.x, leftWing.y, 560, 210, 0xffd700),
-        spawn(BulletType.PLAYER_CHARGE, rightWing.x, rightWing.y, 560, -210, 0xffd700),
+        spawn(BulletType.PLAYER_CHARGE, leftWing.x, leftWing.y, 580, 155, 0xffd700),
+        spawn(BulletType.PLAYER_CHARGE, rightWing.x, rightWing.y, 580, -155, 0xffd700),
       ];
     case WeaponTier.WAVE:
       return [
@@ -78,8 +78,8 @@ export function planChargedFire(tier: WeaponTierValue, hardpoints: WeaponHardpoi
     default:
       return [
         spawn(BulletType.PLAYER_PLASMA, nose.x, nose.y, 550, 0, null, 2),
-        spawn(ProjectileSourceKey.PLAYER_CHARGE_SIDE, leftWing.x, leftWing.y, 540, 190, 0x00ffd5),
-        spawn(ProjectileSourceKey.PLAYER_CHARGE_SIDE, rightWing.x, rightWing.y, 540, -190, 0x00ffd5),
+        spawn(ProjectileSourceKey.PLAYER_CHARGE_SIDE, leftWing.x, leftWing.y, 553, 148, 0x00ffd5),
+        spawn(ProjectileSourceKey.PLAYER_CHARGE_SIDE, rightWing.x, rightWing.y, 553, -148, 0x00ffd5),
       ];
   }
 }

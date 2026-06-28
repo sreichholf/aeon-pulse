@@ -47,6 +47,16 @@ import {
 const LEVEL_EXIT_HOLD_DURATION = 2.0;
 const LEVEL_EXIT_FLYOUT_DURATION = 1.5;
 
+const HP_BONUS_BY_CHAPTER: Readonly<Record<number, number>> = { 1: 0, 2: 1, 3: 2, 4: 3 };
+const ARMORED_ENEMY_TYPES: ReadonlySet<EnemyType> = new Set<EnemyType>([
+  EnemyType.STRAIGHT,
+  EnemyType.SWARM,
+  EnemyType.CHARGER,
+  EnemyType.STALACTITE,
+  EnemyType.SINE,
+  EnemyType.DIVER,
+]);
+
 export interface HUDSnapshot {
   score: number;
   hiScore: number;
@@ -441,6 +451,12 @@ export class GameplayRun implements LevelGameHost {
 
     if (enemy) {
       this._enemyTypes.set(enemy, type);
+      const chapter = this._level?.chapterNumber ?? 1;
+      const armored = chapter >= 2 && ARMORED_ENEMY_TYPES.has(type);
+      const hpBonus = armored ? 0 : (HP_BONUS_BY_CHAPTER[chapter] ?? 0);
+      if (hpBonus > 0 || armored) {
+        enemy.applyDurabilityScaling(hpBonus, armored);
+      }
       if (enemy.isSpaceShip) {
         if (this._playfieldBounds) {
           enemy.terrainBounds = this._playfieldBounds;

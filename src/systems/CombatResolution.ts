@@ -94,7 +94,7 @@ export function resolveDamageRequests(
     } else if ('isBoss' in req.target && !req.target.isBoss) {
       const enemy = req.target as IEnemy;
       if (!enemy.isAlive) continue;
-      const death = enemy.hit(req.amount);
+      const death = enemy.hit(req.amount, req.source !== DamageSource.BULLET);
       if (death) {
         onHit({
           kind: HitEventKind.ENEMY_KILLED,
@@ -261,7 +261,7 @@ function resolveCollisionContact(contact: CollisionContact, onHit: (event: HitEv
         });
       }
 
-      const death = enemy.hit(999);
+      const death = enemy.hit(999, true);
       if (death) {
         onHit({
           kind: HitEventKind.ENEMY_KILLED,

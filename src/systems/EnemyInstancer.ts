@@ -39,6 +39,8 @@ interface CompiledMeshEntry {
 const INSTANCE_CAPACITY = 512;
 const DEFAULT_COLOR = new THREE.Color(0xffffff);
 const FLASH_COLOR = new THREE.Color(0xffaaaa);
+const ARMOR_COLOR = new THREE.Color(0xff8844);
+const ARMOR_BREAK_COLOR = new THREE.Color(0xffdd88);
 
 export class EnemyInstancer {
   private _scene: THREE.Scene;
@@ -93,6 +95,8 @@ export class EnemyInstancer {
     enemyMesh.updateMatrixWorld(true);
 
     const isFlashing = !!enemyMesh.userData.isFlashing;
+    const isArmored = !!enemyMesh.userData.armorTint;
+    const armorBreaking = !!enemyMesh.userData.armorBreak;
 
     // 3. Process each compiled child mesh in an allocation-free loop
       const len = compiled.length;
@@ -136,8 +140,12 @@ export class EnemyInstancer {
         // Copy the world matrix of the child mesh to the instanced batch
         instMesh.setMatrixAt(count, entry.mesh.matrixWorld);
 
-        // Copy flash color or default white to the instanced batch
-        instMesh.setColorAt(count, isFlashing ? FLASH_COLOR : DEFAULT_COLOR);
+        // Copy per-instance color: armor break-flash > hit flash > armor tint > default
+        const color = armorBreaking ? ARMOR_BREAK_COLOR
+          : isFlashing ? FLASH_COLOR
+          : isArmored ? ARMOR_COLOR
+          : DEFAULT_COLOR;
+        instMesh.setColorAt(count, color);
         
         this._instanceCounts.set(key, count + 1);
       }

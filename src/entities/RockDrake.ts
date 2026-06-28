@@ -491,8 +491,8 @@ export class RockDrake extends Enemy {
 
   override get isSpaceShip(): boolean { return false; }
 
-  hit(damage = 1) {
-    const result = super.hit(damage);
+  hit(damage = 1, bypassArmor = false) {
+    const result = super.hit(damage, bypassArmor);
     if (result) {
       result.triggerCancellation = true;
     }

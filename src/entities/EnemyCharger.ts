@@ -84,8 +84,8 @@ export class EnemyCharger extends Enemy {
 
   get isSpaceShip(): boolean { return true; }
 
-  hit(damage = 1) {
-    const result = super.hit(damage);
+  hit(damage = 1, bypassArmor = false) {
+    const result = super.hit(damage, bypassArmor);
     if (result) {
       result.triggerCancellation = true;
     }

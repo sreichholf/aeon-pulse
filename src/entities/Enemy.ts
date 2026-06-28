@@ -17,6 +17,9 @@ export class Enemy extends Entity implements IEnemy {
   protected _hitCooldown: number;
   protected _hitCooldownDur: number;
   protected _hitFlashTimer: number;
+  protected _armorActive: boolean;
+  protected _armorJustBroken: boolean;
+  protected _armorBreakTimer: number;
   protected _dropChance: number;
   protected _projectileFactory: ProjectileFactoryFn;
   score: number;
@@ -52,6 +55,9 @@ export class Enemy extends Entity implements IEnemy {
     this._hitCooldown    = 0;
     this._hitCooldownDur = 0;
     this._hitFlashTimer  = 0;
+    this._armorActive    = false;
+    this._armorJustBroken = false;
+    this._armorBreakTimer = 0;
     this._dropChance     = 0;
     this._projectileFactory = projectileFactory;
     this.score           = 0;
@@ -115,11 +121,19 @@ export class Enemy extends Entity implements IEnemy {
     }
     this._newBullets     = [...this._pendingBullets];
     this._pendingBullets = [];
+    this._armorJustBroken = false;
     if (!this._alive) return this._newBullets;
     if (this._hitCooldown > 0) this._hitCooldown -= dt;
     if (this._hitFlashTimer > 0) {
       this._hitFlashTimer -= dt;
       if (this._hitFlashTimer <= 0) this._restoreFlash();
+    }
+    if (this._armorBreakTimer > 0) {
+      this._armorBreakTimer -= dt;
+      if (this._armorBreakTimer <= 0) {
+        this._armorBreakTimer = 0;
+        if (this._mesh) this._mesh.userData['armorBreak'] = false;
+      }
     }
     this._tick(dt);
     return this._newBullets;
@@ -127,10 +141,16 @@ export class Enemy extends Entity implements IEnemy {
 
   _tick(_dt: number): void {}
 
-  hit(damage = 1): HitResult | null {
+  hit(damage = 1, bypassArmor = false): HitResult | null {
     if (!this._alive) return null;
     if (this._hitCooldown > 0) return null;
+    if (this._armorJustBroken) return null;
     this._hitCooldown = this._hitCooldownDur;
+    if (this._armorActive && !bypassArmor) {
+      this._breakArmor();
+      this._armorJustBroken = true;
+      return null;
+    }
     this._hp -= damage;
     this._flash();
     if (this._hp <= 0) {
@@ -139,6 +159,66 @@ export class Enemy extends Entity implements IEnemy {
       return { x: this.x, y: this.y, dropPowerup: Math.random() < this._dropChance };
     }
     return null;
+  }
+
+  applyDurabilityScaling(hpBonus: number, armored: boolean): void {
+    this._hp += hpBonus;
+    if (armored && this._alive) this._applyArmor();
+  }
+
+  private _applyArmor(): void {
+    this._armorActive = true;
+    if (!this._mesh) return;
+    if (this._mesh.userData['isInstanced'] === true) {
+      this._mesh.userData['armorTint'] = true;
+    } else {
+      this._applyArmorMaterialTint();
+    }
+  }
+
+  private _breakArmor(): void {
+    this._armorActive = false;
+    if (!this._mesh) return;
+    if (this._mesh.userData['isInstanced'] === true) {
+      this._mesh.userData['armorTint'] = false;
+      this._mesh.userData['armorBreak'] = true;
+      this._armorBreakTimer = 0.15;
+    } else {
+      this._restoreArmorMaterialTint();
+      this._flash();
+    }
+  }
+
+  private _applyArmorMaterialTint(): void {
+    if (!this._mesh) return;
+    this._mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const mat = child.material;
+        if (!Array.isArray(mat) && 'color' in mat) {
+          const phongMat = mat as THREE.MeshPhongMaterial | THREE.MeshBasicMaterial;
+          if (child.userData['armorOrigColor'] === undefined) {
+            child.userData['armorOrigColor'] = phongMat.color.getHex();
+          }
+          phongMat.color.setHex(0xff8844);
+        }
+      }
+    });
+  }
+
+  private _restoreArmorMaterialTint(): void {
+    if (!this._mesh) return;
+    this._mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const mat = child.material;
+        if (!Array.isArray(mat) && 'color' in mat) {
+          const orig = child.userData['armorOrigColor'] as number | undefined;
+          if (orig !== undefined) {
+            (mat as THREE.MeshPhongMaterial | THREE.MeshBasicMaterial).color.setHex(orig);
+            delete child.userData['armorOrigColor'];
+          }
+        }
+      }
+    });
   }
 
   _onDeath(): void {}

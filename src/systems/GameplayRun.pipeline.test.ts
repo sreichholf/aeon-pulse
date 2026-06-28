@@ -371,7 +371,7 @@ describe('GameplayRun pipeline — smart-bomb re-entrancy cascade', () => {
     expect(player.useBomb).toHaveBeenCalledOnce();
     expect(deps.scene.flash).toHaveBeenCalledWith(0.35);
     // Direct cancellation + area damage both hit the enemy.
-    expect(cancellationEnemy.hit).toHaveBeenCalledWith(200);
+    expect(cancellationEnemy.hit).toHaveBeenCalledWith(200, true);
     expect(deps.score.addScore).toHaveBeenCalledWith(200);
     // Cancellation Point Items were produced for the cancelled bullet(s).
     expect(CancellationPointItem).toHaveBeenCalled();

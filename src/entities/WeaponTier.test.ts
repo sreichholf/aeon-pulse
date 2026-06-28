@@ -36,8 +36,8 @@ describe('WeaponTier policy', () => {
 
     expect(planTapFire(WeaponTier.SPREAD, hardpoints)).toEqual([
       expect.objectContaining({ type: BulletType.PLAYER, x: 10, y: 1, vx: 520, vy: 0, tint: 0xffffff }),
-      expect.objectContaining({ type: BulletType.PLAYER, x: 2, y: 3, vx: 470, vy: 170, tint: 0xffffff }),
-      expect.objectContaining({ type: BulletType.PLAYER, x: 2, y: -3, vx: 470, vy: -170, tint: 0xffffff }),
+      expect.objectContaining({ type: BulletType.PLAYER, x: 2, y: 3, vx: 483, vy: 129, tint: 0xffffff }),
+      expect.objectContaining({ type: BulletType.PLAYER, x: 2, y: -3, vx: 483, vy: -129, tint: 0xffffff }),
     ]);
 
     expect(planTapFire(WeaponTier.WAVE, hardpoints)).toEqual([
@@ -46,8 +46,8 @@ describe('WeaponTier policy', () => {
 
     expect(planTapFire(WeaponTier.PLASMA, hardpoints)).toEqual([
       expect.objectContaining({ type: BulletType.PLAYER_WAVE, x: 10, y: 1, vx: 500, vy: 0, tint: 0x00ffd5, damageOverride: 2 }),
-      expect.objectContaining({ type: BulletType.PLAYER, x: 2, y: 3, vx: 500, vy: 170, tint: 0x00ffd5 }),
-      expect.objectContaining({ type: BulletType.PLAYER, x: 2, y: -3, vx: 500, vy: -170, tint: 0x00ffd5 }),
+      expect.objectContaining({ type: BulletType.PLAYER, x: 2, y: 3, vx: 510, vy: 137, tint: 0x00ffd5 }),
+      expect.objectContaining({ type: BulletType.PLAYER, x: 2, y: -3, vx: 510, vy: -137, tint: 0x00ffd5 }),
     ]);
   });
 
@@ -63,8 +63,8 @@ describe('WeaponTier policy', () => {
 
     expect(planChargedFire(WeaponTier.SPREAD, hardpoints)).toEqual([
       expect.objectContaining({ type: BulletType.PLAYER_CHARGE, x: 10, y: 1, vx: 620, vy: 0, tint: 0xffd700 }),
-      expect.objectContaining({ type: BulletType.PLAYER_CHARGE, x: 2, y: 3, vx: 560, vy: 210, tint: 0xffd700 }),
-      expect.objectContaining({ type: BulletType.PLAYER_CHARGE, x: 2, y: -3, vx: 560, vy: -210, tint: 0xffd700 }),
+      expect.objectContaining({ type: BulletType.PLAYER_CHARGE, x: 2, y: 3, vx: 580, vy: 155, tint: 0xffd700 }),
+      expect.objectContaining({ type: BulletType.PLAYER_CHARGE, x: 2, y: -3, vx: 580, vy: -155, tint: 0xffd700 }),
     ]);
 
     expect(planChargedFire(WeaponTier.WAVE, hardpoints)).toEqual([
@@ -75,8 +75,8 @@ describe('WeaponTier policy', () => {
 
     expect(planChargedFire(WeaponTier.PLASMA, hardpoints)).toEqual([
       expect.objectContaining({ type: BulletType.PLAYER_PLASMA, x: 10, y: 1, vx: 550, vy: 0, tint: null, damageOverride: 2 }),
-      expect.objectContaining({ type: ProjectileSourceKey.PLAYER_CHARGE_SIDE, x: 2, y: 3, vx: 540, vy: 190, tint: 0x00ffd5 }),
-      expect.objectContaining({ type: ProjectileSourceKey.PLAYER_CHARGE_SIDE, x: 2, y: -3, vx: 540, vy: -190, tint: 0x00ffd5 }),
+      expect.objectContaining({ type: ProjectileSourceKey.PLAYER_CHARGE_SIDE, x: 2, y: 3, vx: 553, vy: 148, tint: 0x00ffd5 }),
+      expect.objectContaining({ type: ProjectileSourceKey.PLAYER_CHARGE_SIDE, x: 2, y: -3, vx: 553, vy: -148, tint: 0x00ffd5 }),
     ]);
   });
 });

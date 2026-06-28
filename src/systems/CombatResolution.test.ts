@@ -210,7 +210,7 @@ describe('resolveCollisionContacts', () => {
     ]);
 
     expect(calls).toEqual(['player', 'enemy']);
-    expect(rammer.hit).toHaveBeenCalledWith(999);
+    expect(rammer.hit).toHaveBeenCalledWith(999, true);
     expect(events).toEqual([
       { kind: HitEventKind.PLAYER_HIT, cause: HitCause.RAM, x: 30, y: 40 },
       {
