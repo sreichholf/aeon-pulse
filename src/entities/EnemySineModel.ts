@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import sineGlbUrl from '../models/sine.glb';
-import sineViewerGlbUrl from '../models/sine-viewer.glb';
 import {
   UNNAMED_STANDARD_ENEMY_MATERIAL,
   type StandardEnemyModelBucketConfig,
@@ -23,7 +22,7 @@ export const SINE_MODEL_PROFILES: StandardEnemyPresentationProfiles = {
     offset: SINE_MODEL_OFFSET,
   },
   viewer: {
-    assetUrl: sineViewerGlbUrl,
+    assetUrl: sineGlbUrl,
     targetVisualHeight: 24,
     rotation: SINE_MODEL_ROTATION,
     offset: SINE_MODEL_OFFSET,

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import diverGlbUrl from '../models/diver.glb';
-import diverViewerGlbUrl from '../models/diver-viewer.glb';
 import {
   UNNAMED_STANDARD_ENEMY_MATERIAL,
   type StandardEnemyModelBucketConfig,
@@ -19,7 +18,7 @@ export const DIVER_MODEL_PROFILES: StandardEnemyPresentationProfiles = {
     offset: DIVER_MODEL_OFFSET,
   },
   viewer: {
-    assetUrl: diverViewerGlbUrl,
+    assetUrl: diverGlbUrl,
     targetVisualHeight: 44,
     rotation: DIVER_MODEL_ROTATION,
     offset: DIVER_MODEL_OFFSET,

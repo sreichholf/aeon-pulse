@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import straightGlbUrl from '../models/straight.glb';
-import straightViewerGlbUrl from '../models/straight-viewer.glb';
 import {
   UNNAMED_STANDARD_ENEMY_MATERIAL,
   type StandardEnemyModelBucketConfig,
@@ -19,7 +18,7 @@ export const STRAIGHT_MODEL_PROFILES: StandardEnemyPresentationProfiles = {
     offset: STRAIGHT_MODEL_OFFSET,
   },
   viewer: {
-    assetUrl: straightViewerGlbUrl,
+    assetUrl: straightGlbUrl,
     targetVisualHeight: 16,
     rotation: STRAIGHT_MODEL_ROTATION,
     offset: STRAIGHT_MODEL_OFFSET,

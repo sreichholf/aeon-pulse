@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import swarmGlbUrl from '../models/swarm.glb';
-import swarmViewerGlbUrl from '../models/swarm-viewer.glb';
 import {
   UNNAMED_STANDARD_ENEMY_MATERIAL,
   type StandardEnemyModelBucketConfig,
@@ -23,7 +22,7 @@ export const SWARM_MODEL_PROFILES: StandardEnemyPresentationProfiles = {
     offset: SWARM_MODEL_OFFSET,
   },
   viewer: {
-    assetUrl: swarmViewerGlbUrl,
+    assetUrl: swarmGlbUrl,
     targetVisualHeight: 26,
     rotation: SWARM_MODEL_ROTATION,
     offset: SWARM_MODEL_OFFSET,
